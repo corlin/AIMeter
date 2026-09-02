@@ -12,9 +12,10 @@ import (
 
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/google/uuid"
+	"github.com/ledongthuc/pdf"
 )
 
-// ParseInvoiceFile detects file type (CSV or PDF) and parses billing line items
+// ParseInvoiceFile detects file type (CSV, PDF, or JSON) and parses billing line items
 func ParseInvoiceFile(data []byte, filename string, providerHint string, defaultPeriod string) ([]domain.InvoiceRecord, error) {
 	filenameLower := strings.ToLower(filename)
 	if strings.HasSuffix(filenameLower, ".pdf") || bytes.HasPrefix(data, []byte("%PDF")) {
@@ -25,17 +26,28 @@ func ParseInvoiceFile(data []byte, filename string, providerHint string, default
 
 // ParseInvoicePDF extracts text and detects invoice line items from a PDF document
 func ParseInvoicePDF(pdfBytes []byte, providerHint string, defaultPeriod string) ([]domain.InvoiceRecord, error) {
-	extractedText := extractTextFromPDF(pdfBytes)
+	// 1. Try robust industrial PDF text extraction via github.com/ledongthuc/pdf
+	extractedText, err := readPdfText(pdfBytes)
+	if err != nil || len(strings.TrimSpace(extractedText)) == 0 {
+		// Fallback to raw stream scanning
+		extractedText = extractTextFromPDF(pdfBytes)
+	}
 
 	provider := strings.ToLower(providerHint)
-	if strings.Contains(strings.ToLower(extractedText), "openai") {
+	textLower := strings.ToLower(extractedText)
+
+	if strings.Contains(textLower, "openai") {
 		provider = "openai"
-	} else if strings.Contains(strings.ToLower(extractedText), "anthropic") {
+	} else if strings.Contains(textLower, "anthropic") {
 		provider = "anthropic"
-	} else if strings.Contains(strings.ToLower(extractedText), "amazon web services") || strings.Contains(strings.ToLower(extractedText), "aws") {
+	} else if strings.Contains(textLower, "amazon web services") || strings.Contains(textLower, "aws") {
 		provider = "aws"
-	} else if strings.Contains(strings.ToLower(extractedText), "microsoft") || strings.Contains(strings.ToLower(extractedText), "azure") {
+	} else if strings.Contains(textLower, "microsoft") || strings.Contains(textLower, "azure") {
 		provider = "azure"
+	} else if strings.Contains(textLower, "deepseek") {
+		provider = "deepseek"
+	} else if strings.Contains(textLower, "google") {
+		provider = "google"
 	}
 
 	period := defaultPeriod
@@ -48,13 +60,12 @@ func ParseInvoicePDF(pdfBytes []byte, providerHint string, defaultPeriod string)
 
 	var results []domain.InvoiceRecord
 
-	// Regex patterns for model names and amounts
-	// e.g. "GPT-4o ... $45.20", "Claude 3.5 Sonnet ... $120.00", "Total Due: $50.00"
+	// Model dictionary to scan for line items
 	models := []string{
 		"gpt-4o", "gpt-4o-mini", "o1", "o3-mini", "dall-e-3",
 		"claude-3-5-sonnet", "claude-3-5-haiku", "claude-3-opus",
 		"deepseek-chat", "deepseek-reasoner",
-		"gemini-1.5-pro", "gemini-2.0-flash",
+		"gemini-1.5-pro", "gemini-2.0-flash", "tavily",
 	}
 
 	amountRegex := regexp.MustCompile(`\$?\s*([0-9]+\.[0-9]{2,4})`)
@@ -75,10 +86,10 @@ func ParseInvoicePDF(pdfBytes []byte, providerHint string, defaultPeriod string)
 							MeterName:      domain.MeterLLMInputToken,
 							BillingPeriod:  period,
 							BilledCost:     val,
-							BilledQuantity: val * 500000, // estimated tokens if not explicit
+							BilledQuantity: val * 500000,
 							Unit:           "Count",
 							Currency:       "USD",
-							RawDescription: line,
+							RawDescription: strings.TrimSpace(line),
 						})
 					}
 				}
@@ -86,15 +97,17 @@ func ParseInvoicePDF(pdfBytes []byte, providerHint string, defaultPeriod string)
 		}
 	}
 
-	// Fallback: If no individual model lines matched, look for Total Amount
+	// Fallback 1: If no specific model lines were detected, match invoice Total Amount
 	if len(results) == 0 {
-		totalRegex := regexp.MustCompile(`(?i)(?:total|amount due|total due|invoice total)[\s:]*\$?\s*([0-9]+\.[0-9]{2,4})`)
+		totalRegex := regexp.MustCompile(`(?i)(?:total|amount due|total due|invoice total|balance due)[\s:]*\$?\s*([0-9]+\.[0-9]{2,4})`)
 		if match := totalRegex.FindStringSubmatch(extractedText); len(match) > 1 {
 			totalVal, _ := strconv.ParseFloat(match[1], 64)
 			if totalVal > 0 {
 				defaultModel := "gpt-4o"
 				if provider == "anthropic" {
 					defaultModel = "claude-3-5-sonnet"
+				} else if provider == "deepseek" {
+					defaultModel = "deepseek-reasoner"
 				}
 				results = append(results, domain.InvoiceRecord{
 					ID:             uuid.New(),
@@ -112,40 +125,75 @@ func ParseInvoicePDF(pdfBytes []byte, providerHint string, defaultPeriod string)
 		}
 	}
 
+	// Fallback 2: Any single dollar amount found in PDF
 	if len(results) == 0 {
-		// Mock reasonable invoice record from PDF upload if text extraction is compressed/scanned
-		defaultModel := "gpt-4o"
-		if provider == "anthropic" {
-			defaultModel = "claude-3-5-sonnet"
+		allAmounts := amountRegex.FindAllStringSubmatch(extractedText, -1)
+		var maxAmount float64
+		for _, a := range allAmounts {
+			if v, err := strconv.ParseFloat(a[1], 64); err == nil && v > maxAmount {
+				maxAmount = v
+			}
 		}
-		results = append(results, domain.InvoiceRecord{
-			ID:             uuid.New(),
-			Provider:       provider,
-			Model:          defaultModel,
-			MeterName:      domain.MeterLLMInputToken,
-			BillingPeriod:  period,
-			BilledCost:     12.50,
-			BilledQuantity: 2500000,
-			Unit:           "Count",
-			Currency:       "USD",
-			RawDescription: "Extracted Invoice from PDF: " + provider + " (" + period + ")",
-		})
+		if maxAmount > 0 {
+			defaultModel := "gpt-4o"
+			if provider == "anthropic" {
+				defaultModel = "claude-3-5-sonnet"
+			}
+			results = append(results, domain.InvoiceRecord{
+				ID:             uuid.New(),
+				Provider:       provider,
+				Model:          defaultModel,
+				MeterName:      domain.MeterLLMInputToken,
+				BillingPeriod:  period,
+				BilledCost:     maxAmount,
+				BilledQuantity: maxAmount * 300000,
+				Unit:           "Count",
+				Currency:       "USD",
+				RawDescription: fmt.Sprintf("Extracted Invoice Amount from PDF: $%.2f", maxAmount),
+			})
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no billing line items or amounts could be detected in PDF")
 	}
 
 	return results, nil
 }
 
-// extractTextFromPDF extracts readable ASCII/Unicode text streams from PDF objects
+// readPdfText uses ledongthuc/pdf to decode CMap, font encodings and multi-page text
+func readPdfText(data []byte) (string, error) {
+	reader, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	numPages := reader.NumPage()
+	for pageIndex := 1; pageIndex <= numPages; pageIndex++ {
+		p := reader.Page(pageIndex)
+		if p.V.IsNull() {
+			continue
+		}
+		text, err := p.GetPlainText(nil)
+		if err == nil {
+			buf.WriteString(text)
+			buf.WriteString("\n")
+		}
+	}
+
+	return buf.String(), nil
+}
+
+// extractTextFromPDF extracts readable text streams from raw PDF objects as fallback
 func extractTextFromPDF(data []byte) string {
 	var buf strings.Builder
 
-	// 1. Direct text streams search
 	streamRegex := regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
 	matches := streamRegex.FindAllSubmatch(data, -1)
 
 	for _, m := range matches {
 		rawStream := m[1]
-		// Try zlib decompress
 		zr, err := zlib.NewReader(bytes.NewReader(rawStream))
 		if err == nil {
 			decompressed, err := io.ReadAll(zr)
@@ -156,12 +204,10 @@ func extractTextFromPDF(data []byte) string {
 				continue
 			}
 		}
-		// Plain text stream fallback
 		buf.Write(cleanPDFText(rawStream))
 		buf.WriteString("\n")
 	}
 
-	// 2. Direct string literals search: (Text) or <Hex>
 	if buf.Len() < 20 {
 		buf.Write(cleanPDFText(data))
 	}
@@ -255,7 +301,7 @@ func parseRow(row []string, headers map[string]int, providerHint string, default
 		period = defaultPeriod
 	}
 	if len(period) > 7 {
-		period = period[:7] // e.g. "2026-09"
+		period = period[:7]
 	}
 
 	costStr := getField(row, headers, "billed_cost", "cost", "amount", "total_usd", "billed_amount")
