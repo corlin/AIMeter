@@ -1,0 +1,307 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/corlin/AIMeter/pkg/domain"
+)
+
+// Store defines the interface for persisting and querying ledgers
+type Store interface {
+	WriteBatch(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error
+	GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error)
+	GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error)
+	GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error)
+}
+
+// MemoryStore provides a high-performance in-memory ledger store
+type MemoryStore struct {
+	mu     sync.RWMutex
+	usages []domain.UsageEvent
+	costs  []domain.CostItem
+}
+
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{
+		usages: make([]domain.UsageEvent, 0, 10000),
+		costs:  make([]domain.CostItem, 0, 10000),
+	}
+}
+
+func (s *MemoryStore) WriteBatch(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.usages = append(s.usages, usages...)
+	s.costs = append(s.costs, costs...)
+	return nil
+}
+
+func (s *MemoryStore) GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	stats := &domain.OverviewStats{
+		TopModels:    make([]domain.BreakdownItem, 0),
+		TopAgents:    make([]domain.BreakdownItem, 0),
+		TopWorkflows: make([]domain.BreakdownItem, 0),
+		SpendTrend:   make([]domain.TimeSeriesSpendData, 0),
+	}
+
+	traceSet := make(map[string]bool)
+	modelMap := make(map[string]*domain.BreakdownItem)
+	agentMap := make(map[string]*domain.BreakdownItem)
+	trendMap := make(map[string]*domain.TimeSeriesSpendData)
+
+	var totalTokens float64
+	var cachedTokens float64
+
+	for _, c := range s.costs {
+		if !c.Timestamp.Before(startTime) && !c.Timestamp.After(endTime) {
+			if tenantID != "" && tenantID != "all" && c.Attribution.TenantID != tenantID {
+				continue
+			}
+
+			stats.TotalSpendUSD += c.EffectiveCost
+			totalTokens += c.Quantity
+			traceSet[c.TraceID] = true
+
+			// Model breakdown
+			mKey := c.Model
+			if mKey == "" {
+				mKey = "unknown"
+			}
+			if _, exists := modelMap[mKey]; !exists {
+				modelMap[mKey] = &domain.BreakdownItem{Key: mKey}
+			}
+			modelMap[mKey].SpendUSD += c.EffectiveCost
+			modelMap[mKey].Tokens += int64(c.Quantity)
+			modelMap[mKey].Requests++
+
+			// Agent breakdown
+			aKey := c.Attribution.AgentID
+			if aKey == "" {
+				aKey = "MainAgent"
+			}
+			if _, exists := agentMap[aKey]; !exists {
+				agentMap[aKey] = &domain.BreakdownItem{Key: aKey}
+			}
+			agentMap[aKey].SpendUSD += c.EffectiveCost
+			agentMap[aKey].Tokens += int64(c.Quantity)
+			agentMap[aKey].Requests++
+
+			// Trend breakdown
+			tHour := c.Timestamp.Format("2006-01-02 15:00")
+			if _, exists := trendMap[tHour]; !exists {
+				trendMap[tHour] = &domain.TimeSeriesSpendData{TimePoint: tHour}
+			}
+			trendMap[tHour].SpendUSD += c.EffectiveCost
+			trendMap[tHour].Tokens += int64(c.Quantity)
+		}
+	}
+
+	for _, u := range s.usages {
+		if !u.Timestamp.Before(startTime) && !u.Timestamp.After(endTime) {
+			if u.MeterName == domain.MeterLLMCacheReadToken {
+				cachedTokens += u.Quantity
+			}
+		}
+	}
+
+	stats.TotalTokens = int64(totalTokens)
+	stats.TotalRequests = int64(len(traceSet))
+	if stats.TotalRequests > 0 {
+		stats.AverageRequestCost = stats.TotalSpendUSD / float64(stats.TotalRequests)
+	}
+	if totalTokens > 0 {
+		stats.CacheHitRatio = cachedTokens / totalTokens
+	}
+
+	// Sort Top Models
+	for _, item := range modelMap {
+		if stats.TotalSpendUSD > 0 {
+			item.Percentage = (item.SpendUSD / stats.TotalSpendUSD) * 100
+		}
+		stats.TopModels = append(stats.TopModels, *item)
+	}
+	sort.Slice(stats.TopModels, func(i, j int) bool {
+		return stats.TopModels[i].SpendUSD > stats.TopModels[j].SpendUSD
+	})
+	if len(stats.TopModels) > 5 {
+		stats.TopModels = stats.TopModels[:5]
+	}
+
+	// Sort Top Agents
+	for _, item := range agentMap {
+		if stats.TotalSpendUSD > 0 {
+			item.Percentage = (item.SpendUSD / stats.TotalSpendUSD) * 100
+		}
+		stats.TopAgents = append(stats.TopAgents, *item)
+	}
+	sort.Slice(stats.TopAgents, func(i, j int) bool {
+		return stats.TopAgents[i].SpendUSD > stats.TopAgents[j].SpendUSD
+	})
+	if len(stats.TopAgents) > 5 {
+		stats.TopAgents = stats.TopAgents[:5]
+	}
+
+	// Sort Trend
+	for _, item := range trendMap {
+		stats.SpendTrend = append(stats.SpendTrend, *item)
+	}
+	sort.Slice(stats.SpendTrend, func(i, j int) bool {
+		return stats.SpendTrend[i].TimePoint < stats.SpendTrend[j].TimePoint
+	})
+
+	return stats, nil
+}
+
+func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	traceMap := make(map[string]*domain.TraceDetail)
+
+	for _, c := range s.costs {
+		if tenantID != "" && tenantID != "all" && c.Attribution.TenantID != tenantID {
+			continue
+		}
+
+		td, exists := traceMap[c.TraceID]
+		if !exists {
+			td = &domain.TraceDetail{
+				TraceID:    c.TraceID,
+				TenantID:   c.Attribution.TenantID,
+				CustomerID: c.Attribution.CustomerID,
+				AppID:      c.Attribution.AppID,
+				WorkflowID: c.Attribution.WorkflowID,
+				Timestamp:  c.Timestamp,
+			}
+			traceMap[c.TraceID] = td
+		}
+
+		td.TotalCost += c.EffectiveCost
+		td.TotalTokens += c.Quantity
+		if c.Timestamp.Before(td.Timestamp) {
+			td.Timestamp = c.Timestamp
+		}
+	}
+
+	var result []domain.TraceDetail
+	for _, td := range traceMap {
+		result = append(result, *td)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Timestamp.After(result[j].Timestamp)
+	})
+
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+
+	return result, nil
+}
+
+func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var costItems []domain.CostItem
+	for _, c := range s.costs {
+		if c.TraceID == traceID {
+			costItems = append(costItems, c)
+		}
+	}
+
+	if len(costItems) == 0 {
+		return nil, fmt.Errorf("trace not found: %s", traceID)
+	}
+
+	latencyMap := make(map[string]uint32)
+	for _, u := range s.usages {
+		if u.TraceID == traceID {
+			latencyMap[u.SpanID] = u.LatencyMs
+		}
+	}
+
+	nodeMap := make(map[string]*domain.TraceTreeNode)
+	var rootNode *domain.TraceTreeNode
+	var totalTraceCost float64
+	var totalTraceTokens float64
+
+	for _, item := range costItems {
+		totalTraceCost += item.EffectiveCost
+		totalTraceTokens += item.Quantity
+
+		node, exists := nodeMap[item.SpanID]
+		if !exists {
+			node = &domain.TraceTreeNode{
+				SpanID:       item.SpanID,
+				ParentSpanID: item.ParentSpanID,
+				SpanName:     item.Attribution.AgentID,
+				AgentID:      item.Attribution.AgentID,
+				FeatureID:    item.Attribution.FeatureID,
+				Provider:     item.Provider,
+				Model:        item.Model,
+				LatencyMs:    latencyMap[item.SpanID],
+				Timestamp:    item.Timestamp,
+				UsageMeters:  make([]domain.UsageEvent, 0),
+				CostItems:    make([]domain.CostItem, 0),
+				Children:     make([]*domain.TraceTreeNode, 0),
+			}
+			if node.SpanName == "" {
+				node.SpanName = item.Model
+			}
+			nodeMap[item.SpanID] = node
+		}
+
+		node.CostItems = append(node.CostItems, item)
+		node.TotalCost += item.EffectiveCost
+		node.TotalTokens += item.Quantity
+	}
+
+	for _, node := range nodeMap {
+		if node.ParentSpanID == "" || node.ParentSpanID == node.SpanID {
+			rootNode = node
+		} else if parent, exists := nodeMap[node.ParentSpanID]; exists {
+			parent.Children = append(parent.Children, node)
+		} else {
+			if rootNode == nil {
+				rootNode = node
+			}
+		}
+	}
+
+	var sortChildren func(n *domain.TraceTreeNode)
+	sortChildren = func(n *domain.TraceTreeNode) {
+		if n == nil {
+			return
+		}
+		sort.Slice(n.Children, func(i, j int) bool {
+			return n.Children[i].Timestamp.Before(n.Children[j].Timestamp)
+		})
+		for _, child := range n.Children {
+			sortChildren(child)
+		}
+	}
+	sortChildren(rootNode)
+
+	firstItem := costItems[0]
+	return &domain.TraceDetail{
+		TraceID:     traceID,
+		TenantID:    firstItem.Attribution.TenantID,
+		CustomerID:  firstItem.Attribution.CustomerID,
+		AppID:       firstItem.Attribution.AppID,
+		WorkflowID:  firstItem.Attribution.WorkflowID,
+		TotalCost:   totalTraceCost,
+		TotalTokens: totalTraceTokens,
+		DurationMs:  latencyMap[firstItem.SpanID],
+		Timestamp:   firstItem.Timestamp,
+		RootNode:    rootNode,
+	}, nil
+}

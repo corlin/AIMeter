@@ -1,0 +1,35 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/aimeter
+/simulator
+
+# Test artifacts
+*.out
+*.test
+coverage.txt
+
+# Dependencies & Build
+vendor/
+node_modules/
+.next/
+out/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Environment & Local data
+.env
+.env.local
+.env.*.local
+*.log
+data/

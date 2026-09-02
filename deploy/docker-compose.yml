@@ -1,0 +1,41 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: aimeter-clickhouse
+    ports:
+      - "8123:8123" # HTTP interface
+      - "9000:9000" # Native TCP client
+    environment:
+      - CLICKHOUSE_DB=aimeter
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ../migrations/clickhouse/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: aimeter-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=aimeter
+      - POSTGRES_USER=aimeter
+      - POSTGRES_PASSWORD=aimeter
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../migrations/postgres/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aimeter -d aimeter"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clickhouse_data:
+  postgres_data:

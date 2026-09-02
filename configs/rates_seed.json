@@ -1,0 +1,353 @@
+[
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.0000025,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.0000100,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.00000125,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000015,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000060,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.000000075,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o1",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.0000150,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o1",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.0000600,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o1",
+    "meter_name": "LLM.ReasoningToken",
+    "unit_price": 0.0000600,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o1",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.0000075,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o3-mini",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000110,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o3-mini",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000440,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o3-mini",
+    "meter_name": "LLM.ReasoningToken",
+    "unit_price": 0.00000440,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "o3-mini",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.00000055,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.0000030,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.0000150,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.00000030,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "meter_name": "LLM.CacheWriteToken",
+    "unit_price": 0.00000375,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000080,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000400,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.00000008,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku",
+    "meter_name": "LLM.CacheWriteToken",
+    "unit_price": 0.00000100,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000014,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000028,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.000000014,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-reasoner",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000055,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-reasoner",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000219,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-reasoner",
+    "meter_name": "LLM.ReasoningToken",
+    "unit_price": 0.00000219,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-reasoner",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.00000014,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-1.5-pro",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000125,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-1.5-pro",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000500,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-1.5-pro",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.0000003125,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-1.5-flash",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.000000075,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-1.5-flash",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000030,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-2.0-flash",
+    "meter_name": "LLM.InputToken",
+    "unit_price": 0.00000010,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-2.0-flash",
+    "meter_name": "LLM.OutputToken",
+    "unit_price": 0.00000040,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-2.0-flash",
+    "meter_name": "LLM.CacheReadToken",
+    "unit_price": 0.000000025,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "tavily",
+    "model": "search",
+    "meter_name": "Search.Query",
+    "unit_price": 0.005,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "dall-e-3",
+    "meter_name": "Image.Generation",
+    "unit_price": 0.040,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  }
+]
