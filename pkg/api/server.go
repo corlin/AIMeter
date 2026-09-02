@@ -57,6 +57,7 @@ func (s *Server) setupRoutes() {
 		v1.GET("/rates", s.handler.GetRates)
 		v1.POST("/rates", s.handler.UpsertRate)
 		v1.GET("/tenants", s.handler.GetTenants)
+		v1.POST("/tenants", s.handler.CreateTenant)
 
 		// Phase 2: Reconcile, FOCUS, Budgets
 		v1.POST("/reconcile/upload", s.handler.UploadInvoiceCSV)

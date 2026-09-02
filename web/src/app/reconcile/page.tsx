@@ -22,6 +22,7 @@ export default function ReconcilePage() {
   const [provider, setProvider] = useState("openai");
   const [period, setPeriod] = useState("2026-09");
   const [uploading, setUploading] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const loadReports = async () => {
@@ -44,11 +45,12 @@ export default function ReconcilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSelectedFileName(file.name);
     setUploading(true);
     setUploadError(null);
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", file, file.name);
     formData.append("provider", provider);
     formData.append("billing_period", period);
 
@@ -99,7 +101,7 @@ export default function ReconcilePage() {
             Invoice Reconciliation & Variance Decomposition
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Compare OTel telemetry calculated cost with provider official billing invoices with 5-factor root cause analysis.
+            Compare OTel telemetry calculated cost with provider official billing invoices (PDF / CSV) with 5-factor root cause analysis.
           </p>
         </div>
 
@@ -116,7 +118,7 @@ export default function ReconcilePage() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 backdrop-blur-sm space-y-4">
         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
           <UploadCloud className="h-4 w-4 text-emerald-400" />
-          Upload Provider Billing Invoice (CSV / JSON)
+          Upload Provider Billing Invoice (PDF / CSV / JSON)
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -127,11 +129,11 @@ export default function ReconcilePage() {
               onChange={(e) => setProvider(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:border-zinc-700"
             >
-              <option value="openai">OpenAI (Usage Export CSV)</option>
-              <option value="anthropic">Anthropic (Console Invoices)</option>
+              <option value="openai">OpenAI (Invoice PDF / Usage CSV)</option>
+              <option value="anthropic">Anthropic (Console Invoice PDF / CSV)</option>
               <option value="aws">AWS CUR (Bedrock / SageMaker)</option>
               <option value="azure">Azure Cost Management</option>
-              <option value="generic">Generic Standard Invoice CSV</option>
+              <option value="generic">Generic Standard Invoice</option>
             </select>
           </div>
 
@@ -147,13 +149,13 @@ export default function ReconcilePage() {
           </div>
 
           <div>
-            <label className="block text-xs text-zinc-400 mb-1 font-medium">Upload File</label>
+            <label className="block text-xs text-zinc-400 mb-1 font-medium">Upload File (PDF / CSV)</label>
             <label className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-medium cursor-pointer transition-colors">
               <UploadCloud className="h-4 w-4" />
-              <span>{uploading ? "Reconciling..." : "Select CSV / Invoice"}</span>
+              <span>{uploading ? "Reconciling..." : selectedFileName ? selectedFileName : "Select PDF / CSV File"}</span>
               <input
                 type="file"
-                accept=".csv,.json"
+                accept=".pdf,.csv,.json,.txt"
                 onChange={handleFileUpload}
                 disabled={uploading}
                 className="hidden"
@@ -309,7 +311,7 @@ export default function ReconcilePage() {
           </div>
           <h3 className="text-sm font-semibold text-white">No Reconciliation Reports Uploaded Yet</h3>
           <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-            Upload your monthly provider invoice CSV (from OpenAI, Anthropic, AWS, or Azure) to generate variance analysis.
+            Upload your monthly provider invoice (PDF or CSV from OpenAI, Anthropic, AWS, or Azure) to generate variance analysis.
           </p>
         </div>
       )}

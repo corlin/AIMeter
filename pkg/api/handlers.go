@@ -1,9 +1,10 @@
 package api
 
 import (
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
-	
 	"time"
 
 	"github.com/corlin/AIMeter/pkg/budget"
@@ -165,31 +166,95 @@ func (h *APIHandler) GetTenants(c *gin.Context) {
 	})
 }
 
+// CreateTenant registers a new enterprise tenant / customer
+func (h *APIHandler) CreateTenant(c *gin.Context) {
+	var tenant domain.Tenant
+	if err := c.ShouldBindJSON(&tenant); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if tenant.ID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant ID is required"})
+		return
+	}
+	if tenant.Name == "" {
+		tenant.Name = tenant.ID
+	}
+	if tenant.DefaultCurrency == "" {
+		tenant.DefaultCurrency = "USD"
+	}
+	tenant.CreatedAt = time.Now().UTC()
+	tenant.UpdatedAt = time.Now().UTC()
+
+	// Update in-memory Rating Engine cache
+	h.rater.UpsertTenant(tenant)
+
+	// Persist to Postgres if available
+	if h.postgres != nil {
+		if err := h.postgres.UpsertTenant(c.Request.Context(), tenant); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist tenant: " + err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusCreated, tenant)
+}
+
 // ==========================================
 // Phase 2: Reconcile, FOCUS, Budgets Handlers
 // ==========================================
 
-// UploadInvoiceCSV receives an uploaded provider billing CSV and triggers reconciliation
+// UploadInvoiceCSV receives an uploaded provider billing CSV/PDF and triggers reconciliation
 func (h *APIHandler) UploadInvoiceCSV(c *gin.Context) {
 	provider := c.DefaultPostForm("provider", "openai")
 	period := c.DefaultPostForm("billing_period", time.Now().Format("2006-01"))
 
-	file, err := c.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invoice file is required"})
+	var fileHeader *multipart.FileHeader
+	var err error
+
+	// 1. Try standard field names
+	for _, fieldName := range []string{"file", "invoice", "pdf", "document", "upload"} {
+		fileHeader, err = c.FormFile(fieldName)
+		if err == nil && fileHeader != nil {
+			break
+		}
+	}
+
+	// 2. Fallback: check any file in multipart form
+	if fileHeader == nil {
+		form, formErr := c.MultipartForm()
+		if formErr == nil && form != nil && form.File != nil {
+			for _, files := range form.File {
+				if len(files) > 0 {
+					fileHeader = files[0]
+					break
+				}
+			}
+		}
+	}
+
+	if fileHeader == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invoice file is required (PDF or CSV)"})
 		return
 	}
 
-	src, err := file.Open()
+	src, err := fileHeader.Open()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open uploaded file"})
 		return
 	}
 	defer src.Close()
 
-	invoices, err := reconcile.ParseInvoiceCSV(src, provider, period)
+	data, err := io.ReadAll(src)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse invoice CSV: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file content"})
+		return
+	}
+
+	invoices, err := reconcile.ParseInvoiceFile(data, fileHeader.Filename, provider, period)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse invoice: " + err.Error()})
 		return
 	}
 
