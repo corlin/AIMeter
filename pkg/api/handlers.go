@@ -45,7 +45,12 @@ func (h *APIHandler) GetOverviewStats(c *gin.Context) {
 	}
 
 	if h.store == nil {
-		c.JSON(http.StatusOK, domain.OverviewStats{})
+		c.JSON(http.StatusOK, domain.OverviewStats{
+			TopModels:    make([]domain.BreakdownItem, 0),
+			TopAgents:    make([]domain.BreakdownItem, 0),
+			TopWorkflows: make([]domain.BreakdownItem, 0),
+			SpendTrend:   make([]domain.TimeSeriesSpendData, 0),
+		})
 		return
 	}
 
@@ -65,7 +70,7 @@ func (h *APIHandler) GetTraces(c *gin.Context) {
 	limit, _ := strconv.Atoi(limitStr)
 
 	if h.store == nil {
-		c.JSON(http.StatusOK, []any{})
+		c.JSON(http.StatusOK, []domain.TraceDetail{})
 		return
 	}
 
@@ -73,6 +78,9 @@ func (h *APIHandler) GetTraces(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if traces == nil {
+		traces = make([]domain.TraceDetail, 0)
 	}
 
 	c.JSON(http.StatusOK, traces)
@@ -103,6 +111,9 @@ func (h *APIHandler) GetTraceDetail(c *gin.Context) {
 // GetRates lists all rates in the catalog
 func (h *APIHandler) GetRates(c *gin.Context) {
 	rates := h.rater.GetAllRates()
+	if rates == nil {
+		rates = make([]domain.RateEntry, 0)
+	}
 	c.JSON(http.StatusOK, rates)
 }
 
@@ -127,7 +138,7 @@ func (h *APIHandler) UpsertRate(c *gin.Context) {
 func (h *APIHandler) GetTenants(c *gin.Context) {
 	if h.postgres != nil {
 		tenants, err := h.postgres.GetTenants(c.Request.Context())
-		if err == nil {
+		if err == nil && len(tenants) > 0 {
 			c.JSON(http.StatusOK, tenants)
 			return
 		}

@@ -29,7 +29,10 @@ func NewPostgresClient(dsn string) (*PostgresClient, error) {
 		return nil, fmt.Errorf("failed to connect to postgres pool: %w", err)
 	}
 
-	return &PostgresClient{pool: pool}, nil
+	client := &PostgresClient{pool: pool}
+	// Seed default tenants if needed
+	_ = client.SeedDefaultTenants(context.Background())
+	return client, nil
 }
 
 func (p *PostgresClient) Ping(ctx context.Context) error {
@@ -38,6 +41,18 @@ func (p *PostgresClient) Ping(ctx context.Context) error {
 
 func (p *PostgresClient) Close() {
 	p.pool.Close()
+}
+
+func (p *PostgresClient) SeedDefaultTenants(ctx context.Context) error {
+	defaultTenants := []domain.Tenant{
+		{ID: "org-enterprise-1", Name: "Enterprise Corp", DefaultCurrency: "USD", GlobalDiscount: 0.15},
+		{ID: "org-fintech-2", Name: "Fintech Global", DefaultCurrency: "USD", GlobalDiscount: 0.0},
+		{ID: "default", Name: "Default Organization", DefaultCurrency: "USD", GlobalDiscount: 0.0},
+	}
+	for _, t := range defaultTenants {
+		_ = p.UpsertTenant(ctx, t)
+	}
+	return nil
 }
 
 // SeedRates inserts rates if not existing
@@ -104,13 +119,13 @@ func (p *PostgresClient) GetRates(ctx context.Context) ([]domain.RateEntry, erro
 		ORDER BY provider, model, meter_name
 	`
 
+	rates := make([]domain.RateEntry, 0)
 	rows, err := p.pool.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query rates: %w", err)
+		return rates, fmt.Errorf("failed to query rates: %w", err)
 	}
 	defer rows.Close()
 
-	var rates []domain.RateEntry
 	for rows.Next() {
 		var r domain.RateEntry
 		if err := rows.Scan(
@@ -144,13 +159,13 @@ func (p *PostgresClient) UpsertTenant(ctx context.Context, tenant domain.Tenant)
 // GetTenants returns all registered tenants
 func (p *PostgresClient) GetTenants(ctx context.Context) ([]domain.Tenant, error) {
 	query := `SELECT id, name, default_currency, global_discount, created_at, updated_at FROM tenants ORDER BY name`
+	tenants := make([]domain.Tenant, 0)
 	rows, err := p.pool.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query tenants: %w", err)
+		return tenants, fmt.Errorf("failed to query tenants: %w", err)
 	}
 	defer rows.Close()
 
-	var tenants []domain.Tenant
 	for rows.Next() {
 		var t domain.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.DefaultCurrency, &t.GlobalDiscount, &t.CreatedAt, &t.UpdatedAt); err == nil {

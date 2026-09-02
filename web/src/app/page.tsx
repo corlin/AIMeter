@@ -15,8 +15,7 @@ import {
   ArrowUpRight, 
   Layers, 
   Bot, 
-  Terminal,
-  Play
+  Terminal
 } from "lucide-react";
 
 export default function OverviewPage() {
@@ -36,8 +35,8 @@ export default function OverviewPage() {
         fetchTenants(),
       ]);
       setStats(sData);
-      setTraces(tData);
-      setTenants(tenData);
+      setTraces(Array.isArray(tData) ? tData : []);
+      setTenants(Array.isArray(tenData) ? tenData : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -48,6 +47,11 @@ export default function OverviewPage() {
   useEffect(() => {
     loadData();
   }, [selectedTenant, timeRange]);
+
+  const safeTenants = Array.isArray(tenants) ? tenants : [];
+  const safeTraces = Array.isArray(traces) ? traces : [];
+  const safeTopModels = stats && Array.isArray(stats.top_models) ? stats.top_models : [];
+  const safeTopAgents = stats && Array.isArray(stats.top_agents) ? stats.top_agents : [];
 
   return (
     <div className="space-y-8">
@@ -68,7 +72,7 @@ export default function OverviewPage() {
             className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-700"
           >
             <option value="all">All Tenants / Orgs</option>
-            {tenants.map((t) => (
+            {safeTenants.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name} ({t.id})
               </option>
@@ -136,7 +140,7 @@ export default function OverviewPage() {
       </div>
 
       {/* Quick Simulation Banner if Empty */}
-      {(!traces || traces.length === 0) && (
+      {safeTraces.length === 0 && (
         <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 p-8 text-center space-y-4">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Terminal className="h-6 w-6" />
@@ -167,8 +171,8 @@ export default function OverviewPage() {
           </div>
 
           <div className="mt-4 space-y-4">
-            {stats?.top_models && stats.top_models.length > 0 ? (
-              stats.top_models.map((item) => (
+            {safeTopModels.length > 0 ? (
+              safeTopModels.map((item) => (
                 <div key={item.key} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-mono font-medium text-zinc-200">{item.key}</span>
@@ -202,8 +206,8 @@ export default function OverviewPage() {
           </div>
 
           <div className="mt-4 space-y-4">
-            {stats?.top_agents && stats.top_agents.length > 0 ? (
-              stats.top_agents.map((item) => (
+            {safeTopAgents.length > 0 ? (
+              safeTopAgents.map((item) => (
                 <div key={item.key} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-zinc-200">{item.key}</span>
@@ -256,8 +260,8 @@ export default function OverviewPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60 font-mono">
-              {traces && traces.length > 0 ? (
-                traces.map((t) => (
+              {safeTraces.length > 0 ? (
+                safeTraces.map((t) => (
                   <tr key={t.trace_id} className="hover:bg-zinc-800/40 transition-colors">
                     <td className="py-3 font-sans">
                       <div className="font-semibold text-white">{t.workflow_id}</div>
