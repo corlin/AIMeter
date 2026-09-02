@@ -93,17 +93,31 @@ export async function fetchTenants(): Promise<Tenant[]> {
   }
 }
 
-// Phase 2: Reconciliation
+// Phase 2: Reconciliation with 15s timeout protection
 export async function uploadInvoiceCSV(formData: FormData): Promise<ReconciliationReport> {
-  const res = await fetch(`${API_BASE}/reconcile/upload`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Failed to upload invoice" }));
-    throw new Error(err.error || "Failed to upload invoice");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+  try {
+    const res = await fetch(`${API_BASE}/reconcile/upload`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Failed to upload invoice" }));
+      throw new Error(err.error || "Failed to upload invoice");
+    }
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("账单上传解析超时（15秒）。请检查文件大小或尝试使用 CSV 纯文本账单格式。");
+    }
+    throw err;
   }
-  return await res.json();
 }
 
 export async function fetchReconcileReports(): Promise<ReconciliationReport[]> {
