@@ -11,70 +11,91 @@ import (
 )
 
 type Server struct {
-	httpServer *http.Server
-	engine     *gin.Engine
+	port             int
+	engine           *gin.Engine
+	httpServer       *http.Server
+	handler          *APIHandler
+	ingestionService *collector.IngestionService
 }
 
-func NewServer(port int, handler *APIHandler, ingestion *collector.IngestionService) *Server {
+func NewServer(port int, handler *APIHandler, ingestionService *collector.IngestionService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
-	engine.Use(gin.Recovery(), corsMiddleware())
+	engine.Use(gin.Recovery())
+	engine.Use(corsMiddleware())
 
-	// Health endpoint
-	engine.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC()})
+	s := &Server{
+		port:             port,
+		engine:           engine,
+		handler:          handler,
+		ingestionService: ingestionService,
+	}
+	s.setupRoutes()
+	return s
+}
+
+func (s *Server) setupRoutes() {
+	// Health & System
+	s.engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+			"time":   time.Now().UTC(),
+		})
 	})
 
-	// OTLP Ingestion Endpoints (4318 standard /v1/traces)
-	ingestion.RegisterOTLPHTTPHandler(engine.Group("/"))
+	// OTLP & REST Ingestion Endpoints
+	s.ingestionService.RegisterOTLPHTTPHandler(&s.engine.RouterGroup)
+	s.ingestionService.RegisterRESTHandler(&s.engine.RouterGroup)
 
-	// Direct REST Usage Ingestion Endpoints (/v1/events)
-	ingestion.RegisterRESTHandler(engine.Group("/v1"))
-
-	// Control Plane API Endpoints (/api/v1/...)
-	apiGroup := engine.Group("/api/v1")
+	// Control Plane REST API v1
+	v1 := s.engine.Group("/api/v1")
 	{
-		apiGroup.GET("/overview/stats", handler.GetOverviewStats)
-		apiGroup.GET("/traces", handler.GetTraces)
-		apiGroup.GET("/traces/:id", handler.GetTraceDetail)
-		apiGroup.GET("/rates", handler.GetRates)
-		apiGroup.POST("/rates", handler.UpsertRate)
-		apiGroup.GET("/tenants", handler.GetTenants)
-	}
+		// Phase 1 Overview & Traces
+		v1.GET("/overview/stats", s.handler.GetOverviewStats)
+		v1.GET("/traces", s.handler.GetTraces)
+		v1.GET("/traces/:id", s.handler.GetTraceDetail)
+		v1.GET("/rates", s.handler.GetRates)
+		v1.POST("/rates", s.handler.UpsertRate)
+		v1.GET("/tenants", s.handler.GetTenants)
 
-	httpServer := &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
-		Handler:      engine,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-	}
-
-	return &Server{
-		httpServer: httpServer,
-		engine:     engine,
+		// Phase 2: Reconcile, FOCUS, Budgets
+		v1.POST("/reconcile/upload", s.handler.UploadInvoiceCSV)
+		v1.GET("/reconcile/reports", s.handler.GetReconciliationReports)
+		v1.GET("/focus/export", s.handler.ExportFocus)
+		v1.GET("/budgets", s.handler.GetBudgets)
+		v1.POST("/budgets", s.handler.UpsertBudget)
+		v1.GET("/budgets/alerts", s.handler.GetAlerts)
 	}
 }
 
 func (s *Server) Start() error {
+	s.httpServer = &http.Server{
+		Addr:         fmt.Sprintf(":%d", s.port),
+		Handler:      s.engine,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+	}
 	return s.httpServer.ListenAndServe()
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	return s.httpServer.Shutdown(ctx)
+	if s.httpServer != nil {
+		return s.httpServer.Shutdown(ctx)
+	}
+	return nil
 }
 
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, tracestate")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-
 		c.Next()
 	}
 }

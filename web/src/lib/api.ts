@@ -1,4 +1,13 @@
-import { OverviewStats, TraceDetail, RateEntry, Tenant } from "@/types";
+import { 
+  OverviewStats, 
+  TraceDetail, 
+  RateEntry, 
+  Tenant, 
+  ReconciliationReport, 
+  FocusRecord, 
+  BudgetRule, 
+  AlertEvent 
+} from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
 
@@ -81,6 +90,79 @@ export async function fetchTenants(): Promise<Tenant[]> {
   } catch (err) {
     console.warn("API fetch error for tenants", err);
     return defaultTenants;
+  }
+}
+
+// Phase 2: Reconciliation
+export async function uploadInvoiceCSV(formData: FormData): Promise<ReconciliationReport> {
+  const res = await fetch(`${API_BASE}/reconcile/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to upload invoice" }));
+    throw new Error(err.error || "Failed to upload invoice");
+  }
+  return await res.json();
+}
+
+export async function fetchReconcileReports(): Promise<ReconciliationReport[]> {
+  try {
+    const res = await fetch(`${API_BASE}/reconcile/reports`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch reports");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for reports", err);
+    return [];
+  }
+}
+
+// Phase 2: FOCUS 1.0
+export async function fetchFocusRecords(tenantId = "all"): Promise<FocusRecord[]> {
+  try {
+    const res = await fetch(`${API_BASE}/focus/export?tenant_id=${tenantId}&format=json`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch FOCUS records");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for FOCUS", err);
+    return [];
+  }
+}
+
+// Phase 2: Budgets & Alerts
+export async function fetchBudgets(tenantId = "all"): Promise<BudgetRule[]> {
+  try {
+    const res = await fetch(`${API_BASE}/budgets?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch budgets");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for budgets", err);
+    return [];
+  }
+}
+
+export async function upsertBudget(rule: Partial<BudgetRule>): Promise<BudgetRule> {
+  const res = await fetch(`${API_BASE}/budgets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rule),
+  });
+  if (!res.ok) throw new Error("Failed to save budget");
+  return await res.json();
+}
+
+export async function fetchAlerts(): Promise<AlertEvent[]> {
+  try {
+    const res = await fetch(`${API_BASE}/budgets/alerts`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch alerts");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for alerts", err);
+    return [];
   }
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/corlin/AIMeter/pkg/api"
 	"github.com/corlin/AIMeter/pkg/attribution"
+	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/config"
 	"github.com/corlin/AIMeter/pkg/domain"
@@ -52,7 +53,22 @@ func main() {
 		GlobalDiscount: 0.15, // 15% discount
 	})
 
-	// 2. Initialize In-Memory Store & Database Connections
+	// 2. Initialize Budget Manager & Seed Sample Budgets
+	budgetMgr := budget.NewBudgetManager()
+	budgetMgr.UpsertBudget(domain.BudgetRule{
+		TenantID:        "org-enterprise-1",
+		MonthlyLimitUSD: 10.0,
+		WarningThreshold: 0.80,
+		CriticalThreshold: 1.00,
+	})
+	budgetMgr.UpsertBudget(domain.BudgetRule{
+		TenantID:        "org-fintech-2",
+		MonthlyLimitUSD: 5.0,
+		WarningThreshold: 0.80,
+		CriticalThreshold: 1.00,
+	})
+
+	// 3. Initialize In-Memory Store & Database Connections
 	memStore := storage.NewMemoryStore()
 	var primaryStore storage.Store = memStore
 
@@ -81,7 +97,7 @@ func main() {
 		return
 	}
 
-	// 3. Initialize Micro-Batcher for Storage Writes
+	// 4. Initialize Micro-Batcher for Storage Writes
 	flushHandler := func(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error {
 		_ = memStore.WriteBatch(ctx, usages, costs)
 		if chClient != nil {
@@ -89,19 +105,22 @@ func main() {
 				log.Printf("[WARN] ClickHouse write failed: %v", err)
 			}
 		}
+		for _, c := range costs {
+			budgetMgr.TrackSpend(c.Attribution.TenantID, c.Attribution.AppID, c.Attribution.WorkflowID, c.EffectiveCost)
+		}
 		log.Printf("[INFO Ingestion] Flushed batch of %d usage events, %d cost items", len(usages), len(costs))
 		return nil
 	}
 
 	batcher := storage.NewMicroBatcher(cfg.Collector.BatchSize, cfg.Collector.FlushIntervalMs, flushHandler)
 
-	// 4. Initialize Normalizer, Attribution & Ingestion
+	// 5. Initialize Normalizer, Attribution & Ingestion
 	normalizerInst := normalizer.NewNormalizer()
 	contextResolver := attribution.NewContextResolver()
 	ingestionService := collector.NewIngestionService(normalizerInst, contextResolver, ratingEngine, batcher)
 
-	// 5. Initialize API Handler & Server
-	apiHandler := api.NewAPIHandler(primaryStore, pgClient, ratingEngine)
+	// 6. Initialize API Handler & Server
+	apiHandler := api.NewAPIHandler(primaryStore, pgClient, ratingEngine, budgetMgr)
 	server := api.NewServer(cfg.Server.HTTPPort, apiHandler, ingestionService)
 
 	go func() {
@@ -111,7 +130,7 @@ func main() {
 		}
 	}()
 
-	// 6. Graceful Shutdown
+	// 7. Graceful Shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

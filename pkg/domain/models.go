@@ -168,3 +168,114 @@ type TimeSeriesSpendData struct {
 	SpendUSD  float64 `json:"spend_usd"`
 	Tokens    int64   `json:"tokens"`
 }
+
+// ==========================================
+// Phase 2: FinOps, Reconciliation & FOCUS
+// ==========================================
+
+// InvoiceRecord represents a line item from a provider billing invoice or CSV
+type InvoiceRecord struct {
+	ID             uuid.UUID `json:"id"`
+	Provider       string    `json:"provider"`
+	Model          string    `json:"model"`
+	MeterName      string    `json:"meter_name"`
+	BillingPeriod  string    `json:"billing_period"` // e.g. "2026-09"
+	BilledCost     float64   `json:"billed_cost"`
+	BilledQuantity float64   `json:"billed_quantity"`
+	Unit           string    `json:"unit"`
+	Currency       string    `json:"currency"`
+	RawDescription string    `json:"raw_description,omitempty"`
+}
+
+// VarianceBreakdown represents the 5-factor decomposition of the reconciliation discrepancy
+type VarianceBreakdown struct {
+	UnmonitoredTrafficUSD float64 `json:"unmonitored_traffic_usd"` // 账单有但未通过OTel采集的流量
+	CacheDiscrepancyUSD   float64 `json:"cache_discrepancy_usd"`   // 缓存未命中/扣减差异
+	PricingDriftUSD       float64 `json:"pricing_drift_usd"`       // 价格版本漂移
+	ServiceTierMarkupUSD  float64 `json:"service_tier_markup_usd"` // Priority Tier 等服务加价
+	AdjustmentsUSD        float64 `json:"adjustments_usd"`         // 税费、精度舍入与厂商官方抵扣
+}
+
+// ReconciliationReport represents the final output of an invoice reconciliation run
+type ReconciliationReport struct {
+	ID               uuid.UUID         `json:"id"`
+	BillingPeriod    string            `json:"billing_period"`
+	Provider         string            `json:"provider"`
+	ExpectedCostUSD  float64           `json:"expected_cost_usd"`
+	ActualBilledUSD  float64           `json:"actual_billed_usd"`
+	VarianceUSD      float64           `json:"variance_usd"`
+	VariancePercent  float64           `json:"variance_percent"`
+	Status           string            `json:"status"` // "matched", "variance_warning", "critical_drift"
+	Breakdown        VarianceBreakdown `json:"breakdown"`
+	ModelDifferences []ModelDiff       `json:"model_differences"`
+	CreatedAt        time.Time         `json:"created_at"`
+}
+
+// ModelDiff represents per-model cost difference
+type ModelDiff struct {
+	Model           string  `json:"model"`
+	ExpectedCostUSD float64 `json:"expected_cost_usd"`
+	ActualBilledUSD float64 `json:"actual_billed_usd"`
+	DifferenceUSD   float64 `json:"difference_usd"`
+	DiffPercent     float64 `json:"diff_percent"`
+}
+
+// FocusRecord represents a record compliant with FOCUS 1.0 / 1.1 Specification
+type FocusRecord struct {
+	AvailabilityZone  string    `json:"AvailabilityZone,omitempty"`
+	BilledCost        float64   `json:"BilledCost"`
+	BillingCurrency   string    `json:"BillingCurrency"`
+	BillingPeriodEnd  time.Time `json:"BillingPeriodEnd"`
+	BillingPeriodStart time.Time `json:"BillingPeriodStart"`
+	ChargeCategory    string    `json:"ChargeCategory"` // "Usage"
+	ChargeClass       string    `json:"ChargeClass,omitempty"`
+	ChargeDescription string    `json:"ChargeDescription"`
+	EffectiveCost     float64   `json:"EffectiveCost"`
+	InvoiceIssuerName string    `json:"InvoiceIssuerName"`
+	PricingCategory   string    `json:"PricingCategory"`
+	PricingQuantity   float64   `json:"PricingQuantity"`
+	PricingUnit       string    `json:"PricingUnit"`
+	ProviderName      string    `json:"ProviderName"`
+	RegionName        string    `json:"RegionName"`
+	ResourceName      string    `json:"ResourceName"`
+	ResourceType      string    `json:"ResourceType"`
+	ServiceName       string    `json:"ServiceName"` // "GenAI / LLM"
+	SkuId             string    `json:"SkuId"`
+	SkuPriceId        string    `json:"SkuPriceId"`
+	SubAccountId      string    `json:"SubAccountId"` // TenantID
+	SubAccountName    string    `json:"SubAccountName,omitempty"`
+	Tags              string    `json:"Tags"` // JSON string
+	UsageQuantity     float64   `json:"UsageQuantity"`
+	UsageUnit         string    `json:"UsageUnit"`
+}
+
+// BudgetRule represents a monthly spend limit definition
+type BudgetRule struct {
+	ID              uuid.UUID `json:"id"`
+	TenantID        string    `json:"tenant_id"`
+	AppID           string    `json:"app_id,omitempty"`
+	WorkflowID      string    `json:"workflow_id,omitempty"`
+	MonthlyLimitUSD float64   `json:"monthly_limit_usd"`
+	CurrentSpendUSD float64   `json:"current_spend_usd"`
+	PercentUsed     float64   `json:"percent_used"`
+	WarningThreshold float64  `json:"warning_threshold"` // default 0.80
+	CriticalThreshold float64 `json:"critical_threshold"`// default 1.00
+	WebhookURL      string    `json:"webhook_url,omitempty"`
+	Status          string    `json:"status"` // "ok", "warning", "critical"
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// AlertEvent represents an alert dispatched when a budget is exceeded
+type AlertEvent struct {
+	ID          uuid.UUID `json:"id"`
+	BudgetID    uuid.UUID `json:"budget_id"`
+	TenantID    string    `json:"tenant_id"`
+	WorkflowID  string    `json:"workflow_id,omitempty"`
+	Level       string    `json:"level"` // "warning" or "critical"
+	Percentage  float64   `json:"percentage"`
+	LimitUSD    float64   `json:"limit_usd"`
+	SpendUSD    float64   `json:"spend_usd"`
+	Message     string    `json:"message"`
+	TriggeredAt time.Time `json:"triggered_at"`
+}

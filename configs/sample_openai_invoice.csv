@@ -1,0 +1,5 @@
+Provider,Model,Meter_Name,Billed_Cost,Quantity,Billing_Period,Description
+openai,gpt-4o,LLM.InputToken,0.0450,15000,2026-09,OpenAI Standard Usage
+openai,gpt-4o-mini,LLM.InputToken,0.0050,10000,2026-09,OpenAI Mini Ingestion
+anthropic,claude-3-5-sonnet,LLM.InputToken,0.0350,12000,2026-09,Anthropic Invoices
+openai,dall-e-3,Image.Generation,0.0400,1,2026-09,Unmonitored Image Calls

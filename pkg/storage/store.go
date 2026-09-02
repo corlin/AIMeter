@@ -16,19 +16,24 @@ type Store interface {
 	GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error)
 	GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error)
 	GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error)
+	GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error)
+	SaveReconciliationReport(ctx context.Context, report domain.ReconciliationReport) error
+	GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error)
 }
 
 // MemoryStore provides a high-performance in-memory ledger store
 type MemoryStore struct {
-	mu     sync.RWMutex
-	usages []domain.UsageEvent
-	costs  []domain.CostItem
+	mu            sync.RWMutex
+	usages        []domain.UsageEvent
+	costs         []domain.CostItem
+	reconciliations []domain.ReconciliationReport
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		usages: make([]domain.UsageEvent, 0, 10000),
-		costs:  make([]domain.CostItem, 0, 10000),
+		usages:          make([]domain.UsageEvent, 0, 10000),
+		costs:           make([]domain.CostItem, 0, 10000),
+		reconciliations: make([]domain.ReconciliationReport, 0),
 	}
 }
 
@@ -39,6 +44,40 @@ func (s *MemoryStore) WriteBatch(ctx context.Context, usages []domain.UsageEvent
 	s.usages = append(s.usages, usages...)
 	s.costs = append(s.costs, costs...)
 	return nil
+}
+
+func (s *MemoryStore) GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []domain.CostItem
+	for _, c := range s.costs {
+		if tenantID != "" && tenantID != "all" && c.Attribution.TenantID != tenantID {
+			continue
+		}
+		if period != "" && c.BillingPeriod != period {
+			continue
+		}
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+func (s *MemoryStore) SaveReconciliationReport(ctx context.Context, report domain.ReconciliationReport) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reconciliations = append(s.reconciliations, report)
+	return nil
+}
+
+func (s *MemoryStore) GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]domain.ReconciliationReport, len(s.reconciliations))
+	for i := range s.reconciliations {
+		result[i] = s.reconciliations[len(s.reconciliations)-1-i]
+	}
+	return result, nil
 }
 
 func (s *MemoryStore) GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error) {
