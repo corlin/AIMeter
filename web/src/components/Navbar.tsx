@@ -6,10 +6,11 @@ import {
   Activity, 
   Layers, 
   Network, 
-  SlidersHorizontal, 
   FileCheck2, 
   PieChart, 
-  BellRing 
+  BellRing,
+  ShieldAlert,
+  Sparkles
 } from "lucide-react";
 
 export function Navbar() {
@@ -17,11 +18,13 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
-    { label: "Traces & Economics", href: "/traces", icon: Network },
+    { label: "Traces & Unit Economics", href: "/traces", icon: Network },
     { label: "Rate Catalog", href: "/rates", icon: Layers },
     { label: "Reconciliation", href: "/reconcile", icon: FileCheck2 },
     { label: "FOCUS FinOps", href: "/focus", icon: PieChart },
-    { label: "Budgets & Alerts", href: "/budgets", icon: BellRing },
+    { label: "Budgets", href: "/budgets", icon: BellRing },
+    { label: "Anomalies", href: "/anomalies", icon: ShieldAlert },
+    { label: "Savings Advisor", href: "/recommendations", icon: Sparkles },
   ];
 
   return (
@@ -48,7 +51,7 @@ export function Navbar() {
         </Link>
 
         {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -56,7 +59,7 @@ export function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   isActive
                     ? "bg-zinc-800 text-white shadow-sm border border-zinc-700/60"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"

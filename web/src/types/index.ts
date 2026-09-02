@@ -1,106 +1,3 @@
-export interface UsageEvent {
-  event_id: string;
-  timestamp: string;
-  trace_id: string;
-  span_id: string;
-  parent_span_id: string;
-  provider: string;
-  model: string;
-  meter_name: string;
-  quantity: number;
-  unit: string;
-  latency_ms: number;
-  http_status_code: number;
-  attribution: AttributionContext;
-}
-
-export interface CostItem {
-  cost_item_id: string;
-  usage_event_id: string;
-  timestamp: string;
-  trace_id: string;
-  span_id: string;
-  parent_span_id: string;
-  attribution: AttributionContext;
-  provider: string;
-  model: string;
-  meter_name: string;
-  quantity: number;
-  unit: string;
-  rate_id: string;
-  rate_version: string;
-  unit_price: number;
-  currency: string;
-  list_cost: number;
-  contract_discount: number;
-  effective_cost: number;
-  is_reconciled: number;
-  billing_period: string;
-}
-
-export interface AttributionContext {
-  tenant_id: string;
-  customer_id: string;
-  app_id: string;
-  workflow_id: string;
-  agent_id: string;
-  feature_id: string;
-  environment: string;
-}
-
-export interface RateEntry {
-  id: string;
-  provider: string;
-  model: string;
-  meter_name: string;
-  region: string;
-  service_tier: string;
-  pricing_type: string;
-  unit_price: number;
-  currency: string;
-  unit: string;
-  effective_start_at: string;
-  effective_end_at?: string;
-  tenant_id?: string;
-  discount_rate: number;
-}
-
-export interface Tenant {
-  id: string;
-  name: string;
-  default_currency: string;
-  global_discount: number;
-}
-
-export interface TraceTreeNode {
-  span_id: string;
-  parent_span_id: string;
-  span_name: string;
-  agent_id: string;
-  feature_id: string;
-  provider: string;
-  model: string;
-  latency_ms: number;
-  timestamp: string;
-  cost_items: CostItem[];
-  total_cost: number;
-  total_tokens: number;
-  children: TraceTreeNode[];
-}
-
-export interface TraceDetail {
-  trace_id: string;
-  tenant_id: string;
-  customer_id: string;
-  app_id: string;
-  workflow_id: string;
-  total_cost: number;
-  total_tokens: number;
-  duration_ms: number;
-  timestamp: string;
-  root_node: TraceTreeNode | null;
-}
-
 export interface OverviewStats {
   total_spend_usd: number;
   total_tokens: number;
@@ -127,26 +24,78 @@ export interface TimeSeriesSpendData {
   tokens: number;
 }
 
-// ==========================================
-// Phase 2: Reconciliation, FOCUS, Budgets
-// ==========================================
-
-export interface VarianceBreakdown {
-  unmonitored_traffic_usd: number;
-  cache_discrepancy_usd: number;
-  pricing_drift_usd: number;
-  service_tier_markup_usd: number;
-  adjustments_usd: number;
-}
-
-export interface ModelDiff {
+export interface CostItem {
+  cost_item_id: string;
+  usage_event_id: string;
+  timestamp: string;
+  trace_id: string;
+  span_id: string;
+  parent_span_id?: string;
+  provider: string;
   model: string;
-  expected_cost_usd: number;
-  actual_billed_usd: number;
-  difference_usd: number;
-  diff_percent: number;
+  meter_name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  currency: string;
+  list_cost: number;
+  contract_discount: number;
+  effective_cost: number;
+  billing_period: string;
 }
 
+export interface TraceTreeNode {
+  span_id: string;
+  parent_span_id: string;
+  span_name: string;
+  agent_id: string;
+  feature_id: string;
+  provider: string;
+  model: string;
+  latency_ms: number;
+  timestamp: string;
+  total_cost: number;
+  total_tokens: number;
+  cost_items?: CostItem[];
+  children: TraceTreeNode[];
+}
+
+export interface TraceDetail {
+  trace_id: string;
+  tenant_id: string;
+  customer_id: string;
+  app_id: string;
+  workflow_id: string;
+  total_cost: number;
+  total_tokens: number;
+  duration_ms: number;
+  timestamp: string;
+  root_node?: TraceTreeNode;
+}
+
+export interface RateEntry {
+  id: string;
+  provider: string;
+  model: string;
+  meter_name: string;
+  region: string;
+  service_tier: string;
+  pricing_type: string;
+  unit_price: number;
+  currency: string;
+  unit: string;
+  effective_start_at: string;
+  discount_rate?: number;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  default_currency: string;
+  global_discount: number;
+}
+
+// Phase 2: Reconciliation & FOCUS
 export interface ReconciliationReport {
   id: string;
   billing_period: string;
@@ -156,16 +105,29 @@ export interface ReconciliationReport {
   variance_usd: number;
   variance_percent: number;
   status: "matched" | "variance_warning" | "critical_drift";
-  breakdown: VarianceBreakdown;
-  model_differences: ModelDiff[];
+  breakdown: {
+    unmonitored_traffic_usd: number;
+    cache_discrepancy_usd: number;
+    pricing_drift_usd: number;
+    service_tier_markup_usd: number;
+    adjustments_usd: number;
+  };
+  model_differences: {
+    model: string;
+    expected_cost_usd: number;
+    actual_billed_usd: number;
+    difference_usd: number;
+    diff_percent: number;
+  }[];
   created_at: string;
 }
 
 export interface FocusRecord {
+  AvailabilityZone?: string;
   BilledCost: number;
   BillingCurrency: string;
-  BillingPeriodStart: string;
   BillingPeriodEnd: string;
+  BillingPeriodStart: string;
   ChargeCategory: string;
   ChargeDescription: string;
   EffectiveCost: number;
@@ -181,6 +143,7 @@ export interface FocusRecord {
   SkuId: string;
   SkuPriceId: string;
   SubAccountId: string;
+  SubAccountName?: string;
   Tags: string;
   UsageQuantity: number;
   UsageUnit: string;
@@ -197,9 +160,7 @@ export interface BudgetRule {
   warning_threshold: number;
   critical_threshold: number;
   webhook_url?: string;
-  status: "ok" | "warning" | "critical";
-  created_at: string;
-  updated_at: string;
+  status: "normal" | "warning" | "critical";
 }
 
 export interface AlertEvent {
@@ -213,4 +174,36 @@ export interface AlertEvent {
   spend_usd: number;
   message: string;
   triggered_at: string;
+}
+
+// ==========================================
+// Phase 3: Anomalies & Recommendations
+// ==========================================
+
+export interface AnomalyEvent {
+  id: string;
+  tenant_id: string;
+  workflow_id?: string;
+  trace_id?: string;
+  span_id?: string;
+  type: "runaway_loop" | "spend_spike" | "high_latency_waste";
+  severity: "low" | "medium" | "high" | "critical";
+  title: string;
+  description: string;
+  metric_value: number;
+  threshold_value: number;
+  triggered_at: string;
+}
+
+export interface CostRecommendation {
+  id: string;
+  tenant_id: string;
+  category: "cache_optimization" | "model_downgrade" | "reasoning_budget";
+  title: string;
+  description: string;
+  estimated_monthly_savings_usd: number;
+  impact_level: "high" | "medium" | "low";
+  confidence_score: number;
+  actionable_step: string;
+  created_at: string;
 }

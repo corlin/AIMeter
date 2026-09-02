@@ -6,7 +6,9 @@ import {
   ReconciliationReport, 
   FocusRecord, 
   BudgetRule, 
-  AlertEvent 
+  AlertEvent,
+  AnomalyEvent,
+  CostRecommendation 
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -176,6 +178,31 @@ export async function fetchAlerts(): Promise<AlertEvent[]> {
     return Array.isArray(data) ? data : [];
   } catch (err) {
     console.warn("API fetch error for alerts", err);
+    return [];
+  }
+}
+
+// Phase 3: Anomalies & Recommendations
+export async function fetchAnomalies(tenantId = "all"): Promise<AnomalyEvent[]> {
+  try {
+    const res = await fetch(`${API_BASE}/anomalies?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch anomalies");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for anomalies", err);
+    return [];
+  }
+}
+
+export async function fetchRecommendations(tenantId = "all"): Promise<CostRecommendation[]> {
+  try {
+    const res = await fetch(`${API_BASE}/recommendations?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch recommendations");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for recommendations", err);
     return [];
   }
 }

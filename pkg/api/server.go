@@ -6,97 +6,103 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/advisor"
+	"github.com/corlin/AIMeter/pkg/anomaly"
+	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/collector"
+	"github.com/corlin/AIMeter/pkg/rater"
+	"github.com/corlin/AIMeter/pkg/storage"
 	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
-	port             int
-	engine           *gin.Engine
-	httpServer       *http.Server
-	handler          *APIHandler
-	ingestionService *collector.IngestionService
+	router     *gin.Engine
+	httpServer *http.Server
+	port       int
 }
 
-func NewServer(port int, handler *APIHandler, ingestionService *collector.IngestionService) *Server {
+func NewServer(
+	port int,
+	store storage.Store,
+	pg *storage.PostgresClient,
+	r *rater.RatingEngine,
+	collectorSvc *collector.IngestionService,
+	budgetMgr *budget.BudgetManager,
+	detector *anomaly.AnomalyDetector,
+	costAdvisor *advisor.CostAdvisor,
+) *Server {
 	gin.SetMode(gin.ReleaseMode)
-	engine := gin.New()
-	engine.Use(gin.Recovery())
-	engine.Use(corsMiddleware())
+	router := gin.New()
+	router.Use(gin.Recovery())
 
-	s := &Server{
-		port:             port,
-		engine:           engine,
-		handler:          handler,
-		ingestionService: ingestionService,
-	}
-	s.setupRoutes()
-	return s
-}
+	// Standard CORS middleware
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
-func (s *Server) setupRoutes() {
-	// Health & System
-	s.engine.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-			"time":   time.Now().UTC(),
-		})
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
 	})
 
-	// OTLP & REST Ingestion Endpoints
-	s.ingestionService.RegisterOTLPHTTPHandler(&s.engine.RouterGroup)
-	s.ingestionService.RegisterRESTHandler(&s.engine.RouterGroup)
+	handler := NewAPIHandler(store, pg, r, budgetMgr, detector, costAdvisor)
 
-	// Control Plane REST API v1
-	v1 := s.engine.Group("/api/v1")
+	// Health check
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "aimeter-control-plane"})
+	})
+
+	// OTel & REST Receiver Endpoints
+	if collectorSvc != nil {
+		collectorSvc.RegisterOTLPHTTPHandler(router.Group(""))
+		collectorSvc.RegisterRESTHandler(router.Group("/api/v1"))
+		router.POST("/v1/gateway/:vendor", collectorSvc.HandleGatewayLog)
+	}
+
+	// AI Meter REST APIs
+	apiV1 := router.Group("/api/v1")
 	{
-		// Phase 1 Overview & Traces
-		v1.GET("/overview/stats", s.handler.GetOverviewStats)
-		v1.GET("/traces", s.handler.GetTraces)
-		v1.GET("/traces/:id", s.handler.GetTraceDetail)
-		v1.GET("/rates", s.handler.GetRates)
-		v1.POST("/rates", s.handler.UpsertRate)
-		v1.GET("/tenants", s.handler.GetTenants)
-		v1.POST("/tenants", s.handler.CreateTenant)
+		apiV1.GET("/overview/stats", handler.GetOverviewStats)
+		apiV1.GET("/traces", handler.GetTraces)
+		apiV1.GET("/traces/:id", handler.GetTraceDetail)
+		apiV1.GET("/rates", handler.GetRates)
+		apiV1.POST("/rates", handler.UpsertRate)
+		apiV1.GET("/tenants", handler.GetTenants)
+		apiV1.POST("/tenants", handler.CreateTenant)
 
-		// Phase 2: Reconcile, FOCUS, Budgets
-		v1.POST("/reconcile/upload", s.handler.UploadInvoiceCSV)
-		v1.GET("/reconcile/reports", s.handler.GetReconciliationReports)
-		v1.GET("/focus/export", s.handler.ExportFocus)
-		v1.GET("/budgets", s.handler.GetBudgets)
-		v1.POST("/budgets", s.handler.UpsertBudget)
-		v1.GET("/budgets/alerts", s.handler.GetAlerts)
+		// Phase 2: Reconciliation, FOCUS, Budgets
+		apiV1.POST("/reconcile/upload", handler.UploadInvoiceCSV)
+		apiV1.GET("/reconcile/reports", handler.GetReconciliationReports)
+		apiV1.GET("/focus/export", handler.ExportFocus)
+		apiV1.GET("/budgets", handler.GetBudgets)
+		apiV1.POST("/budgets", handler.UpsertBudget)
+		apiV1.GET("/budgets/alerts", handler.GetAlerts)
+
+		// Phase 3: Anomalies & Recommendations
+		apiV1.GET("/anomalies", handler.GetAnomalies)
+		apiV1.GET("/recommendations", handler.GetRecommendations)
+	}
+
+	return &Server{
+		router: router,
+		port:   port,
+		httpServer: &http.Server{
+			Addr:         fmt.Sprintf(":%d", port),
+			Handler:      router,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 30 * time.Second,
+		},
 	}
 }
 
 func (s *Server) Start() error {
-	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", s.port),
-		Handler:      s.engine,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-	}
 	return s.httpServer.ListenAndServe()
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	if s.httpServer != nil {
-		return s.httpServer.Shutdown(ctx)
-	}
-	return nil
-}
-
-func corsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	}
+	return s.httpServer.Shutdown(ctx)
 }

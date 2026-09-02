@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/advisor"
+	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/focus"
@@ -23,6 +25,8 @@ type APIHandler struct {
 	budgetMgr   *budget.BudgetManager
 	reconciler  *reconcile.ReconciliationEngine
 	focusExport *focus.FocusExporter
+	detector    *anomaly.AnomalyDetector
+	advisor     *advisor.CostAdvisor
 }
 
 func NewAPIHandler(
@@ -30,6 +34,8 @@ func NewAPIHandler(
 	pg *storage.PostgresClient,
 	r *rater.RatingEngine,
 	bm *budget.BudgetManager,
+	det *anomaly.AnomalyDetector,
+	adv *advisor.CostAdvisor,
 ) *APIHandler {
 	return &APIHandler{
 		store:       store,
@@ -38,6 +44,8 @@ func NewAPIHandler(
 		budgetMgr:   bm,
 		reconciler:  reconcile.NewReconciliationEngine(),
 		focusExport: focus.NewFocusExporter(),
+		detector:    det,
+		advisor:     adv,
 	}
 }
 
@@ -213,7 +221,6 @@ func (h *APIHandler) UploadInvoiceCSV(c *gin.Context) {
 	var fileHeader *multipart.FileHeader
 	var err error
 
-	// 1. Try standard field names
 	for _, fieldName := range []string{"file", "invoice", "pdf", "document", "upload"} {
 		fileHeader, err = c.FormFile(fieldName)
 		if err == nil && fileHeader != nil {
@@ -221,7 +228,6 @@ func (h *APIHandler) UploadInvoiceCSV(c *gin.Context) {
 		}
 	}
 
-	// 2. Fallback: check any file in multipart form
 	if fileHeader == nil {
 		form, formErr := c.MultipartForm()
 		if formErr == nil && form != nil && form.File != nil {
@@ -258,7 +264,6 @@ func (h *APIHandler) UploadInvoiceCSV(c *gin.Context) {
 		return
 	}
 
-	// Fetch corresponding observed telemetry cost items
 	costs, _ := h.store.GetCostItems(c.Request.Context(), "all", period)
 	if len(costs) == 0 {
 		costs, _ = h.store.GetCostItems(c.Request.Context(), "all", "")
@@ -348,4 +353,35 @@ func (h *APIHandler) GetAlerts(c *gin.Context) {
 		alerts = []domain.AlertEvent{}
 	}
 	c.JSON(http.StatusOK, alerts)
+}
+
+// ==========================================
+// Phase 3: Anomaly & Advisor Handlers
+// ==========================================
+
+// GetAnomalies returns detected anomaly events
+func (h *APIHandler) GetAnomalies(c *gin.Context) {
+	tenantID := c.Query("tenant_id")
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, _ := strconv.Atoi(limitStr)
+
+	anomalies, err := h.store.GetAnomalyEvents(c.Request.Context(), tenantID, limit)
+	if err != nil || anomalies == nil {
+		anomalies = []domain.AnomalyEvent{}
+	}
+	c.JSON(http.StatusOK, anomalies)
+}
+
+// GetRecommendations returns actionable cost-saving recommendations
+func (h *APIHandler) GetRecommendations(c *gin.Context) {
+	tenantID := c.DefaultQuery("tenant_id", "all")
+
+	costs, _ := h.store.GetCostItems(c.Request.Context(), tenantID, "")
+	usages, _ := h.store.GetUsageEvents(c.Request.Context(), tenantID)
+
+	recs := h.advisor.GenerateRecommendations(tenantID, costs, usages)
+	if recs == nil {
+		recs = []domain.CostRecommendation{}
+	}
+	c.JSON(http.StatusOK, recs)
 }

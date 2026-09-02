@@ -65,7 +65,7 @@ type CostItem struct {
 	Provider         string             `json:"provider"`
 	Model            string             `json:"model"`
 	MeterName        string             `json:"meter_name"`
-	Quantity         float64            `json:"quantity"`
+	Quantity       float64            `json:"quantity"`
 	Unit             string             `json:"unit"`
 	RateID           uuid.UUID          `json:"rate_id"`
 	RateVersion      string             `json:"rate_version"`
@@ -179,7 +179,7 @@ type InvoiceRecord struct {
 	Provider       string    `json:"provider"`
 	Model          string    `json:"model"`
 	MeterName      string    `json:"meter_name"`
-	BillingPeriod  string    `json:"billing_period"` // e.g. "2026-09"
+	BillingPeriod  string    `json:"billing_period"`
 	BilledCost     float64   `json:"billed_cost"`
 	BilledQuantity float64   `json:"billed_quantity"`
 	Unit           string    `json:"unit"`
@@ -189,11 +189,11 @@ type InvoiceRecord struct {
 
 // VarianceBreakdown represents the 5-factor decomposition of the reconciliation discrepancy
 type VarianceBreakdown struct {
-	UnmonitoredTrafficUSD float64 `json:"unmonitored_traffic_usd"` // 账单有但未通过OTel采集的流量
-	CacheDiscrepancyUSD   float64 `json:"cache_discrepancy_usd"`   // 缓存未命中/扣减差异
-	PricingDriftUSD       float64 `json:"pricing_drift_usd"`       // 价格版本漂移
-	ServiceTierMarkupUSD  float64 `json:"service_tier_markup_usd"` // Priority Tier 等服务加价
-	AdjustmentsUSD        float64 `json:"adjustments_usd"`         // 税费、精度舍入与厂商官方抵扣
+	UnmonitoredTrafficUSD float64 `json:"unmonitored_traffic_usd"`
+	CacheDiscrepancyUSD   float64 `json:"cache_discrepancy_usd"`
+	PricingDriftUSD       float64 `json:"pricing_drift_usd"`
+	ServiceTierMarkupUSD  float64 `json:"service_tier_markup_usd"`
+	AdjustmentsUSD        float64 `json:"adjustments_usd"`
 }
 
 // ReconciliationReport represents the final output of an invoice reconciliation run
@@ -205,7 +205,7 @@ type ReconciliationReport struct {
 	ActualBilledUSD  float64           `json:"actual_billed_usd"`
 	VarianceUSD      float64           `json:"variance_usd"`
 	VariancePercent  float64           `json:"variance_percent"`
-	Status           string            `json:"status"` // "matched", "variance_warning", "critical_drift"
+	Status           string            `json:"status"`
 	Breakdown        VarianceBreakdown `json:"breakdown"`
 	ModelDifferences []ModelDiff       `json:"model_differences"`
 	CreatedAt        time.Time         `json:"created_at"`
@@ -222,48 +222,48 @@ type ModelDiff struct {
 
 // FocusRecord represents a record compliant with FOCUS 1.0 / 1.1 Specification
 type FocusRecord struct {
-	AvailabilityZone  string    `json:"AvailabilityZone,omitempty"`
-	BilledCost        float64   `json:"BilledCost"`
-	BillingCurrency   string    `json:"BillingCurrency"`
-	BillingPeriodEnd  time.Time `json:"BillingPeriodEnd"`
+	AvailabilityZone   string    `json:"AvailabilityZone,omitempty"`
+	BilledCost         float64   `json:"BilledCost"`
+	BillingCurrency    string    `json:"BillingCurrency"`
+	BillingPeriodEnd   time.Time `json:"BillingPeriodEnd"`
 	BillingPeriodStart time.Time `json:"BillingPeriodStart"`
-	ChargeCategory    string    `json:"ChargeCategory"` // "Usage"
-	ChargeClass       string    `json:"ChargeClass,omitempty"`
-	ChargeDescription string    `json:"ChargeDescription"`
-	EffectiveCost     float64   `json:"EffectiveCost"`
-	InvoiceIssuerName string    `json:"InvoiceIssuerName"`
-	PricingCategory   string    `json:"PricingCategory"`
-	PricingQuantity   float64   `json:"PricingQuantity"`
-	PricingUnit       string    `json:"PricingUnit"`
-	ProviderName      string    `json:"ProviderName"`
-	RegionName        string    `json:"RegionName"`
-	ResourceName      string    `json:"ResourceName"`
-	ResourceType      string    `json:"ResourceType"`
-	ServiceName       string    `json:"ServiceName"` // "GenAI / LLM"
-	SkuId             string    `json:"SkuId"`
-	SkuPriceId        string    `json:"SkuPriceId"`
-	SubAccountId      string    `json:"SubAccountId"` // TenantID
-	SubAccountName    string    `json:"SubAccountName,omitempty"`
-	Tags              string    `json:"Tags"` // JSON string
-	UsageQuantity     float64   `json:"UsageQuantity"`
-	UsageUnit         string    `json:"UsageUnit"`
+	ChargeCategory     string    `json:"ChargeCategory"`
+	ChargeClass        string    `json:"ChargeClass,omitempty"`
+	ChargeDescription  string    `json:"ChargeDescription"`
+	EffectiveCost      float64   `json:"EffectiveCost"`
+	InvoiceIssuerName  string    `json:"InvoiceIssuerName"`
+	PricingCategory    string    `json:"PricingCategory"`
+	PricingQuantity    float64   `json:"PricingQuantity"`
+	PricingUnit        string    `json:"PricingUnit"`
+	ProviderName       string    `json:"ProviderName"`
+	RegionName         string    `json:"RegionName"`
+	ResourceName       string    `json:"ResourceName"`
+	ResourceType       string    `json:"ResourceType"`
+	ServiceName        string    `json:"ServiceName"`
+	SkuId              string    `json:"SkuId"`
+	SkuPriceId         string    `json:"SkuPriceId"`
+	SubAccountId       string    `json:"SubAccountId"`
+	SubAccountName     string    `json:"SubAccountName,omitempty"`
+	Tags               string    `json:"Tags"`
+	UsageQuantity      float64   `json:"UsageQuantity"`
+	UsageUnit          string    `json:"UsageUnit"`
 }
 
 // BudgetRule represents a monthly spend limit definition
 type BudgetRule struct {
-	ID              uuid.UUID `json:"id"`
-	TenantID        string    `json:"tenant_id"`
-	AppID           string    `json:"app_id,omitempty"`
-	WorkflowID      string    `json:"workflow_id,omitempty"`
-	MonthlyLimitUSD float64   `json:"monthly_limit_usd"`
-	CurrentSpendUSD float64   `json:"current_spend_usd"`
-	PercentUsed     float64   `json:"percent_used"`
-	WarningThreshold float64  `json:"warning_threshold"` // default 0.80
-	CriticalThreshold float64 `json:"critical_threshold"`// default 1.00
-	WebhookURL      string    `json:"webhook_url,omitempty"`
-	Status          string    `json:"status"` // "ok", "warning", "critical"
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                uuid.UUID `json:"id"`
+	TenantID          string    `json:"tenant_id"`
+	AppID             string    `json:"app_id,omitempty"`
+	WorkflowID        string    `json:"workflow_id,omitempty"`
+	MonthlyLimitUSD   float64   `json:"monthly_limit_usd"`
+	CurrentSpendUSD   float64   `json:"current_spend_usd"`
+	PercentUsed       float64   `json:"percent_used"`
+	WarningThreshold  float64   `json:"warning_threshold"`
+	CriticalThreshold float64   `json:"critical_threshold"`
+	WebhookURL        string    `json:"webhook_url,omitempty"`
+	Status            string    `json:"status"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // AlertEvent represents an alert dispatched when a budget is exceeded
@@ -272,10 +272,59 @@ type AlertEvent struct {
 	BudgetID    uuid.UUID `json:"budget_id"`
 	TenantID    string    `json:"tenant_id"`
 	WorkflowID  string    `json:"workflow_id,omitempty"`
-	Level       string    `json:"level"` // "warning" or "critical"
+	Level       string    `json:"level"`
 	Percentage  float64   `json:"percentage"`
 	LimitUSD    float64   `json:"limit_usd"`
 	SpendUSD    float64   `json:"spend_usd"`
 	Message     string    `json:"message"`
 	TriggeredAt time.Time `json:"triggered_at"`
+}
+
+// ==========================================
+// Phase 3: Anomaly Detection, Advisor & Gateways
+// ==========================================
+
+// AnomalyEvent represents an operational or economic abnormality detected in real time
+type AnomalyEvent struct {
+	ID             uuid.UUID `json:"id"`
+	TenantID       string    `json:"tenant_id"`
+	WorkflowID     string    `json:"workflow_id,omitempty"`
+	TraceID        string    `json:"trace_id,omitempty"`
+	SpanID         string    `json:"span_id,omitempty"`
+	Type           string    `json:"type"` // "runaway_loop", "spend_spike", "high_latency_waste"
+	Severity       string    `json:"severity"` // "low", "medium", "high", "critical"
+	Title          string    `json:"title"`
+	Description    string    `json:"description"`
+	MetricValue    float64   `json:"metric_value"`
+	ThresholdValue float64   `json:"threshold_value"`
+	TriggeredAt    time.Time `json:"triggered_at"`
+}
+
+// CostRecommendation represents an actionable cost-saving opportunity
+type CostRecommendation struct {
+	ID                         uuid.UUID `json:"id"`
+	TenantID                   string    `json:"tenant_id"`
+	Category                   string    `json:"category"` // "cache_optimization", "model_downgrade", "reasoning_budget"
+	Title                      string    `json:"title"`
+	Description                string    `json:"description"`
+	EstimatedMonthlySavingsUSD float64   `json:"estimated_monthly_savings_usd"`
+	ImpactLevel                string    `json:"impact_level"` // "high", "medium", "low"
+	ConfidenceScore            float64   `json:"confidence_score"` // 0.0 - 1.0
+	ActionableStep             string    `json:"actionable_step"`
+	CreatedAt                  time.Time `json:"created_at"`
+}
+
+// GatewayLogPayload represents an incoming payload from an AI Gateway (LiteLLM, Cloudflare, One-API)
+type GatewayLogPayload struct {
+	TraceID      string             `json:"trace_id,omitempty"`
+	SpanID       string             `json:"span_id,omitempty"`
+	Provider     string             `json:"provider"`
+	Model        string             `json:"model"`
+	PromptTokens int64              `json:"prompt_tokens"`
+	OutputTokens int64              `json:"completion_tokens"`
+	CachedTokens int64              `json:"cached_tokens,omitempty"`
+	LatencyMs    uint32             `json:"latency_ms,omitempty"`
+	CostUSD      float64            `json:"cost,omitempty"`
+	Attribution  *AttributionContext `json:"attribution,omitempty"`
+	Metadata     map[string]any     `json:"metadata,omitempty"`
 }

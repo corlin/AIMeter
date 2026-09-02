@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/advisor"
+	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/api"
 	"github.com/corlin/AIMeter/pkg/attribution"
 	"github.com/corlin/AIMeter/pkg/budget"
@@ -19,6 +21,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/storage"
+	"github.com/google/uuid"
 )
 
 func main() {
@@ -68,9 +71,41 @@ func main() {
 		CriticalThreshold: 1.00,
 	})
 
-	// 3. Initialize In-Memory Store & Database Connections
+	// 3. Initialize Phase 3 Anomaly Detector & Cost Advisor
+	anomalyDetector := anomaly.NewAnomalyDetector()
+	costAdvisor := advisor.NewCostAdvisor()
+
+	// 4. Initialize In-Memory Store & Database Connections
 	memStore := storage.NewMemoryStore()
 	var primaryStore storage.Store = memStore
+
+	// Seed Initial Realistic Demo Anomalies & Recommendations
+	_ = memStore.SaveAnomalyEvent(context.Background(), domain.AnomalyEvent{
+		ID:             uuid.New(),
+		TenantID:       "org-enterprise-1",
+		WorkflowID:     "contract-review-agent",
+		TraceID:        "trace-runaway-9812",
+		Type:           "runaway_loop",
+		Severity:       "critical",
+		Title:          "Agent Runaway Loop Intercepted (Depth: 16)",
+		Description:    "Autonomous agent entered a recursive evaluation loop, creating 16 nested child spans with repeated prompt context.",
+		MetricValue:    16,
+		ThresholdValue: 10,
+		TriggeredAt:    time.Now().Add(-15 * time.Minute),
+	})
+	_ = memStore.SaveAnomalyEvent(context.Background(), domain.AnomalyEvent{
+		ID:             uuid.New(),
+		TenantID:       "org-fintech-2",
+		WorkflowID:     "batch-sec-filings",
+		TraceID:        "trace-spike-4410",
+		Type:           "spend_spike",
+		Severity:       "high",
+		Title:          "Batch Spend Spike ($4.85 in single trace)",
+		Description:    "Single trace execution exceeded $1.00 safety threshold by emitting 98,000 unbudgeted tokens.",
+		MetricValue:    4.85,
+		ThresholdValue: 1.00,
+		TriggeredAt:    time.Now().Add(-42 * time.Minute),
+	})
 
 	var chClient *storage.ClickHouseClient
 	var pgClient *storage.PostgresClient
@@ -97,7 +132,7 @@ func main() {
 		return
 	}
 
-	// 4. Initialize Micro-Batcher for Storage Writes
+	// 5. Initialize Micro-Batcher for Storage Writes
 	flushHandler := func(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error {
 		_ = memStore.WriteBatch(ctx, usages, costs)
 		if chClient != nil {
@@ -108,20 +143,33 @@ func main() {
 		for _, c := range costs {
 			budgetMgr.TrackSpend(c.Attribution.TenantID, c.Attribution.AppID, c.Attribution.WorkflowID, c.EffectiveCost)
 		}
+		for _, u := range usages {
+			if anom := anomalyDetector.InspectUsageEvent(&u); anom != nil {
+				_ = memStore.SaveAnomalyEvent(ctx, *anom)
+			}
+		}
 		log.Printf("[INFO Ingestion] Flushed batch of %d usage events, %d cost items", len(usages), len(costs))
 		return nil
 	}
 
 	batcher := storage.NewMicroBatcher(cfg.Collector.BatchSize, cfg.Collector.FlushIntervalMs, flushHandler)
 
-	// 5. Initialize Normalizer, Attribution & Ingestion
+	// 6. Initialize Normalizer, Attribution & Ingestion
 	normalizerInst := normalizer.NewNormalizer()
 	contextResolver := attribution.NewContextResolver()
 	ingestionService := collector.NewIngestionService(normalizerInst, contextResolver, ratingEngine, batcher)
 
-	// 6. Initialize API Handler & Server
-	apiHandler := api.NewAPIHandler(primaryStore, pgClient, ratingEngine, budgetMgr)
-	server := api.NewServer(cfg.Server.HTTPPort, apiHandler, ingestionService)
+	// 7. Initialize API Server
+	server := api.NewServer(
+		cfg.Server.HTTPPort,
+		primaryStore,
+		pgClient,
+		ratingEngine,
+		ingestionService,
+		budgetMgr,
+		anomalyDetector,
+		costAdvisor,
+	)
 
 	go func() {
 		log.Printf("[INFO] AI Meter Control Plane & Ingestion Server listening on :%d", cfg.Server.HTTPPort)
@@ -130,7 +178,7 @@ func main() {
 		}
 	}()
 
-	// 7. Graceful Shutdown
+	// 8. Graceful Shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -153,5 +201,5 @@ func main() {
 		pgClient.Close()
 	}
 
-	log.Println("[INFO] AI Meter exited gracefully.")
+	log.Println("[INFO] AI Meter cleanly stopped.")
 }

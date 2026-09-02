@@ -17,16 +17,23 @@ type Store interface {
 	GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error)
 	GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error)
 	GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error)
+	GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error)
 	SaveReconciliationReport(ctx context.Context, report domain.ReconciliationReport) error
 	GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error)
+	SaveAnomalyEvent(ctx context.Context, anomaly domain.AnomalyEvent) error
+	GetAnomalyEvents(ctx context.Context, tenantID string, limit int) ([]domain.AnomalyEvent, error)
+	SaveRecommendations(ctx context.Context, recs []domain.CostRecommendation) error
+	GetRecommendations(ctx context.Context, tenantID string) ([]domain.CostRecommendation, error)
 }
 
 // MemoryStore provides a high-performance in-memory ledger store
 type MemoryStore struct {
-	mu            sync.RWMutex
-	usages        []domain.UsageEvent
-	costs         []domain.CostItem
+	mu              sync.RWMutex
+	usages          []domain.UsageEvent
+	costs           []domain.CostItem
 	reconciliations []domain.ReconciliationReport
+	anomalies       []domain.AnomalyEvent
+	recommendations []domain.CostRecommendation
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -34,6 +41,8 @@ func NewMemoryStore() *MemoryStore {
 		usages:          make([]domain.UsageEvent, 0, 10000),
 		costs:           make([]domain.CostItem, 0, 10000),
 		reconciliations: make([]domain.ReconciliationReport, 0),
+		anomalies:       make([]domain.AnomalyEvent, 0),
+		recommendations: make([]domain.CostRecommendation, 0),
 	}
 }
 
@@ -59,6 +68,69 @@ func (s *MemoryStore) GetCostItems(ctx context.Context, tenantID string, period 
 			continue
 		}
 		result = append(result, c)
+	}
+	return result, nil
+}
+
+func (s *MemoryStore) GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []domain.UsageEvent
+	for _, u := range s.usages {
+		if tenantID != "" && tenantID != "all" && u.Attribution.TenantID != tenantID {
+			continue
+		}
+		result = append(result, u)
+	}
+	return result, nil
+}
+
+func (s *MemoryStore) SaveAnomalyEvent(ctx context.Context, anomaly domain.AnomalyEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.anomalies = append(s.anomalies, anomaly)
+	return nil
+}
+
+func (s *MemoryStore) GetAnomalyEvents(ctx context.Context, tenantID string, limit int) ([]domain.AnomalyEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var matched []domain.AnomalyEvent
+	for _, a := range s.anomalies {
+		if tenantID == "" || tenantID == "all" || a.TenantID == tenantID {
+			matched = append(matched, a)
+		}
+	}
+
+	if limit <= 0 || limit > len(matched) {
+		limit = len(matched)
+	}
+
+	result := make([]domain.AnomalyEvent, limit)
+	for i := 0; i < limit; i++ {
+		result[i] = matched[len(matched)-1-i]
+	}
+	return result, nil
+}
+
+func (s *MemoryStore) SaveRecommendations(ctx context.Context, recs []domain.CostRecommendation) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recommendations = recs
+	return nil
+}
+
+func (s *MemoryStore) GetRecommendations(ctx context.Context, tenantID string) ([]domain.CostRecommendation, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []domain.CostRecommendation
+	for _, r := range s.recommendations {
+		if tenantID == "" || tenantID == "all" || r.TenantID == tenantID {
+			result = append(result, r)
+		}
 	}
 	return result, nil
 }
