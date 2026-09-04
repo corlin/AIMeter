@@ -18,6 +18,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/config"
 	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/storage"
@@ -50,24 +51,24 @@ func main() {
 
 	// Register sample tenant discount
 	ratingEngine.UpsertTenant(domain.Tenant{
-		ID:             "org-enterprise-1",
-		Name:           "Enterprise Corp",
+		ID:              "org-enterprise-1",
+		Name:            "Enterprise Corp",
 		DefaultCurrency: "USD",
-		GlobalDiscount: 0.15, // 15% discount
+		GlobalDiscount:  0.15, // 15% discount
 	})
 
 	// 2. Initialize Budget Manager & Seed Sample Budgets
 	budgetMgr := budget.NewBudgetManager()
 	budgetMgr.UpsertBudget(domain.BudgetRule{
-		TenantID:        "org-enterprise-1",
-		MonthlyLimitUSD: 10.0,
-		WarningThreshold: 0.80,
+		TenantID:          "org-enterprise-1",
+		MonthlyLimitUSD:   10.0,
+		WarningThreshold:  0.80,
 		CriticalThreshold: 1.00,
 	})
 	budgetMgr.UpsertBudget(domain.BudgetRule{
-		TenantID:        "org-fintech-2",
-		MonthlyLimitUSD: 5.0,
-		WarningThreshold: 0.80,
+		TenantID:          "org-fintech-2",
+		MonthlyLimitUSD:   5.0,
+		WarningThreshold:  0.80,
 		CriticalThreshold: 1.00,
 	})
 
@@ -107,6 +108,15 @@ func main() {
 		TriggeredAt:    time.Now().Add(-42 * time.Minute),
 	})
 
+	// 5. Initialize Phase 4 Guard & Circuit Breaker Manager
+	breakerMgr := guard.NewCircuitBreakerManager(300)
+	guardSvc := guard.NewGuardService(breakerMgr, budgetMgr, primaryStore)
+
+	// Seed demo tripped breaker
+	breakerMgr.Trip("org-enterprise-1", "contract-review-agent", "Runaway loop detected: execution tree depth reached 16 (exceeded limit of 12)", 300)
+	breakerMgr.RecordBlock("org-enterprise-1", "contract-review-agent")
+	breakerMgr.RecordBlock("org-enterprise-1", "contract-review-agent")
+
 	var chClient *storage.ClickHouseClient
 	var pgClient *storage.PostgresClient
 
@@ -132,7 +142,7 @@ func main() {
 		return
 	}
 
-	// 5. Initialize Micro-Batcher for Storage Writes
+	// 6. Initialize Micro-Batcher for Storage Writes
 	flushHandler := func(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error {
 		_ = memStore.WriteBatch(ctx, usages, costs)
 		if chClient != nil {
@@ -154,12 +164,12 @@ func main() {
 
 	batcher := storage.NewMicroBatcher(cfg.Collector.BatchSize, cfg.Collector.FlushIntervalMs, flushHandler)
 
-	// 6. Initialize Normalizer, Attribution & Ingestion
+	// 7. Initialize Normalizer, Attribution & Ingestion
 	normalizerInst := normalizer.NewNormalizer()
 	contextResolver := attribution.NewContextResolver()
 	ingestionService := collector.NewIngestionService(normalizerInst, contextResolver, ratingEngine, batcher)
 
-	// 7. Initialize API Server
+	// 8. Initialize API Server
 	server := api.NewServer(
 		cfg.Server.HTTPPort,
 		primaryStore,
@@ -169,6 +179,7 @@ func main() {
 		budgetMgr,
 		anomalyDetector,
 		costAdvisor,
+		guardSvc,
 	)
 
 	go func() {
@@ -178,7 +189,7 @@ func main() {
 		}
 	}()
 
-	// 8. Graceful Shutdown
+	// 9. Graceful Shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

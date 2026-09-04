@@ -65,7 +65,7 @@ type CostItem struct {
 	Provider         string             `json:"provider"`
 	Model            string             `json:"model"`
 	MeterName        string             `json:"meter_name"`
-	Quantity       float64            `json:"quantity"`
+	Quantity         float64            `json:"quantity"`
 	Unit             string             `json:"unit"`
 	RateID           uuid.UUID          `json:"rate_id"`
 	RateVersion      string             `json:"rate_version"`
@@ -110,20 +110,20 @@ type Tenant struct {
 
 // TraceTreeNode represents a node in the hierarchical execution tree of a trace
 type TraceTreeNode struct {
-	SpanID        string           `json:"span_id"`
-	ParentSpanID  string           `json:"parent_span_id"`
-	SpanName      string           `json:"span_name"`
-	AgentID       string           `json:"agent_id"`
-	FeatureID     string           `json:"feature_id"`
-	Provider      string           `json:"provider"`
-	Model         string           `json:"model"`
-	LatencyMs     uint32           `json:"latency_ms"`
-	Timestamp     time.Time        `json:"timestamp"`
-	UsageMeters   []UsageEvent     `json:"usage_meters"`
-	CostItems     []CostItem       `json:"cost_items"`
-	TotalCost     float64          `json:"total_cost"`
-	TotalTokens   float64          `json:"total_tokens"`
-	Children      []*TraceTreeNode `json:"children"`
+	SpanID       string           `json:"span_id"`
+	ParentSpanID string           `json:"parent_span_id"`
+	SpanName     string           `json:"span_name"`
+	AgentID      string           `json:"agent_id"`
+	FeatureID    string           `json:"feature_id"`
+	Provider     string           `json:"provider"`
+	Model        string           `json:"model"`
+	LatencyMs    uint32           `json:"latency_ms"`
+	Timestamp    time.Time        `json:"timestamp"`
+	UsageMeters  []UsageEvent     `json:"usage_meters"`
+	CostItems    []CostItem       `json:"cost_items"`
+	TotalCost    float64          `json:"total_cost"`
+	TotalTokens  float64          `json:"total_tokens"`
+	Children     []*TraceTreeNode `json:"children"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
@@ -316,15 +316,52 @@ type CostRecommendation struct {
 
 // GatewayLogPayload represents an incoming payload from an AI Gateway (LiteLLM, Cloudflare, One-API)
 type GatewayLogPayload struct {
-	TraceID      string             `json:"trace_id,omitempty"`
-	SpanID       string             `json:"span_id,omitempty"`
-	Provider     string             `json:"provider"`
-	Model        string             `json:"model"`
-	PromptTokens int64              `json:"prompt_tokens"`
-	OutputTokens int64              `json:"completion_tokens"`
-	CachedTokens int64              `json:"cached_tokens,omitempty"`
-	LatencyMs    uint32             `json:"latency_ms,omitempty"`
-	CostUSD      float64            `json:"cost,omitempty"`
+	TraceID      string              `json:"trace_id,omitempty"`
+	SpanID       string              `json:"span_id,omitempty"`
+	Provider     string              `json:"provider"`
+	Model        string              `json:"model"`
+	PromptTokens int64               `json:"prompt_tokens"`
+	OutputTokens int64               `json:"completion_tokens"`
+	CachedTokens int64               `json:"cached_tokens,omitempty"`
+	LatencyMs    uint32              `json:"latency_ms,omitempty"`
+	CostUSD      float64             `json:"cost,omitempty"`
 	Attribution  *AttributionContext `json:"attribution,omitempty"`
-	Metadata     map[string]any     `json:"metadata,omitempty"`
+	Metadata     map[string]any      `json:"metadata,omitempty"`
+}
+
+// ==========================================
+// Phase 4: Active Guard & Circuit Breaker
+// ==========================================
+
+// GuardCheckRequest represents an invocation pre-check sent by SDKs or Gateways
+type GuardCheckRequest struct {
+	TenantID              string `json:"tenant_id"`
+	WorkflowID            string `json:"workflow_id,omitempty"`
+	TraceID               string `json:"trace_id,omitempty"`
+	Model                 string `json:"model"`
+	EstimatedInputTokens  int64  `json:"estimated_input_tokens,omitempty"`
+	CurrentTreeDepth      uint32 `json:"current_tree_depth,omitempty"`
+}
+
+// GuardCheckResponse returns whether an invocation is allowed or tripped
+type GuardCheckResponse struct {
+	Allowed       bool      `json:"allowed"`
+	DecisionCode  string    `json:"decision_code"` // "OK", "BUDGET_EXCEEDED", "RUNAWAY_LOOP_PREVENTED", "CIRCUIT_BREAKER_OPEN"
+	Reason        string    `json:"reason"`
+	CircuitState  string    `json:"circuit_state"` // "CLOSED", "OPEN", "HALF_OPEN"
+	FallbackModel string    `json:"fallback_model,omitempty"`
+	CheckedAt     time.Time `json:"checked_at"`
+}
+
+// CircuitBreakerRecord represents the state of a circuit breaker for a tenant or workflow
+type CircuitBreakerRecord struct {
+	Key             string    `json:"key"` // "tenant_id:workflow_id"
+	TenantID        string    `json:"tenant_id"`
+	WorkflowID      string    `json:"workflow_id"`
+	State           string    `json:"state"` // "CLOSED", "OPEN", "HALF_OPEN"
+	BlockedCount    int64     `json:"blocked_count"`
+	LastTrippedAt   time.Time `json:"last_tripped_at"`
+	CooldownSeconds int       `json:"cooldown_seconds"`
+	Reason          string    `json:"reason"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }

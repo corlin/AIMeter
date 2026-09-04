@@ -8,7 +8,10 @@ import {
   BudgetRule, 
   AlertEvent,
   AnomalyEvent,
-  CostRecommendation 
+  CostRecommendation,
+  CircuitBreakerRecord,
+  GuardCheckRequest,
+  GuardCheckResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -205,6 +208,41 @@ export async function fetchRecommendations(tenantId = "all"): Promise<CostRecomm
     console.warn("API fetch error for recommendations", err);
     return [];
   }
+}
+
+// Phase 4: Active Guard & Circuit Breakers
+export async function fetchCircuitBreakers(tenantId = "all"): Promise<CircuitBreakerRecord[]> {
+  try {
+    const res = await fetch(`${API_BASE}/circuit-breakers?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch circuit breakers");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for circuit breakers", err);
+    return [];
+  }
+}
+
+export async function resetCircuitBreaker(tenantId: string, workflowId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/circuit-breakers/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenant_id: tenantId, workflow_id: workflowId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to reset breaker" }));
+    throw new Error(err.error || "Failed to reset circuit breaker");
+  }
+  return true;
+}
+
+export async function checkGuard(req: GuardCheckRequest): Promise<GuardCheckResponse> {
+  const res = await fetch(`/v1/guard/check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  return await res.json();
 }
 
 const defaultTenants: Tenant[] = [

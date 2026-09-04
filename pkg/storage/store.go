@@ -24,6 +24,9 @@ type Store interface {
 	GetAnomalyEvents(ctx context.Context, tenantID string, limit int) ([]domain.AnomalyEvent, error)
 	SaveRecommendations(ctx context.Context, recs []domain.CostRecommendation) error
 	GetRecommendations(ctx context.Context, tenantID string) ([]domain.CostRecommendation, error)
+	GetCircuitBreakers(ctx context.Context, tenantID string) ([]domain.CircuitBreakerRecord, error)
+	UpsertCircuitBreaker(ctx context.Context, record domain.CircuitBreakerRecord) error
+	ResetCircuitBreaker(ctx context.Context, key string) error
 }
 
 // MemoryStore provides a high-performance in-memory ledger store
@@ -34,6 +37,7 @@ type MemoryStore struct {
 	reconciliations []domain.ReconciliationReport
 	anomalies       []domain.AnomalyEvent
 	recommendations []domain.CostRecommendation
+	breakers        map[string]domain.CircuitBreakerRecord
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -43,6 +47,7 @@ func NewMemoryStore() *MemoryStore {
 		reconciliations: make([]domain.ReconciliationReport, 0),
 		anomalies:       make([]domain.AnomalyEvent, 0),
 		recommendations: make([]domain.CostRecommendation, 0),
+		breakers:        make(map[string]domain.CircuitBreakerRecord),
 	}
 }
 
@@ -150,6 +155,43 @@ func (s *MemoryStore) GetReconciliationReports(ctx context.Context) ([]domain.Re
 		result[i] = s.reconciliations[len(s.reconciliations)-1-i]
 	}
 	return result, nil
+}
+
+func (s *MemoryStore) GetCircuitBreakers(ctx context.Context, tenantID string) ([]domain.CircuitBreakerRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var list []domain.CircuitBreakerRecord
+	for _, b := range s.breakers {
+		if tenantID == "" || tenantID == "all" || b.TenantID == tenantID {
+			list = append(list, b)
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].LastTrippedAt.After(list[j].LastTrippedAt)
+	})
+	return list, nil
+}
+
+func (s *MemoryStore) UpsertCircuitBreaker(ctx context.Context, record domain.CircuitBreakerRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.breakers[record.Key] = record
+	return nil
+}
+
+func (s *MemoryStore) ResetCircuitBreaker(ctx context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b, ok := s.breakers[key]; ok {
+		b.State = "CLOSED"
+		b.BlockedCount = 0
+		b.Reason = "Reset by operator"
+		b.UpdatedAt = time.Now().UTC()
+		s.breakers[key] = b
+		return nil
+	}
+	return fmt.Errorf("circuit breaker not found for key: %s", key)
 }
 
 func (s *MemoryStore) GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error) {

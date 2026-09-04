@@ -24,6 +24,7 @@
 * **不侵入调用链路**：无需迁移业务 SDK 或强制接入代理网关，直接接收 OpenTelemetry GenAI 遥测、主流网关 Webhook 与厂商账单。
 * **算清账**：统一多模态与推理计量单位，毫秒级流式计价与 8 级业务归因。
 * **管住钱**：实时拦截 Multi-Agent 失控死循环，自动对账并拆解 5 维方差，给出量化的降本优化建议。
+* **守住门**：提供 `<2ms` 极速预检拦截接口（`/v1/guard/check`）与三态熔断器，在预算超支或失控发生时主动切断。
 
 ---
 
@@ -35,6 +36,7 @@ flowchart TD
         A1["OpenTelemetry GenAI (gRPC/HTTP)"]
         A2["AI Gateways (LiteLLM / Cloudflare / One-API / Kong)"]
         A3["Provider Billing (PDF / CSV Invoices)"]
+        A4["Pre-check Callers (Gateways / SDKs via /v1/guard/check)"]
     end
 
     subgraph Processing["⚙️ 核心处理引擎 (Processing Engine)"]
@@ -44,6 +46,7 @@ flowchart TD
         B4["Anomaly Detector (死循环与突增拦截)"]
         B5["Cost Advisor (Prompt 缓存与模型降配测算)"]
         B6["Reconcile Engine (5 维发票方差拆解)"]
+        B7["Circuit Breaker & Active Guard (三态熔断与预检防护)"]
     end
 
     subgraph Storage["💾 混合双引擎存储 (Hybrid Storage)"]
@@ -58,6 +61,7 @@ flowchart TD
     end
 
     A1 & A2 --> B1 --> B2 --> B3 --> Storage
+    A4 --> B7
     B3 --> B4 & B5
     A3 --> B6 --> Storage
     Storage --> Presentation
@@ -91,21 +95,27 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
   4. 服务等级溢价（Service Tier Markup）
   5. 舍入与调整税费（Adjustments & Taxes）
 
-### 5. 智能异常雷达与 Agent 失控死循环拦截 (Runaway Loop Guard)
-* **死循环拦截 (`runaway_loop`)**：实时遍历 Agent 执行树，当 Span 递归深度 $\ge 10$ 时自动报警并阻断失控调用。
-* **消耗突增预警 (`spend_spike`)**：检测单次 Workflow 运行费用超过安全阈值（如单次超过 \$1.00 或 Token 爆炸）。
-* **低效卡顿检测 (`high_latency_waste`)**：识别耗时极高（>25s）且产出极低（<50 Tokens）的无效阻塞。
+### 5. 闭环防护与三态熔断器 (Active Guard & Circuit Breaker)
+* **极速同步预检 (`POST /v1/guard/check`)**：耗时 `< 2ms`，支持在网关调用模型前检查月度预算与执行树深度。
+* **失控死循环阻断 (`RUNAWAY_LOOP_PREVENTED`)**：调用深度达到 $\ge 12$ 时即刻切断，防止 Agent 陷入无休止递归轰炸。
+* **三态熔断机制 (Closed $\rightarrow$ Open $\rightarrow$ Half-Open)**：触发严重超支后进入冷却阻断期，并自动推荐降级平替模型（如推荐降级至 `gpt-4o-mini`），支持控制台一键手动解封。
+* **Fail-Open 柔性兜底**：控制面发生异常时默认放行，确保不发生次生业务阻断事故。
 
-### 6. AI 成本优化建议顾问 (Cost Optimization Advisor)
+### 6. 智能异常雷达与失控告警 (Runaway Loop Radar)
+* **死循环拦截**：实时遍历 Agent 执行树，当 Span 递归深度超标时自动报警并阻断失控调用。
+* **消耗突增预警**：检测单次 Workflow 运行费用超过安全阈值（如单次超过 \$1.00 或 Token 爆炸）。
+* **低效卡顿检测**：识别耗时极高（>25s）且产出极低（<50 Tokens）的无效阻塞。
+
+### 7. AI 成本优化建议顾问 (Cost Optimization Advisor)
 * **Prompt Caching 优化机会测算**：分析高频重复前缀与长上下文，测算开启缓存后的**每月预计节省金额（如 \$45/月）**。
 * **模型降配平替 (Model Routing)**：自动识别日常分类/总结等轻量任务使用昂贵大模型（GPT-4o）的行为，建议降配为 GPT-4o-mini 或 DeepSeek-V3。
 * **Reasoning Token 预算控制**：针对思考 Token 占比给出 `max_thinking_tokens` 上限优化策略。
 
-### 7. 主流 AI 网关原生适配 (Gateway Adapters)
+### 8. 主流 AI 网关原生适配 (Gateway Adapters)
 * 开放 `/v1/gateway/:vendor` Webhook 接入端点。
 * 原生支持 **LiteLLM, Cloudflare AI Gateway, One-API, Kong** 的回调日志，即发即计费。
 
-### 8. FinOps FOCUS 1.0 / 1.1 原生支持
+### 9. FinOps FOCUS 1.0 / 1.1 原生支持
 * 原生支持 21 项 FOCUS 核心列，一键导出 CSV/JSON，无缝对接企业 ERP、PowerBI、Tableau 与 Cloudability。
 
 ---
@@ -122,6 +132,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | `/budgets` | **预算与告警规则** | 租户/工作流月度预算额度配置、进度条与 Webhook 告警流 |
 | `/anomalies` | **实时异常雷达** | 严重级别筛选、失控 Agent 拦截现场指标 |
 | `/recommendations` | **成本优化建议顾问** | 预计每月总节省金额 KPI、3 维建议卡片与精准修复指南 |
+| `/circuit-breaker` | **熔断防护控制中心** | 三态熔断器大盘、阻断原因与冷却倒计时、一键重置解封与仿真沙箱 |
 
 ---
 
@@ -152,31 +163,21 @@ npm run dev
 
 ---
 
-## 📡 数据接入示例
+## 📡 接口接入与鉴权示例
 
-### 1. 发送 OTel 标准 Trace 遥测
+### 1. 极速同步预检与熔断鉴权 (Active Guard Pre-Check)
 ```bash
-curl -X POST http://localhost:8080/v1/traces \
+curl -X POST http://localhost:8080/v1/guard/check \
   -H "Content-Type: application/json" \
-  -H "baggage: tenant_id=org-enterprise-1,workflow_id=legal-agent,agent_id=Auditor" \
   -d '{
-    "resourceSpans": [{
-      "scopeSpans": [{
-        "spans": [{
-          "traceId": "trace-1001",
-          "spanId": "span-2001",
-          "name": "chat gpt-4o",
-          "attributes": [
-            {"key": "gen_ai.system", "value": {"stringValue": "openai"}},
-            {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o"}},
-            {"key": "gen_ai.usage.input_tokens", "value": {"intValue": 1500}},
-            {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 400}}
-          ]
-        }]
-      }]
-    }]
+    "tenant_id": "org-enterprise-1",
+    "workflow_id": "contract-review-agent",
+    "model": "gpt-4o",
+    "current_tree_depth": 3
   }'
 ```
+* **放行响应**：`{"allowed": true, "decision_code": "OK", "circuit_state": "CLOSED"}`
+* **阻断响应**：`{"allowed": false, "decision_code": "RUNAWAY_LOOP_PREVENTED", "circuit_state": "OPEN", "fallback_model": "gpt-4o-mini"}`
 
 ### 2. 发送 AI Gateway (LiteLLM) Webhook 回调
 ```bash
@@ -214,6 +215,7 @@ AIMeter/
 │   ├── config/              # 配置加载器
 │   ├── domain/              # 核心领域模型与数据结构
 │   ├── focus/               # FinOps FOCUS 1.0/1.1 标准导出器
+│   ├── guard/               # 闭环防护与三态熔断器核心引擎
 │   ├── normalizer/          # 统一计量分类法转换器
 │   ├── rater/               # 实时流式计价引擎
 │   ├── reconcile/           # 工业级 PDF/CSV 对账与 5 维方差拆解引擎

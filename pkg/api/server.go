@@ -10,6 +10,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/collector"
+	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/storage"
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,7 @@ func NewServer(
 	budgetMgr *budget.BudgetManager,
 	detector *anomaly.AnomalyDetector,
 	costAdvisor *advisor.CostAdvisor,
+	guardSvc *guard.GuardService,
 ) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -49,7 +51,7 @@ func NewServer(
 		c.Next()
 	})
 
-	handler := NewAPIHandler(store, pg, r, budgetMgr, detector, costAdvisor)
+	handler := NewAPIHandler(store, pg, r, budgetMgr, detector, costAdvisor, guardSvc)
 
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
@@ -62,6 +64,9 @@ func NewServer(
 		collectorSvc.RegisterRESTHandler(router.Group("/api/v1"))
 		router.POST("/v1/gateway/:vendor", collectorSvc.HandleGatewayLog)
 	}
+
+	// Phase 4: Active Guard Check Endpoint
+	router.POST("/v1/guard/check", handler.CheckGuard)
 
 	// AI Meter REST APIs
 	apiV1 := router.Group("/api/v1")
@@ -85,6 +90,10 @@ func NewServer(
 		// Phase 3: Anomalies & Recommendations
 		apiV1.GET("/anomalies", handler.GetAnomalies)
 		apiV1.GET("/recommendations", handler.GetRecommendations)
+
+		// Phase 4: Circuit Breaker Management
+		apiV1.GET("/circuit-breakers", handler.GetCircuitBreakers)
+		apiV1.POST("/circuit-breakers/reset", handler.ResetCircuitBreaker)
 	}
 
 	return &Server{

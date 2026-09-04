@@ -176,10 +176,7 @@ export interface AlertEvent {
   triggered_at: string;
 }
 
-// ==========================================
 // Phase 3: Anomalies & Recommendations
-// ==========================================
-
 export interface AnomalyEvent {
   id: string;
   tenant_id: string;
@@ -206,4 +203,35 @@ export interface CostRecommendation {
   confidence_score: number;
   actionable_step: string;
   created_at: string;
+}
+
+// Phase 4: Active Guard & Circuit Breakers
+export interface GuardCheckRequest {
+  tenant_id: string;
+  workflow_id?: string;
+  trace_id?: string;
+  model: string;
+  estimated_input_tokens?: number;
+  current_tree_depth?: number;
+}
+
+export interface GuardCheckResponse {
+  allowed: boolean;
+  decision_code: string;
+  reason: string;
+  circuit_state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  fallback_model?: string;
+  checked_at: string;
+}
+
+export interface CircuitBreakerRecord {
+  key: string;
+  tenant_id: string;
+  workflow_id: string;
+  state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  blocked_count: number;
+  last_tripped_at: string;
+  cooldown_seconds: number;
+  reason: string;
+  updated_at: string;
 }

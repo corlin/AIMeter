@@ -12,6 +12,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/focus"
+	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/storage"
@@ -27,6 +28,7 @@ type APIHandler struct {
 	focusExport *focus.FocusExporter
 	detector    *anomaly.AnomalyDetector
 	advisor     *advisor.CostAdvisor
+	guardSvc    *guard.GuardService
 }
 
 func NewAPIHandler(
@@ -36,6 +38,7 @@ func NewAPIHandler(
 	bm *budget.BudgetManager,
 	det *anomaly.AnomalyDetector,
 	adv *advisor.CostAdvisor,
+	g *guard.GuardService,
 ) *APIHandler {
 	return &APIHandler{
 		store:       store,
@@ -46,6 +49,7 @@ func NewAPIHandler(
 		focusExport: focus.NewFocusExporter(),
 		detector:    det,
 		advisor:     adv,
+		guardSvc:    g,
 	}
 }
 
@@ -384,4 +388,89 @@ func (h *APIHandler) GetRecommendations(c *gin.Context) {
 		recs = []domain.CostRecommendation{}
 	}
 	c.JSON(http.StatusOK, recs)
+}
+
+// ==========================================
+// Phase 4: Active Guard & Circuit Breaker
+// ==========================================
+
+// CheckGuard handles synchronous pre-check requests (<2ms) from SDKs or Gateways
+func (h *APIHandler) CheckGuard(c *gin.Context) {
+	var req domain.GuardCheckRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Fail-Open: allow on invalid request format to prevent business outage
+		c.JSON(http.StatusOK, domain.GuardCheckResponse{
+			Allowed:      true,
+			DecisionCode: "FAIL_OPEN",
+			Reason:       "Payload format error, failed open to protect business continuity: " + err.Error(),
+			CircuitState: "CLOSED",
+			CheckedAt:    time.Now().UTC(),
+		})
+		return
+	}
+
+	if h.guardSvc == nil {
+		c.JSON(http.StatusOK, domain.GuardCheckResponse{
+			Allowed:      true,
+			DecisionCode: "OK",
+			Reason:       "Guard service not enabled, permitted",
+			CircuitState: "CLOSED",
+			CheckedAt:    time.Now().UTC(),
+		})
+		return
+	}
+
+	resp := h.guardSvc.CheckGuard(c.Request.Context(), req)
+	if !resp.Allowed {
+		// Return 429 Too Many Requests / Circuit Broken with detailed guard decision
+		c.JSON(http.StatusTooManyRequests, resp)
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetCircuitBreakers returns all circuit breaker states for UI rendering
+func (h *APIHandler) GetCircuitBreakers(c *gin.Context) {
+	tenantID := c.Query("tenant_id")
+	if h.guardSvc == nil || h.guardSvc.GetBreakerManager() == nil {
+		c.JSON(http.StatusOK, []domain.CircuitBreakerRecord{})
+		return
+	}
+
+	records := h.guardSvc.GetBreakerManager().GetAllRecords(tenantID)
+	if records == nil {
+		records = []domain.CircuitBreakerRecord{}
+	}
+	c.JSON(http.StatusOK, records)
+}
+
+// ResetCircuitBreaker resets an OPEN or tripped breaker back to CLOSED
+func (h *APIHandler) ResetCircuitBreaker(c *gin.Context) {
+	var body struct {
+		TenantID   string `json:"tenant_id"`
+		WorkflowID string `json:"workflow_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if h.guardSvc == nil || h.guardSvc.GetBreakerManager() == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Guard service not initialized"})
+		return
+	}
+
+	err := h.guardSvc.GetBreakerManager().Reset(body.TenantID, body.WorkflowID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":      "reset_successful",
+		"tenant_id":   body.TenantID,
+		"workflow_id": body.WorkflowID,
+		"state":       "CLOSED",
+	})
 }

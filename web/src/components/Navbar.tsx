@@ -10,7 +10,8 @@ import {
   PieChart, 
   BellRing,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  ZapOff
 } from "lucide-react";
 
 export function Navbar() {
@@ -18,13 +19,14 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
-    { label: "Traces & Unit Economics", href: "/traces", icon: Network },
-    { label: "Rate Catalog", href: "/rates", icon: Layers },
+    { label: "Traces & Economics", href: "/traces", icon: Network },
+    { label: "Rates", href: "/rates", icon: Layers },
     { label: "Reconciliation", href: "/reconcile", icon: FileCheck2 },
-    { label: "FOCUS FinOps", href: "/focus", icon: PieChart },
+    { label: "FOCUS", href: "/focus", icon: PieChart },
     { label: "Budgets", href: "/budgets", icon: BellRing },
     { label: "Anomalies", href: "/anomalies", icon: ShieldAlert },
-    { label: "Savings Advisor", href: "/recommendations", icon: Sparkles },
+    { label: "Advisor", href: "/recommendations", icon: Sparkles },
+    { label: "Circuit Breaker", href: "/circuit-breaker", icon: ZapOff },
   ];
 
   return (
@@ -51,7 +53,7 @@ export function Navbar() {
         </Link>
 
         {/* Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -76,7 +78,7 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Rating Engine Online</span>
+            <span>Active Guard Online</span>
           </div>
         </div>
       </div>
