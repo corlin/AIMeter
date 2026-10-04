@@ -2,6 +2,7 @@ package budget
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,23 +10,54 @@ import (
 	"sync"
 	"time"
 
+	alertPkg "github.com/corlin/AIMeter/pkg/alert"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/google/uuid"
 )
 
 type BudgetManager struct {
-	mu      sync.RWMutex
-	rules   map[uuid.UUID]*domain.BudgetRule
-	alerts  []domain.AlertEvent
-	client  *http.Client
+	mu              sync.RWMutex
+	rules               map[uuid.UUID]*domain.BudgetRule
+	alerts              []domain.AlertEvent
+	client              *http.Client
+	dispatcher          *alertPkg.AlertDispatcher
+	cappingPolicies     map[string]*domain.StreamCappingPolicy     // tenant_id -> policy
+	compressionPolicies map[string]*domain.PromptCompressionPolicy // tenant_id -> policy
 }
 
 func NewBudgetManager() *BudgetManager {
-	return &BudgetManager{
-		rules:  make(map[uuid.UUID]*domain.BudgetRule),
-		alerts: make([]domain.AlertEvent, 0),
-		client: &http.Client{Timeout: 5 * time.Second},
+	bm := &BudgetManager{
+		rules:               make(map[uuid.UUID]*domain.BudgetRule),
+		alerts:              make([]domain.AlertEvent, 0),
+		client:              &http.Client{Timeout: 5 * time.Second},
+		cappingPolicies:     make(map[string]*domain.StreamCappingPolicy),
+		compressionPolicies: make(map[string]*domain.PromptCompressionPolicy),
 	}
+	bm.cappingPolicies["default"] = &domain.StreamCappingPolicy{
+		TenantID:         "default",
+		MaxTokensPerReq:  4096,
+		MaxCostUSDPerReq: 0.10,
+		CustomNotice:     "\n\n[AI Meter: Generation capped: single-request token budget exceeded]",
+		Enabled:          true,
+		UpdatedAt:        time.Now().UTC(),
+	}
+	bm.compressionPolicies["default"] = &domain.PromptCompressionPolicy{
+		TenantID:            "default",
+		Enabled:             true,
+		Mode:                "balanced",
+		MinTokenThreshold:   300,
+		PreserveCodeBlocks:  true,
+		PreserveRecentTurns: 2,
+		UpdatedAt:           time.Now().UTC(),
+	}
+	return bm
+}
+
+// SetAlertDispatcher attaches an alert dispatcher for multi-channel broadcasts
+func (m *BudgetManager) SetAlertDispatcher(d *alertPkg.AlertDispatcher) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dispatcher = d
 }
 
 // UpsertBudget adds or updates a budget rule
@@ -129,6 +161,22 @@ func (m *BudgetManager) TrackSpend(tenantID, appID, workflowID string, addedCost
 			m.alerts = append(m.alerts, alert)
 			triggeredAlerts = append(triggeredAlerts, alert)
 			m.dispatchWebhook(rule.WebhookURL, alert)
+			if m.dispatcher != nil {
+				m.dispatcher.Dispatch(context.Background(), alertPkg.NotificationEvent{
+					TenantID:   rule.TenantID,
+					WorkflowID: rule.WorkflowID,
+					EventType:  alertPkg.EventBudgetExceeded,
+					Severity:   "critical",
+					Title:      fmt.Sprintf("月度预算已耗尽 (100%%) - %s", rule.TenantID),
+					Message:    alert.Message,
+					Metrics: map[string]interface{}{
+						"spent_usd":  rule.CurrentSpendUSD,
+						"limit_usd":  rule.MonthlyLimitUSD,
+						"percentage": newRatio * 100,
+					},
+					TriggeredAt: alert.TriggeredAt,
+				})
+			}
 		} else if oldRatio < rule.WarningThreshold && newRatio >= rule.WarningThreshold {
 			rule.Status = "warning"
 			alert := domain.AlertEvent{
@@ -146,6 +194,22 @@ func (m *BudgetManager) TrackSpend(tenantID, appID, workflowID string, addedCost
 			m.alerts = append(m.alerts, alert)
 			triggeredAlerts = append(triggeredAlerts, alert)
 			m.dispatchWebhook(rule.WebhookURL, alert)
+			if m.dispatcher != nil {
+				m.dispatcher.Dispatch(context.Background(), alertPkg.NotificationEvent{
+					TenantID:   rule.TenantID,
+					WorkflowID: rule.WorkflowID,
+					EventType:  alertPkg.EventBudgetWarning,
+					Severity:   "warning",
+					Title:      fmt.Sprintf("月度预算警戒达到 %.0f%% - %s", newRatio*100, rule.TenantID),
+					Message:    alert.Message,
+					Metrics: map[string]interface{}{
+						"spent_usd":  rule.CurrentSpendUSD,
+						"limit_usd":  rule.MonthlyLimitUSD,
+						"percentage": newRatio * 100,
+					},
+					TriggeredAt: alert.TriggeredAt,
+				})
+			}
 		}
 	}
 
@@ -169,3 +233,90 @@ func (m *BudgetManager) dispatchWebhook(url string, alert domain.AlertEvent) {
 		_ = resp.Body.Close()
 	}()
 }
+
+// GetStreamCappingPolicy retrieves the streaming hard-capping policy for a tenant
+func (m *BudgetManager) GetStreamCappingPolicy(tenantID string) domain.StreamCappingPolicy {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if p, ok := m.cappingPolicies[tenantID]; ok {
+		return *p
+	}
+	if def, ok := m.cappingPolicies["default"]; ok {
+		cpy := *def
+		cpy.TenantID = tenantID
+		return cpy
+	}
+	return domain.StreamCappingPolicy{
+		TenantID:         tenantID,
+		MaxTokensPerReq:  4096,
+		MaxCostUSDPerReq: 0.10,
+		CustomNotice:     "\n\n[AI Meter: Generation capped: single-request token budget exceeded]",
+		Enabled:          true,
+		UpdatedAt:        time.Now().UTC(),
+	}
+}
+
+// UpsertStreamCappingPolicy updates or registers a tenant's streaming policy
+func (m *BudgetManager) UpsertStreamCappingPolicy(policy domain.StreamCappingPolicy) domain.StreamCappingPolicy {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if policy.TenantID == "" {
+		policy.TenantID = "default"
+	}
+	if policy.CustomNotice == "" {
+		policy.CustomNotice = "\n\n[AI Meter: Generation capped: single-request token budget exceeded]"
+	}
+	policy.UpdatedAt = time.Now().UTC()
+	m.cappingPolicies[policy.TenantID] = &policy
+	return policy
+}
+
+// GetPromptCompressionPolicy retrieves prompt compression settings for a tenant
+func (m *BudgetManager) GetPromptCompressionPolicy(tenantID string) domain.PromptCompressionPolicy {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if p, ok := m.compressionPolicies[tenantID]; ok {
+		return *p
+	}
+	if def, ok := m.compressionPolicies["default"]; ok {
+		cpy := *def
+		cpy.TenantID = tenantID
+		return cpy
+	}
+	return domain.PromptCompressionPolicy{
+		TenantID:            tenantID,
+		Enabled:             true,
+		Mode:                "balanced",
+		MinTokenThreshold:   300,
+		PreserveCodeBlocks:  true,
+		PreserveRecentTurns: 2,
+		UpdatedAt:           time.Now().UTC(),
+	}
+}
+
+// UpsertPromptCompressionPolicy updates or registers a tenant's prompt compression policy
+func (m *BudgetManager) UpsertPromptCompressionPolicy(policy domain.PromptCompressionPolicy) domain.PromptCompressionPolicy {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if policy.TenantID == "" {
+		policy.TenantID = "default"
+	}
+	if policy.Mode == "" {
+		policy.Mode = "balanced"
+	}
+	if policy.MinTokenThreshold <= 0 {
+		policy.MinTokenThreshold = 300
+	}
+	if policy.PreserveRecentTurns <= 0 {
+		policy.PreserveRecentTurns = 2
+	}
+	policy.UpdatedAt = time.Now().UTC()
+	m.compressionPolicies[policy.TenantID] = &policy
+	return policy
+}
+
+

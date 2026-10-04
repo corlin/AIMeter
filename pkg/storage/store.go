@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 
 // Store defines the interface for persisting and querying ledgers
 type Store interface {
+	Ping(ctx context.Context) error
 	WriteBatch(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error
 	GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error)
 	GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error)
@@ -49,6 +52,10 @@ func NewMemoryStore() *MemoryStore {
 		recommendations: make([]domain.CostRecommendation, 0),
 		breakers:        make(map[string]domain.CircuitBreakerRecord),
 	}
+}
+
+func (s *MemoryStore) Ping(ctx context.Context) error {
+	return nil
 }
 
 func (s *MemoryStore) WriteBatch(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error {
@@ -344,8 +351,68 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 		}
 	}
 
+	fallbackMap := make(map[string]struct {
+		originalModel string
+		actualModel   string
+	})
+	cappedMap := make(map[string]int)
+	compressedMap := make(map[string]struct {
+		originalTokens int
+		savedTokens    int
+		savedUSD       float64
+	})
+
+	for _, u := range s.usages {
+		if u.RawAttributes != nil {
+			if u.RawAttributes["aimeter.fallback"] == "true" {
+				fallbackMap[u.TraceID] = struct {
+					originalModel string
+					actualModel   string
+				}{
+					originalModel: u.RawAttributes["aimeter.original_model"],
+					actualModel:   u.RawAttributes["aimeter.actual_model"],
+				}
+			}
+			if u.RawAttributes["aimeter.stream_capped"] == "true" {
+				tokens, _ := strconv.Atoi(u.RawAttributes["aimeter.capped_tokens"])
+				cappedMap[u.TraceID] = tokens
+			}
+			if u.RawAttributes["aimeter.prompt_compressed"] == "true" {
+				orig, _ := strconv.Atoi(u.RawAttributes["aimeter.prompt_original_tokens"])
+				saved, _ := strconv.Atoi(u.RawAttributes["aimeter.prompt_saved_tokens"])
+				usd, _ := strconv.ParseFloat(u.RawAttributes["aimeter.prompt_saved_usd"], 64)
+				compressedMap[u.TraceID] = struct {
+					originalTokens int
+					savedTokens    int
+					savedUSD       float64
+				}{
+					originalTokens: orig,
+					savedTokens:    saved,
+					savedUSD:       usd,
+				}
+			}
+		}
+	}
+
 	var result []domain.TraceDetail
 	for _, td := range traceMap {
+		if fb, ok := fallbackMap[td.TraceID]; ok {
+			td.IsFallback = true
+			td.OriginalModel = fb.originalModel
+			td.ActualModel = fb.actualModel
+			td.CostSaved = td.TotalCost * 10
+		}
+		if cappedTokens, ok := cappedMap[td.TraceID]; ok {
+			td.IsStreamCapped = true
+			td.CappedTokens = cappedTokens
+			td.AvoidedWasteUSD = float64(cappedTokens) * 0.000015
+		}
+		if comp, ok := compressedMap[td.TraceID]; ok {
+			td.IsPromptCompressed = true
+			td.PromptOriginalTokens = comp.originalTokens
+			td.PromptSavedTokens = comp.savedTokens
+			td.PromptSavedUSD = comp.savedUSD
+		}
 		result = append(result, *td)
 	}
 
@@ -376,9 +443,33 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	}
 
 	latencyMap := make(map[string]uint32)
+	var isFallback bool
+	var isCapped bool
+	var cappedTokens int
+	var originalModel, actualModel string
+	var isCompressed bool
+	var promptOrigTokens, promptSavedTokens int
+	var promptSavedUSD float64
 	for _, u := range s.usages {
 		if u.TraceID == traceID {
 			latencyMap[u.SpanID] = u.LatencyMs
+			if u.RawAttributes != nil {
+				if u.RawAttributes["aimeter.fallback"] == "true" {
+					isFallback = true
+					originalModel = u.RawAttributes["aimeter.original_model"]
+					actualModel = u.RawAttributes["aimeter.actual_model"]
+				}
+				if u.RawAttributes["aimeter.stream_capped"] == "true" {
+					isCapped = true
+					cappedTokens, _ = strconv.Atoi(u.RawAttributes["aimeter.capped_tokens"])
+				}
+				if u.RawAttributes["aimeter.prompt_compressed"] == "true" {
+					isCompressed = true
+					promptOrigTokens, _ = strconv.Atoi(u.RawAttributes["aimeter.prompt_original_tokens"])
+					promptSavedTokens, _ = strconv.Atoi(u.RawAttributes["aimeter.prompt_saved_tokens"])
+					promptSavedUSD, _ = strconv.ParseFloat(u.RawAttributes["aimeter.prompt_saved_usd"], 64)
+				}
+			}
 		}
 	}
 
@@ -394,18 +485,27 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 		node, exists := nodeMap[item.SpanID]
 		if !exists {
 			node = &domain.TraceTreeNode{
-				SpanID:       item.SpanID,
-				ParentSpanID: item.ParentSpanID,
-				SpanName:     item.Attribution.AgentID,
-				AgentID:      item.Attribution.AgentID,
-				FeatureID:    item.Attribution.FeatureID,
-				Provider:     item.Provider,
-				Model:        item.Model,
-				LatencyMs:    latencyMap[item.SpanID],
-				Timestamp:    item.Timestamp,
-				UsageMeters:  make([]domain.UsageEvent, 0),
-				CostItems:    make([]domain.CostItem, 0),
-				Children:     make([]*domain.TraceTreeNode, 0),
+				SpanID:          item.SpanID,
+				ParentSpanID:    item.ParentSpanID,
+				SpanName:        item.Attribution.AgentID,
+				AgentID:         item.Attribution.AgentID,
+				FeatureID:       item.Attribution.FeatureID,
+				Provider:        item.Provider,
+				Model:           item.Model,
+				LatencyMs:       latencyMap[item.SpanID],
+				Timestamp:       item.Timestamp,
+				UsageMeters:     make([]domain.UsageEvent, 0),
+				CostItems:       make([]domain.CostItem, 0),
+				Children:        make([]*domain.TraceTreeNode, 0),
+				IsFallback:           isFallback,
+				OriginalModel:        originalModel,
+				IsStreamCapped:       isCapped,
+				CappedTokens:         cappedTokens,
+				AvoidedWasteUSD:      float64(cappedTokens) * 0.000015,
+				IsPromptCompressed:   isCompressed,
+				PromptOriginalTokens: promptOrigTokens,
+				PromptSavedTokens:    promptSavedTokens,
+				PromptSavedUSD:       promptSavedUSD,
 			}
 			if node.SpanName == "" {
 				node.SpanName = item.Model
@@ -416,9 +516,21 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 		node.CostItems = append(node.CostItems, item)
 		node.TotalCost += item.EffectiveCost
 		node.TotalTokens += item.Quantity
+
+		if item.GPUType != "" {
+			node.IsSelfHosted = true
+			node.GPUType = item.GPUType
+			node.GPUCount = item.GPUCount
+			node.GPUDurationMs = item.GPUDurationMs
+		} else if strings.EqualFold(item.Provider, "vllm") || strings.EqualFold(item.Provider, "ollama") || strings.EqualFold(item.Provider, "self-hosted") {
+			node.IsSelfHosted = true
+		}
 	}
 
 	for _, node := range nodeMap {
+		if node.IsSelfHosted && node.TotalTokens > 0 && node.TotalCost > 0 {
+			node.EquivalentTokenRate = (node.TotalCost / node.TotalTokens) * 1000000.0
+		}
 		if node.ParentSpanID == "" || node.ParentSpanID == node.SpanID {
 			rootNode = node
 		} else if parent, exists := nodeMap[node.ParentSpanID]; exists {
@@ -445,16 +557,32 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	sortChildren(rootNode)
 
 	firstItem := costItems[0]
+	costSaved := 0.0
+	if isFallback {
+		costSaved = totalTraceCost * 10
+	}
+
 	return &domain.TraceDetail{
-		TraceID:     traceID,
-		TenantID:    firstItem.Attribution.TenantID,
-		CustomerID:  firstItem.Attribution.CustomerID,
-		AppID:       firstItem.Attribution.AppID,
-		WorkflowID:  firstItem.Attribution.WorkflowID,
-		TotalCost:   totalTraceCost,
-		TotalTokens: totalTraceTokens,
-		DurationMs:  latencyMap[firstItem.SpanID],
-		Timestamp:   firstItem.Timestamp,
-		RootNode:    rootNode,
+		TraceID:       traceID,
+		TenantID:      firstItem.Attribution.TenantID,
+		CustomerID:    firstItem.Attribution.CustomerID,
+		AppID:         firstItem.Attribution.AppID,
+		WorkflowID:    firstItem.Attribution.WorkflowID,
+		TotalCost:     totalTraceCost,
+		TotalTokens:   totalTraceTokens,
+		DurationMs:    latencyMap[firstItem.SpanID],
+		Timestamp:     firstItem.Timestamp,
+		RootNode:             rootNode,
+		IsFallback:           isFallback,
+		OriginalModel:        originalModel,
+		ActualModel:          actualModel,
+		CostSaved:            costSaved,
+		IsStreamCapped:       isCapped,
+		CappedTokens:         cappedTokens,
+		AvoidedWasteUSD:      float64(cappedTokens) * 0.000015,
+		IsPromptCompressed:   isCompressed,
+		PromptOriginalTokens: promptOrigTokens,
+		PromptSavedTokens:    promptSavedTokens,
+		PromptSavedUSD:       promptSavedUSD,
 	}, nil
 }

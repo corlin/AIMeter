@@ -11,7 +11,9 @@ import {
   BellRing,
   ShieldAlert,
   Sparkles,
-  ZapOff
+  ZapOff,
+  KeyRound,
+  Scissors
 } from "lucide-react";
 
 export function Navbar() {
@@ -24,9 +26,11 @@ export function Navbar() {
     { label: "Reconciliation", href: "/reconcile", icon: FileCheck2 },
     { label: "FOCUS", href: "/focus", icon: PieChart },
     { label: "Budgets", href: "/budgets", icon: BellRing },
+    { label: "Prompt Slim", href: "/compress", icon: Scissors },
     { label: "Anomalies", href: "/anomalies", icon: ShieldAlert },
     { label: "Advisor", href: "/recommendations", icon: Sparkles },
     { label: "Circuit Breaker", href: "/circuit-breaker", icon: ZapOff },
+    { label: "API Keys", href: "/api-keys", icon: KeyRound },
   ];
 
   return (

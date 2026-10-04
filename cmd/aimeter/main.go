@@ -14,6 +14,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/api"
 	"github.com/corlin/AIMeter/pkg/attribution"
+	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/config"
@@ -169,7 +170,19 @@ func main() {
 	contextResolver := attribution.NewContextResolver()
 	ingestionService := collector.NewIngestionService(normalizerInst, contextResolver, ratingEngine, batcher)
 
-	// 8. Initialize API Server
+	// 8. Initialize Phase 9 Auth Service & Seed Demo Keys
+	authSvc := auth.NewAuthService()
+	demoKey, err := authSvc.GenerateKey(auth.CreateKeyRequest{
+		TenantID:     "org-enterprise-1",
+		Name:         "Default Gateway Production Key",
+		Scopes:       []string{auth.ScopeProxyInvoke, auth.ScopeGuardCheck, auth.ScopeTelemetryWrite, auth.ScopeReadMetrics},
+		RateLimitQPS: 500,
+	})
+	if err == nil {
+		log.Printf("[INFO Auth] Demo API Key generated: %s (Masked: %s)", demoKey.RawKey, demoKey.APIKey.KeyPrefix)
+	}
+
+	// 9. Initialize API Server
 	server := api.NewServer(
 		cfg.Server.HTTPPort,
 		primaryStore,
@@ -180,6 +193,8 @@ func main() {
 		anomalyDetector,
 		costAdvisor,
 		guardSvc,
+		authSvc,
+		cfg.Auth.Enabled,
 	)
 
 	go func() {

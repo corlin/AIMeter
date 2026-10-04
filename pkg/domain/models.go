@@ -18,6 +18,8 @@ const (
 	MeterToolExecution      = "Tool.Execution"
 	MeterAudioInputSecond   = "Audio.InputSecond"
 	MeterAudioOutputSecond  = "Audio.OutputSecond"
+	MeterGPUInferenceHour   = "GPU.InferenceHour"
+	MeterGPUDurationMs      = "GPU.DurationMs"
 )
 
 // AttributionContext represents the 8-level business context hierarchy
@@ -77,6 +79,9 @@ type CostItem struct {
 	IsReconciled     uint8              `json:"is_reconciled"`
 	ReconciliationID *uuid.UUID         `json:"reconciliation_id,omitempty"`
 	BillingPeriod    string             `json:"billing_period"`
+	GPUType          string             `json:"gpu_type,omitempty"`
+	GPUCount         int                `json:"gpu_count,omitempty"`
+	GPUDurationMs    uint32             `json:"gpu_duration_ms,omitempty"`
 }
 
 // RateEntry represents a pricing rule in the Rate Catalog
@@ -123,21 +128,46 @@ type TraceTreeNode struct {
 	CostItems    []CostItem       `json:"cost_items"`
 	TotalCost    float64          `json:"total_cost"`
 	TotalTokens  float64          `json:"total_tokens"`
-	Children     []*TraceTreeNode `json:"children"`
+	Children            []*TraceTreeNode `json:"children"`
+	IsFallback          bool             `json:"is_fallback,omitempty"`
+	OriginalModel       string           `json:"original_model,omitempty"`
+	IsSelfHosted        bool             `json:"is_self_hosted,omitempty"`
+	GPUType             string           `json:"gpu_type,omitempty"`
+	GPUCount            int              `json:"gpu_count,omitempty"`
+	GPUDurationMs       uint32           `json:"gpu_duration_ms,omitempty"`
+	EquivalentTokenRate float64          `json:"equivalent_token_rate,omitempty"`
+	IsStreamCapped       bool             `json:"is_stream_capped,omitempty"`
+	CappedTokens         int              `json:"capped_tokens,omitempty"`
+	AvoidedWasteUSD      float64          `json:"avoided_waste_usd,omitempty"`
+	IsPromptCompressed   bool             `json:"is_prompt_compressed,omitempty"`
+	PromptOriginalTokens int              `json:"prompt_original_tokens,omitempty"`
+	PromptSavedTokens    int              `json:"prompt_saved_tokens,omitempty"`
+	PromptSavedUSD       float64          `json:"prompt_saved_usd,omitempty"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
 type TraceDetail struct {
-	TraceID     string         `json:"trace_id"`
-	TenantID    string         `json:"tenant_id"`
-	CustomerID  string         `json:"customer_id"`
-	AppID       string         `json:"app_id"`
-	WorkflowID  string         `json:"workflow_id"`
-	TotalCost   float64        `json:"total_cost"`
-	TotalTokens float64        `json:"total_tokens"`
-	DurationMs  uint32         `json:"duration_ms"`
-	Timestamp   time.Time      `json:"timestamp"`
-	RootNode    *TraceTreeNode `json:"root_node"`
+	TraceID              string         `json:"trace_id"`
+	TenantID             string         `json:"tenant_id"`
+	CustomerID           string         `json:"customer_id"`
+	AppID                string         `json:"app_id"`
+	WorkflowID           string         `json:"workflow_id"`
+	TotalCost            float64        `json:"total_cost"`
+	TotalTokens          float64        `json:"total_tokens"`
+	DurationMs           uint32         `json:"duration_ms"`
+	Timestamp            time.Time      `json:"timestamp"`
+	RootNode             *TraceTreeNode `json:"root_node"`
+	IsFallback           bool           `json:"is_fallback,omitempty"`
+	OriginalModel        string         `json:"original_model,omitempty"`
+	ActualModel          string         `json:"actual_model,omitempty"`
+	CostSaved            float64        `json:"cost_saved,omitempty"`
+	IsStreamCapped       bool           `json:"is_stream_capped,omitempty"`
+	CappedTokens         int            `json:"capped_tokens,omitempty"`
+	AvoidedWasteUSD      float64        `json:"avoided_waste_usd,omitempty"`
+	IsPromptCompressed   bool           `json:"is_prompt_compressed,omitempty"`
+	PromptOriginalTokens int            `json:"prompt_original_tokens,omitempty"`
+	PromptSavedTokens    int            `json:"prompt_saved_tokens,omitempty"`
+	PromptSavedUSD       float64        `json:"prompt_saved_usd,omitempty"`
 }
 
 // OverviewStats provides high level aggregate metrics for the dashboard
@@ -365,3 +395,115 @@ type CircuitBreakerRecord struct {
 	Reason          string    `json:"reason"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+
+// ==========================================
+// Phase 11: Self-Hosted GPU & Hardware Catalog
+// ==========================================
+
+// GPUCatalogEntry represents a standardized GPU accelerator card and hourly rate
+type GPUCatalogEntry struct {
+	ID            uuid.UUID `json:"id"`
+	GPUType       string    `json:"gpu_type"`        // "H100", "A100", "L40S", "RTX4090"
+	VRAMGB        int       `json:"vram_gb"`         // 80, 48, 24
+	HourlyRateUSD float64   `json:"hourly_rate_usd"` // e.g. 2.80, 1.60, 0.95, 0.40
+	Provider      string    `json:"provider"`        // "on-premise", "lambda", "runpod", "coreweave"
+	Description   string    `json:"description"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// ModelGPUBinding defines the recommended hardware cluster allocation for an open-source model
+type ModelGPUBinding struct {
+	Model           string `json:"model"`             // "deepseek-ai/DeepSeek-R1", "qwen2.5:72b"
+	DefaultGPUType  string `json:"default_gpu_type"`  // "A100"
+	DefaultGPUCount int    `json:"default_gpu_count"` // 4
+	Framework       string `json:"framework"`         // "vllm", "ollama", "tgi"
+	Description     string `json:"description"`
+}
+
+// GPUCostCalculationRequest represents on-the-fly hardware cost estimation
+type GPUCostCalculationRequest struct {
+	Model         string  `json:"model"`
+	GPUType       string  `json:"gpu_type"`
+	GPUCount      int     `json:"gpu_count"`
+	DurationMs    uint32  `json:"duration_ms"`
+	TotalTokens   int64   `json:"total_tokens"`
+}
+
+// GPUCostCalculationResult represents output of hardware cost conversion
+type GPUCostCalculationResult struct {
+	Model               string  `json:"model"`
+	GPUType             string  `json:"gpu_type"`
+	GPUCount            int     `json:"gpu_count"`
+	DurationMs          uint32  `json:"duration_ms"`
+	HardwareCostUSD     float64 `json:"hardware_cost_usd"`
+	HourlyRateUSD       float64 `json:"hourly_rate_usd"`
+	TotalTokens         int64   `json:"total_tokens"`
+	EquivalentTokenRate float64 `json:"equivalent_token_rate"` // USD per 1M tokens
+}
+
+// ==========================================
+// Phase 12: Streaming Hard-Capping Policies
+// ==========================================
+
+// StreamCappingPolicy defines real-time cutoff thresholds during streaming generation
+type StreamCappingPolicy struct {
+	TenantID         string  `json:"tenant_id"`
+	MaxTokensPerReq  int     `json:"max_tokens_per_req"`   // 0 = unlimited, e.g. 4096
+	MaxCostUSDPerReq float64 `json:"max_cost_usd_per_req"` // 0.0 = unlimited, e.g. 0.05
+	CustomNotice     string  `json:"custom_notice"`        // Injected message on cutoff
+	Enabled          bool    `json:"enabled"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// ==========================================
+// Phase 13: Semantic Prompt Compression
+// ==========================================
+
+// ChatMessage represents a single chat completion message item
+type ChatMessage struct {
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"` // string or []map[string]interface{}
+	Name    string      `json:"name,omitempty"`
+}
+
+// PromptCompressionPolicy defines tenant-level prompt slimming rules
+type PromptCompressionPolicy struct {
+	TenantID            string    `json:"tenant_id"`
+	Enabled             bool      `json:"enabled"`
+	Mode                string    `json:"mode"` // safe, balanced, aggressive
+	MinTokenThreshold   int       `json:"min_token_threshold"`
+	PreserveCodeBlocks  bool      `json:"preserve_code_blocks"`
+	PreserveRecentTurns int       `json:"preserve_recent_turns"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+// PromptCompressionResult holds the metrics of a prompt compression run
+type PromptCompressionResult struct {
+	OriginalTokens   int           `json:"original_tokens"`
+	CompressedTokens int           `json:"compressed_tokens"`
+	SavedTokens      int           `json:"saved_tokens"`
+	CompressionRatio float64       `json:"compression_ratio"`
+	DurationMs       float64       `json:"duration_ms"`
+	Messages         []ChatMessage `json:"messages"`
+}
+
+// PromptCompressionSimulateRequest represents request for interactive playground
+type PromptCompressionSimulateRequest struct {
+	Messages            []ChatMessage `json:"messages"`
+	Mode                string        `json:"mode"` // safe, balanced, aggressive
+	PreserveCodeBlocks  bool          `json:"preserve_code_blocks"`
+	PreserveRecentTurns int           `json:"preserve_recent_turns"`
+	SelectedModel       string        `json:"selected_model,omitempty"`
+}
+
+// PromptCompressionSimulateResponse represents response for interactive playground
+type PromptCompressionSimulateResponse struct {
+	OriginalTokens     int                `json:"original_tokens"`
+	CompressedTokens   int                `json:"compressed_tokens"`
+	SavedTokens        int                `json:"saved_tokens"`
+	CompressionRatio   float64            `json:"compression_ratio"`
+	DurationMs         float64            `json:"duration_ms"`
+	CompressedMessages []ChatMessage      `json:"compressed_messages"`
+	ModelSavings       map[string]float64 `json:"model_savings_usd"`
+}
+

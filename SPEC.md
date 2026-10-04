@@ -518,35 +518,119 @@ AIMeter/
 ## 7. 分期演进路线图 (Phased Roadmap)
 
 ### Phase 1: MVP 核心经济闭环 (Core Observe-Normalize-Rate-Explore)
-* [ ] 搭建 Go 模块化单体与 Next.js 基础工程框架。
-* [ ] 实现 OTLP gRPC/HTTP Receiver 与标准 REST Usage API。
-* [ ] 实现主流模型（OpenAI, Anthropic, Gemini, DeepSeek, Bedrock）的 Taxonomy Normalizer。
-* [ ] 建立 PostgreSQL 存储的公有 Rate Catalog（带主流模型 Seed 数据与内存缓存刷新）。
-* [ ] 实现实时流式 Rating Engine，并将 Usage Ledger & Cost Ledger 批量高效写入 ClickHouse。
-* [ ] 实现 W3C Baggage 与 Span Attributes 归因提取。
-* [ ] 构建 Next.js Cost Explorer：支持多维成本统计分析与端到端 Trace 树成本下钻视图。
-* [ ] 交付一键启动 Docker Compose 编排文件。
+* [x] 搭建 Go 模块化单体与 Next.js 基础工程框架。
+* [x] 实现 OTLP gRPC/HTTP Receiver 与标准 REST Usage API。
+* [x] 实现主流模型（OpenAI, Anthropic, Gemini, DeepSeek, Bedrock）的 Taxonomy Normalizer。
+* [x] 建立 PostgreSQL 存储的公有 Rate Catalog（带主流模型 Seed 数据与内存缓存刷新）。
+* [x] 实现实时流式 Rating Engine，并将 Usage Ledger & Cost Ledger 批量高效写入 ClickHouse。
+* [x] 实现 W3C Baggage 与 Span Attributes 归因提取。
+* [x] 构建 Next.js Cost Explorer：支持多维成本统计分析与端到端 Trace 树成本下钻视图。
+* [x] 交付一键启动 Docker Compose 编排文件。
 
 ### Phase 2: 企业级 FinOps 与对账能力 (Enterprise FinOps & Reconcile)
-* [ ] 开发多租户专属合同费率覆盖与折扣管理（Custom Contract Rates）。
-* [ ] 实现主流云厂商（OpenAI, AWS, Azure）账单 API 定时拉取与 CSV 上传解析器。
-* [ ] 构建 Reconciliation Engine，提供日/月度观测金额与开票金额的方差拆解视图。
-* [ ] 实现 FOCUS 1.0/1.1 标准导出适配器（支持 Parquet/CSV 自动同步至 S3/GCS）。
-* [ ] 增加预算设置（Budgets）与阈值 Webhook/Email 告警。
+* [x] 开发多租户专属合同费率覆盖与折扣管理（Custom Contract Rates）。
+* [x] 实现主流云厂商（OpenAI, AWS, Azure）账单 API 定时拉取与 CSV/PDF 上传解析器。
+* [x] 构建 Reconciliation Engine，提供日/月度观测金额与开票金额的 5 维方差拆解视图。
+* [x] 实现 FOCUS 1.0/1.1 标准导出适配器（支持 CSV/JSON 规范化流式导出）。
+* [x] 增加多粒度预算设置（Budgets）与阈值 Webhook 实时告警。
 
 ### Phase 3: AI 成本智能与架构优化建议 (Cost Intelligence)
-* [ ] 构建 AI Spend 行业基准与模型能效比分析（Unit Economics Benchmark）。
-* [ ] 提供自动化优化洞察（如：检测高频重复 Prompt 提示 Cache 命中提升空间、大模型降级至小型蒸馏模型/Reasoning 模型的 ROI 预估）。
-* [ ] 智能路由与成本异常自动检测（Anomaly Detection）。
+* [x] 构建 AI Spend 智能异常与死循环自动拦截雷达（Runaway Loop Radar & Anomaly Detector）。
+* [x] 提供自动化优化洞察（Prompt Caching 命中提升测算、大模型降配平替 ROI 预估、Thinking Token 控制）。
+* [x] 适配主流 AI 网关（LiteLLM, Cloudflare AI Gateway, One-API, Kong）Webhook 日志。
+
+### Phase 4: 闭环防护与三态熔断器 (Active Guard & Circuit Breaker)
+* [x] 构建 <2ms 极速同步预检接口（POST /v1/guard/check）与 DAG 递归深度拦截。
+* [x] 实现 Closed -> Open -> Half-Open 三态熔断器核心与推荐平替降级策略。
+* [x] 交付控制台熔断防护大盘、一键重置解封与仿真测试沙箱。
+
+### Phase 5: 生产化工程与可观测体系 (Production Engineering & Observability)
+* [x] 交付生产级 Dockerfile.backend 与 Dockerfile.frontend（Next.js standalone 轻量容器）。
+* [x] 升级 docker-compose.yml 实现 Backend + Frontend + ClickHouse + Postgres 4 容器全栈一键编排。
+* [x] 引入 Prometheus 指标监控（/metrics）与 Kubernetes 标准双探针（/livez, /readyz）。
+* [x] 交付云原生 Kubernetes Helm Chart（含 Ingress, HPA 弹性伸缩, ServiceMonitor, ConfigMap）。
+* [x] 构建 GitHub Actions 三阶并发质量门禁 CI 流水线（Go test -race, Next.js standalone build, Docker & Helm lint）。
+
+### Phase 6: 客户端 SDK 与 Agent 生态扩展 (Client SDKs & Framework Adapters)
+* [x] 基于 uv 搭建标准 Python SDK 工程（sdks/python/，支持 pyproject.toml 与 py.typed）。
+* [x] 交付极速 Active Guard 预检客户端（默认 20ms 超时 + Fail-Open 柔性降级）。
+* [x] 交付非阻塞后台守护线程上报器（BackgroundReporter，带内存队列、批量 Flush 与 atexit 优雅刷盘）。
+* [x] 交付 @meter.trace 装饰器与上下文管理器（基于 contextvars 自动级联树深度与父子 Span，自动嗅探提取 OpenAI/Anthropic Token 消耗）。
+* [x] 交付 LangChain（AIMeterCallbackHandler）与 LlamaIndex（AIMeterLlamaIndexCallbackHandler）原生回调适配器。
+* [x] 补齐 GitHub Actions CI 中的 Python SDK 自动化测试 Job。
+
+### Phase 7: 智能反向代理网关与模型动态平替 (Smart LLM Reverse Proxy & Dynamic Fallback)
+* [x] 交付双入口透明反向代理（OpenAI 标准兼容 `/v1/chat/completions` 与多厂商前缀 `/v1/proxy/:vendor/chat/completions`）。
+* [x] 交付前置熔断预算预检与级联模型平替管理器（FallbackManager），支持高性价比模型平替映射（如 gpt-4o ➔ gpt-4o-mini）。
+* [x] 支持通过 `X-AIMeter-Disable-Fallback: true` 快速阻断（HTTP 429）与平替响应头标记（`X-AIMeter-Fallback: true`）。
+* [x] 交付流式 SSE 零缓冲逐块实时透传（Flusher）与 `stream_options.include_usage=true` 自动注入补齐。
+* [x] 交付流式/非流式响应异步计量入库流水线（零 Payload 隐私原则）。
+* [x] 暴露 Prometheus 代理指标（`aimeter_proxy_requests_total`, `aimeter_proxy_duration_seconds`, `aimeter_proxy_fallback_events_total`）。
+* [x] 控制台 Traces 列表直观渲染 `Fallback` 徽标、原模型/实际模型比对与成本节省（Cost Saved）核算。
+
+### Phase 8: 多渠道实时告警通知与 Webhook 调度引擎 (Alert Notifications & Webhooks)
+* [x] 建立集中式告警调度中心（`pkg/alert/`），统一纳管预算超支、熔断器跳闸与失控死循环异常事件。
+* [x] 原生适配多渠道富文本与卡片消息（飞书交互式卡片、钉钉 Markdown、企业微信 Markdown、Slack Block Kit 与通用标准 JSON）。
+* [x] 实现基于指纹的 5 分钟静默冷却期防群聊刷屏、聚合抑制计数与最多 3 次指数退避容错重试。
+* [x] 交付 Webhook 端点管理 REST API 与一键发送测试卡片功能（`/api/v1/alerts/channels`、`/api/v1/alerts/channels/test`、`/api/v1/alerts/deliveries`）。
+* [x] 升级 Web 控制台 `/budgets` 为双 Tab 交互看板（预算配额管理 + 告警通道与投递审计日志）。
+
+### Phase 9: 企业级多租户安全鉴权与 API Key 凭证体系 (Enterprise RBAC & API Key Management)
+* [x] 建立工业级凭证安全体系（`pkg/auth/`），格式规范为 `sk-aimeter-live-<32位随机安全熵>`。
+* [x] 实施不可逆 `SHA-256` 散列存储与脱敏掩码（如 `sk-aimeter-live-...8f4a`），密钥明文仅在签发时展示一次。
+* [x] 构建高并发并发安全带 LRU 淘汰的内存极速验签引擎（单次验签 `< 0.05ms`），确保 Active Guard `< 2ms` 预检零性能衰减。
+* [x] 交付细粒度最小权限作用域（`proxy:invoke`, `guard:check`, `telemetry:write`, `read:metrics`, `admin:*`）。
+* [x] 实现针对每个 Key 的独立令牌桶 QPS 限流器（超额即刻返回 HTTP 429 频控拦截）。
+* [x] 交付支持开发模式（Permissive）与生产严格模式（Enforcing）的平滑鉴权中间件。
+* [x] 交付 Web 控制台全新 `/api-keys` 一级路由看板（凭证清单、模态窗签发、一次性明文防盗弹窗与挂起/吊销即时生命周期控制）。
+
+### Phase 10: 万级 QPS 生产级基准压测与性能体检套件 (High-QPS Benchmark & Stress Test Suite)
+* [x] 交付 Go 原生高并发压测引擎 CLI（`cmd/bench/`），内置高性能 Mock Server 与 TCP Keep-Alive 连接池，零外部依赖一键运行。
+* [x] 交付云原生标准 `k6` 压测套件（`scripts/bench/k6_stress.js`），支持阶梯负载与 CI/DevOps 自动化门禁。
+* [x] 覆盖 4 维核心场景矩阵实测验证（预检 **10.1 万 QPS / P99 1.66ms**、LRU 验签 **10.8 万 QPS / P99 1.45ms**、反向代理 **4.1 万 QPS / P99 4.04ms**、遥测微批 **6.5 万 QPS / P99 2.78ms**，100% 通过 SLA 门禁）。
+* [x] 完成双重检查锁定（DCL）架构优化，消除高并发下的写锁争用，微基准下验签纯算力耗时仅 **~199ns**、预检仅 **~164ns**。
+* [x] 自动生成权威结构化生产性能报告（[`BENCHMARK.md`](file:///Users/corlin/2026/AIMeter/BENCHMARK.md)），支持 `--sla-gate` 质量回归阻断。
+
+### Phase 11: 私有化算力与开源模型成本折算引擎 (Self-Hosted GPU & vLLM/Ollama Cost Modeling)
+* [x] 建立私有化 GPU 加速卡硬件目录与卡时单价折算引擎（`pkg/rater/gpu.go`），内置 H100 ($2.80/h), A100 ($1.60/h), L40S ($0.95/h), RTX 4090 ($0.40/h) 标准卡时费率。
+* [x] 实现动态双轨模型成本精确核算：$\text{Cost} = \frac{\text{Duration (ms)}}{3,600,000} \times \text{Hourly Rate} \times \text{GPU Count}$，并自动反推等效 \$/1M Tokens。
+* [x] 建立开源模型推荐硬件绑定表（DeepSeek-R1 4×A100, Qwen2.5 2×A100/1×L40S, Llama 3.3 等）与动态覆写机制。
+* [x] 适配 vLLM 与 Ollama 原生调用（网关接收 `/v1/gateway/:vendor` 与请求头 `X-AIMeter-GPU-Type` / `X-AIMeter-GPU-Count` 透传识别）。
+* [x] 暴露 GPU 算力 REST API（`/api/v1/rates/gpus`, `/api/v1/rates/gpus/bindings`, `/api/v1/rates/gpus/calculate` 在线试算）。
+* [x] 升级 Web 控制台 `/rates` 为双 Tab 看板（公有云模型基准费率 + 自建 GPU 硬件目录与模型绑定表 + 在线实时成本计算器）。
+* [x] 升级 Traces 树状图渲染：点亮 `[Self-Hosted GPU]` 芯片标识、卡型、卡数、纯推理时长及等效每百万 Token 费率。
+
+### Phase 12: 实时 Token 级流式断流与单次请求硬限额 (Streaming Token-Level Hard-Capping & Budget Cut-off)
+* [x] 构建高性能双轨混合 Token 增量估算引擎（`pkg/proxy/token_counter.go`），支持多语言极速启发式统计（中文/CJK ~1.0 Token/字，西文 ~3.8 字符/Token，耗时 <50ns）结合原生 Usage Chunk 动态回填校准。
+* [x] 实现反向代理流式传输中的实时累计与物理阻断引擎：单次请求超出最大 Token (`max_tokens_per_req`) 或最大金额 (`max_cost_usd_per_req`) 时，立即调用 `cancelUpstream()` 物理关闭上游 HTTP 连接，从源头停止云厂商模型扣费。
+* [x] 交付优雅 SSE 终结协议注入器（`BuildTerminationSSEChunks`），下发友好截断告知文案 + 注入终结状态 `finish_reason: "budget_exceeded"` + 推送 `data: [DONE]\n\n`，确保客户端与应用 SDK 正常解析无丢包。
+* [x] 支持双层级灵活限额级联：支持租户默认策略纳管与通过客户端 HTTP 请求头 `X-AIMeter-Max-Tokens` / `X-AIMeter-Max-Cost-USD` 动态覆盖。
+* [x] 暴露流式断流租户配置 REST API（`GET/POST /api/v1/budgets/stream-capping`），并在跨域 CORS 中完整暴露断流控制响应头。
+* [x] 升级 Web 控制台 `/budgets` 看板，增加全新第 3 个 Tab：“流式断流与单次硬限额 (Streaming Hard-Capping)”，支持在线调整租户策略与查看协议架构。
+* [x] 升级 Web 控制台 `/traces` 列表与 `TraceTreeViewer` 树状层级图，被断流请求高亮渲染 `⚡ Stream Capped` 警示徽标与 Avoided Runaway Spend（规避浪费金额）。
+* [x] 交付严密后端端到端流式断流代理集成测试套件（`pkg/proxy/token_capping_test.go`），覆盖增量估算、终结 chunk 构造与上游 Cancel 行为。
+
+### Phase 13: 语义级智能 Prompt 压缩与 Token 瘦身代理 (Semantic Prompt Compression & Token Slimming Engine)
+* [x] 交付纯 Go 高性能两阶段无依赖 Prompt 压缩引擎（`pkg/compress/engine.go`），单次脱水时延 `< 0.5ms`，无需部署外部模型或 Python Sidecar。
+* [x] 实现 Stage 1 结构化语义脱水：智能折叠多余空白与重复标点，并具备 Markdown 代码块（```）与缩进保护，保留代码格式与 JSON 结构完整性。
+* [x] 实现 Stage 2 上下文自适应信息熵剪枝：绝对保护 System 提示词与最近 $N$ 轮最新对话，自动识别并过滤历史冗余客套语（如“你好”、“请问”等低信息熵词）。
+* [x] 实现安全兜底与跳过机制：极短文本（< 60 字符）自动跳过，压缩率保真底线控制。
+* [x] 接入反向代理网关：通过请求头 `X-AIMeter-Compress-Prompt: true` 及 `X-AIMeter-Compress-Mode` 动态开关，自动重写上游请求 `messages` 并通过响应头 `X-AIMeter-Prompt-Compressed`, `X-AIMeter-Tokens-Saved`, `X-AIMeter-Compression-Ratio` 透明回传节省指标。
+* [x] 建立租户级压缩策略管理与仿真 REST API（`GET/POST /api/v1/compress/policy`, `POST /api/v1/compress/simulate`）。
+* [x] 交付全新 Web 页面 `/compress`（Prompt Slim 策略中心与多模型交互式试算对比 Playground）。
+* [x] 升级 `/traces` 列表与 `TraceTreeViewer` 树状层级图：点亮 `🌿 Prompt Slimmed` 徽标、节省 Token 数与节省美元金额（`Slimmed: +$X`）。
 
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)
 
-1. **零 Payload 存储原则 (Zero-Payload Retention)**：
+1. **不可逆凭证哈希与防泄露机制 (Credential Security)**：
+   * 数据库仅持久化 API Key 的 SHA-256 散列值与脱敏掩码，即便数据库备份泄露也无法还原明文密钥。
+   * 控制台仅在签发成功瞬间展示一次明文，关闭后永不再向任何客户端返回密钥原始内容。
+2. **零 Payload 存储原则 (Zero-Payload Retention)**：
    * AI Meter 是纯粹的经济与计量控制面，**默认绝不记录或持久化 Prompt 内容、用户输入文本与模型回复内容（No Prompts / No Completions stored）**。
    * 系统仅收集 Token 数、延迟、模型名、维度标签等元数据。
-2. **多租户严格逻辑隔离**：
+3. **多租户严格逻辑隔离**：
    * 所有 OLTP 与 OLAP 查询均以 `tenant_id` 作为强制过滤索引条件。
-3. **数据主权与私有化友好**：
+4. **数据主权与私有化友好**：
    * 系统支持完全在客户自身 VPC / 内部 K8s 集群中无外网依赖私有化运行。

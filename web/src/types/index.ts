@@ -42,6 +42,9 @@ export interface CostItem {
   contract_discount: number;
   effective_cost: number;
   billing_period: string;
+  gpu_type?: string;
+  gpu_count?: number;
+  gpu_duration_ms?: number;
 }
 
 export interface TraceTreeNode {
@@ -58,6 +61,20 @@ export interface TraceTreeNode {
   total_tokens: number;
   cost_items?: CostItem[];
   children: TraceTreeNode[];
+  is_fallback?: boolean;
+  original_model?: string;
+  is_self_hosted?: boolean;
+  gpu_type?: string;
+  gpu_count?: number;
+  gpu_duration_ms?: number;
+  equivalent_token_rate?: number;
+  is_stream_capped?: boolean;
+  capped_tokens?: number;
+  avoided_waste_usd?: number;
+  is_prompt_compressed?: boolean;
+  prompt_original_tokens?: number;
+  prompt_saved_tokens?: number;
+  prompt_saved_usd?: number;
 }
 
 export interface TraceDetail {
@@ -71,6 +88,17 @@ export interface TraceDetail {
   duration_ms: number;
   timestamp: string;
   root_node?: TraceTreeNode;
+  is_fallback?: boolean;
+  original_model?: string;
+  actual_model?: string;
+  cost_saved?: number;
+  is_stream_capped?: boolean;
+  capped_tokens?: number;
+  avoided_waste_usd?: number;
+  is_prompt_compressed?: boolean;
+  prompt_original_tokens?: number;
+  prompt_saved_tokens?: number;
+  prompt_saved_usd?: number;
 }
 
 export interface RateEntry {
@@ -235,3 +263,143 @@ export interface CircuitBreakerRecord {
   reason: string;
   updated_at: string;
 }
+
+// Phase 8: Multi-channel Alerts & Webhooks
+export interface AlertChannel {
+  id: string;
+  tenant_id: string;
+  name: string;
+  channel_type: "feishu" | "dingtalk" | "wecom" | "slack" | "generic_json";
+  webhook_url: string;
+  secret?: string;
+  subscribed_events: string[];
+  cooldown_seconds: number;
+  enabled: boolean;
+  created_at?: string;
+}
+
+export interface DeliveryLog {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  channel_type: string;
+  event_id: string;
+  event_type: string;
+  success: boolean;
+  http_status: number;
+  error_message?: string;
+  latency_ms: number;
+  delivered_at: string;
+}
+
+// Phase 9: Multi-tenant RBAC & API Keys
+export interface APIKey {
+  id: string;
+  tenant_id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  rate_limit_qps: number;
+  status: 'active' | 'suspended' | 'revoked';
+  created_at: string;
+  expires_at?: string;
+  last_used_at?: string;
+}
+
+export interface KeyCreateResult {
+  raw_key: string;
+  api_key: APIKey;
+}
+
+export interface CreateKeyRequest {
+  tenant_id: string;
+  name: string;
+  scopes: string[];
+  rate_limit_qps: number;
+  expires_in_days: number;
+}
+
+// Phase 11: Self-Hosted GPU & Hardware Catalog
+export interface GPUCatalogEntry {
+  id: string;
+  gpu_type: string;
+  vram_gb: number;
+  hourly_rate_usd: number;
+  provider: string;
+  description: string;
+  updated_at?: string;
+}
+
+export interface ModelGPUBinding {
+  model: string;
+  default_gpu_type: string;
+  default_gpu_count: number;
+  framework: string;
+  description: string;
+}
+
+export interface GPUCostCalculationRequest {
+  model: string;
+  gpu_type: string;
+  gpu_count: number;
+  duration_ms: number;
+  total_tokens: number;
+}
+
+export interface GPUCostCalculationResult {
+  model: string;
+  gpu_type: string;
+  gpu_count: number;
+  duration_ms: number;
+  hardware_cost_usd: number;
+  hourly_rate_usd: number;
+  total_tokens: number;
+  equivalent_token_rate: number;
+}
+
+// Phase 12: Streaming Hard-Capping & Budget Cut-off
+export interface StreamCappingPolicy {
+  tenant_id: string;
+  max_tokens_per_req: number;
+  max_cost_usd_per_req: number;
+  custom_notice: string;
+  enabled: boolean;
+  updated_at?: string;
+}
+
+// Phase 13: Semantic Prompt Compression & Token Slimming
+export interface ChatMessageItem {
+  role: string;
+  content: string;
+  name?: string;
+}
+
+export interface PromptCompressionPolicy {
+  tenant_id: string;
+  enabled: boolean;
+  mode: "safe" | "balanced" | "aggressive";
+  min_token_threshold: number;
+  preserve_code_blocks: boolean;
+  preserve_recent_turns: number;
+  updated_at?: string;
+}
+
+export interface PromptCompressionSimulateRequest {
+  messages: ChatMessageItem[];
+  mode: "safe" | "balanced" | "aggressive";
+  preserve_code_blocks: boolean;
+  preserve_recent_turns: number;
+  selected_model?: string;
+}
+
+export interface PromptCompressionSimulateResponse {
+  original_tokens: number;
+  compressed_tokens: number;
+  saved_tokens: number;
+  compression_ratio: number;
+  duration_ms: number;
+  compressed_messages: ChatMessageItem[];
+  model_savings_usd: Record<string, number>;
+}
+
+

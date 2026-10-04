@@ -11,7 +11,20 @@ import {
   CostRecommendation,
   CircuitBreakerRecord,
   GuardCheckRequest,
-  GuardCheckResponse
+  GuardCheckResponse,
+  AlertChannel,
+  DeliveryLog,
+  APIKey,
+  KeyCreateResult,
+  CreateKeyRequest,
+  GPUCatalogEntry,
+  ModelGPUBinding,
+  GPUCostCalculationRequest,
+  GPUCostCalculationResult,
+  StreamCappingPolicy,
+  PromptCompressionPolicy,
+  PromptCompressionSimulateRequest,
+  PromptCompressionSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -245,8 +258,243 @@ export async function checkGuard(req: GuardCheckRequest): Promise<GuardCheckResp
   return await res.json();
 }
 
+// Phase 8: Multi-channel Alerts & Webhooks
+export async function fetchAlertChannels(tenantId = "all"): Promise<AlertChannel[]> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/channels?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch alert channels");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for alert channels", err);
+    return [];
+  }
+}
+
+export async function createAlertChannel(channel: Partial<AlertChannel>): Promise<AlertChannel> {
+  const res = await fetch(`${API_BASE}/alerts/channels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(channel),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create channel" }));
+    throw new Error(err.error || "Failed to create channel");
+  }
+  return await res.json();
+}
+
+export async function deleteAlertChannel(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/alerts/channels/${id}`, { method: "DELETE" });
+  return res.ok;
+}
+
+export async function testAlertChannel(channel: Partial<AlertChannel>): Promise<DeliveryLog> {
+  const res = await fetch(`${API_BASE}/alerts/channels/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(channel),
+  });
+  return await res.json();
+}
+
+export async function fetchAlertDeliveries(limit = 50): Promise<DeliveryLog[]> {
+  try {
+    const res = await fetch(`${API_BASE}/alerts/deliveries?limit=${limit}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch delivery logs");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for delivery logs", err);
+    return [];
+  }
+}
+
+// Phase 9: Multi-tenant RBAC & API Keys
+export async function fetchAPIKeys(tenantId = "all"): Promise<APIKey[]> {
+  try {
+    const url = tenantId === "all" ? `${API_BASE}/auth/keys` : `${API_BASE}/auth/keys?tenant_id=${tenantId}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch API keys");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for API keys", err);
+    return [];
+  }
+}
+
+export async function createAPIKey(req: CreateKeyRequest): Promise<KeyCreateResult> {
+  const res = await fetch(`${API_BASE}/auth/keys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create API key" }));
+    throw new Error(err.error || "Failed to create API key");
+  }
+  return await res.json();
+}
+
+export async function revokeAPIKey(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/auth/keys/${id}`, { method: "DELETE" });
+  return res.ok;
+}
+
+export async function updateAPIKeyStatus(id: string, status: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/auth/keys/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return res.ok;
+}
+
 const defaultTenants: Tenant[] = [
   { id: "org-enterprise-1", name: "Enterprise Corp", default_currency: "USD", global_discount: 0.15 },
   { id: "org-fintech-2", name: "Fintech Global", default_currency: "USD", global_discount: 0.0 },
   { id: "default", name: "Default Organization", default_currency: "USD", global_discount: 0.0 },
 ];
+
+// Phase 11: Self-Hosted GPU & Hardware Catalog APIs
+export async function fetchGPUCatalog(): Promise<GPUCatalogEntry[]> {
+  try {
+    const res = await fetch(`${API_BASE}/rates/gpus`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch GPU catalog");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for GPU catalog", err);
+    return [];
+  }
+}
+
+export async function upsertGPUCatalog(entry: Partial<GPUCatalogEntry>): Promise<GPUCatalogEntry> {
+  const res = await fetch(`${API_BASE}/rates/gpus`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save GPU entry" }));
+    throw new Error(err.error || "Failed to save GPU entry");
+  }
+  return await res.json();
+}
+
+export async function fetchModelGPUBindings(): Promise<ModelGPUBinding[]> {
+  try {
+    const res = await fetch(`${API_BASE}/rates/gpus/bindings`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch model GPU bindings");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("API fetch error for GPU bindings", err);
+    return [];
+  }
+}
+
+export async function upsertModelGPUBinding(binding: ModelGPUBinding): Promise<ModelGPUBinding> {
+  const res = await fetch(`${API_BASE}/rates/gpus/bindings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(binding),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save binding" }));
+    throw new Error(err.error || "Failed to save binding");
+  }
+  return await res.json();
+}
+
+export async function calculateGPUCost(req: GPUCostCalculationRequest): Promise<GPUCostCalculationResult> {
+  const res = await fetch(`${API_BASE}/rates/gpus/calculate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to calculate GPU cost" }));
+    throw new Error(err.error || "Failed to calculate GPU cost");
+  }
+  return await res.json();
+}
+
+// Phase 12: Streaming Hard-Capping & Budget Cut-off
+export async function fetchStreamCappingPolicy(tenantId = "tenant-default"): Promise<StreamCappingPolicy> {
+  try {
+    const res = await fetch(`${API_BASE}/budgets/stream-capping?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch stream capping policy");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for stream capping policy", err);
+    return {
+      tenant_id: tenantId,
+      max_tokens_per_req: 4096,
+      max_cost_usd_per_req: 0.10,
+      custom_notice: "\n\n[AI Meter Notice: Stream output terminated as the single-request budget limit was reached]",
+      enabled: true,
+    };
+  }
+}
+
+export async function upsertStreamCappingPolicy(policy: StreamCappingPolicy): Promise<StreamCappingPolicy> {
+  const res = await fetch(`${API_BASE}/budgets/stream-capping`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save stream capping policy" }));
+    throw new Error(err.error || "Failed to save stream capping policy");
+  }
+  return await res.json();
+}
+
+// Phase 13: Semantic Prompt Compression & Token Slimming
+export async function fetchPromptCompressionPolicy(tenantId = "tenant-default"): Promise<PromptCompressionPolicy> {
+  try {
+    const res = await fetch(`${API_BASE}/compress/policy?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch prompt compression policy");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for prompt compression policy", err);
+    return {
+      tenant_id: tenantId,
+      enabled: true,
+      mode: "balanced",
+      min_token_threshold: 300,
+      preserve_code_blocks: true,
+      preserve_recent_turns: 2,
+    };
+  }
+}
+
+export async function upsertPromptCompressionPolicy(policy: PromptCompressionPolicy): Promise<PromptCompressionPolicy> {
+  const res = await fetch(`${API_BASE}/compress/policy`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save prompt compression policy" }));
+    throw new Error(err.error || "Failed to save prompt compression policy");
+  }
+  return await res.json();
+}
+
+export async function simulatePromptCompression(req: PromptCompressionSimulateRequest): Promise<PromptCompressionSimulateResponse> {
+  const res = await fetch(`${API_BASE}/compress/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate prompt compression" }));
+    throw new Error(err.error || "Failed to simulate prompt compression");
+  }
+  return await res.json();
+}
+
+

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/alert"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/storage"
@@ -15,6 +16,7 @@ type GuardService struct {
 	breakerMgr *CircuitBreakerManager
 	budgetMgr  *budget.BudgetManager
 	store      storage.Store
+	dispatcher *alert.AlertDispatcher
 }
 
 func NewGuardService(
@@ -27,6 +29,11 @@ func NewGuardService(
 		budgetMgr:  budgetMgr,
 		store:      store,
 	}
+}
+
+// SetAlertDispatcher attaches an alert dispatcher for multi-channel broadcasts
+func (s *GuardService) SetAlertDispatcher(d *alert.AlertDispatcher) {
+	s.dispatcher = d
 }
 
 func (s *GuardService) GetBreakerManager() *CircuitBreakerManager {
@@ -85,6 +92,23 @@ func (s *GuardService) CheckGuard(ctx context.Context, req domain.GuardCheckRequ
 			})
 		}
 
+		if s.dispatcher != nil {
+			s.dispatcher.Dispatch(ctx, alert.NotificationEvent{
+				TenantID:   req.TenantID,
+				WorkflowID: req.WorkflowID,
+				EventType:  alert.EventRunawayLoopPrevented,
+				Severity:   "critical",
+				Title:      fmt.Sprintf("失控死循环被拦截 - %s", req.WorkflowID),
+				Message:    reason,
+				Metrics: map[string]interface{}{
+					"tree_depth": req.CurrentTreeDepth,
+					"model":      req.Model,
+					"limit":      12,
+				},
+				TriggeredAt: now,
+			})
+		}
+
 		return domain.GuardCheckResponse{
 			Allowed:       false,
 			DecisionCode:  "RUNAWAY_LOOP_PREVENTED",
@@ -104,6 +128,23 @@ func (s *GuardService) CheckGuard(ctx context.Context, req domain.GuardCheckRequ
 					reason := fmt.Sprintf("Monthly spend budget exceeded: spent $%.2f of $%.2f limit (100%% exhausted)", b.CurrentSpendUSD, b.MonthlyLimitUSD)
 					s.breakerMgr.Trip(req.TenantID, req.WorkflowID, reason, 600)
 					s.breakerMgr.RecordBlock(req.TenantID, req.WorkflowID)
+
+					if s.dispatcher != nil {
+						s.dispatcher.Dispatch(ctx, alert.NotificationEvent{
+							TenantID:   req.TenantID,
+							WorkflowID: req.WorkflowID,
+							EventType:  alert.EventCircuitBreakerTripped,
+							Severity:   "critical",
+							Title:      fmt.Sprintf("熔断器跳闸开闸 - %s", req.WorkflowID),
+							Message:    reason,
+							Metrics: map[string]interface{}{
+								"current_spend_usd": b.CurrentSpendUSD,
+								"monthly_limit_usd": b.MonthlyLimitUSD,
+								"model":             req.Model,
+							},
+							TriggeredAt: now,
+						})
+					}
 
 					return domain.GuardCheckResponse{
 						Allowed:       false,

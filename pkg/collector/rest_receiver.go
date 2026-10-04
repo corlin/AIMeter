@@ -6,6 +6,7 @@ import (
 
 	"github.com/corlin/AIMeter/pkg/attribution"
 	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/storage"
@@ -73,6 +74,8 @@ func (s *IngestionService) IngestRawInput(input normalizer.RawUsageInput, baggag
 		cost := s.rater.RateUsageEvent(usage)
 		costItems = append(costItems, cost)
 		s.batcher.Push(usage, cost)
+		metrics.IngestedEventsTotal.WithLabelValues("collector", usage.Provider, usage.Model).Inc()
+		metrics.IngestedCostDollarsTotal.Add(cost.EffectiveCost)
 	}
 
 	return usageEvents, costItems

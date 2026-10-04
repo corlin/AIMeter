@@ -20,3 +20,7 @@ collector:
 rates:
   seed_file: "configs/rates_seed.json"
   cache_ttl_minutes: 60
+
+auth:
+  enabled: false # Set to true to enforce strict API key authentication across all gateway and guard endpoints
+

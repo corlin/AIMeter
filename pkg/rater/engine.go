@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,19 +14,25 @@ import (
 )
 
 type RatingEngine struct {
-	mu            sync.RWMutex
-	rates         map[string]*domain.RateEntry // key -> rate entry
-	tenants       map[string]*domain.Tenant    // tenant_id -> tenant
-	defaultCur    string
-	seedLoaded    bool
+	mu          sync.RWMutex
+	rates       map[string]*domain.RateEntry        // key -> rate entry
+	tenants     map[string]*domain.Tenant           // tenant_id -> tenant
+	defaultCur  string
+	seedLoaded  bool
+	gpuCatalog  map[string]*domain.GPUCatalogEntry  // GPU_TYPE -> entry
+	gpuBindings map[string]*domain.ModelGPUBinding  // model -> binding
 }
 
 func NewRatingEngine() *RatingEngine {
-	return &RatingEngine{
-		rates:      make(map[string]*domain.RateEntry),
-		tenants:    make(map[string]*domain.Tenant),
-		defaultCur: "USD",
+	engine := &RatingEngine{
+		rates:       make(map[string]*domain.RateEntry),
+		tenants:     make(map[string]*domain.Tenant),
+		defaultCur:  "USD",
+		gpuCatalog:  make(map[string]*domain.GPUCatalogEntry),
+		gpuBindings: make(map[string]*domain.ModelGPUBinding),
 	}
+	engine.initDefaultGPUs()
+	return engine
 }
 
 // LoadSeedRates loads seed rates from a JSON file
@@ -117,6 +124,56 @@ func (r *RatingEngine) RateUsageEvent(usage domain.UsageEvent) domain.CostItem {
 		serviceTier = "default"
 	}
 
+	// Detect Self-Hosted GPU context
+	var isSelfHosted bool
+	var detectedGPUType string
+	var detectedGPUCount int
+	var gpuDurationMs uint32 = usage.LatencyMs
+
+	if usage.RawAttributes != nil {
+		if usage.RawAttributes["aimeter.self_hosted"] == "true" ||
+			strings.EqualFold(provider, "vllm") ||
+			strings.EqualFold(provider, "ollama") ||
+			strings.EqualFold(provider, "self-hosted") {
+			isSelfHosted = true
+		}
+		if gt := usage.RawAttributes["aimeter.gpu_type"]; gt != "" {
+			detectedGPUType = gt
+			isSelfHosted = true
+		}
+		if gcStr := usage.RawAttributes["aimeter.gpu_count"]; gcStr != "" {
+			if gc, err := strconv.Atoi(gcStr); err == nil && gc > 0 {
+				detectedGPUCount = gc
+			}
+		}
+		if dStr := usage.RawAttributes["aimeter.duration_ms"]; dStr != "" {
+			if d, err := strconv.ParseUint(dStr, 10, 32); err == nil && d > 0 {
+				gpuDurationMs = uint32(d)
+			}
+		}
+	} else if strings.EqualFold(provider, "vllm") || strings.EqualFold(provider, "ollama") || strings.EqualFold(provider, "self-hosted") {
+		isSelfHosted = true
+	}
+
+	if isSelfHosted {
+		if detectedGPUType == "" || detectedGPUCount <= 0 {
+			if binding, ok := r.GetModelGPUBinding(model); ok {
+				if detectedGPUType == "" {
+					detectedGPUType = binding.DefaultGPUType
+				}
+				if detectedGPUCount <= 0 {
+					detectedGPUCount = binding.DefaultGPUCount
+				}
+			}
+		}
+		if detectedGPUType == "" {
+			detectedGPUType = "A100"
+		}
+		if detectedGPUCount <= 0 {
+			detectedGPUCount = 1
+		}
+	}
+
 	rate := r.findBestRate(tenantID, provider, model, meterName, region, serviceTier, usage.Timestamp)
 
 	var unitPrice float64
@@ -132,6 +189,23 @@ func (r *RatingEngine) RateUsageEvent(usage domain.UsageEvent) domain.CostItem {
 
 	// Calculate costs
 	listCost := usage.Quantity * unitPrice
+
+	// Dynamic Self-Hosted GPU Hardware Cost calculation
+	if meterName == domain.MeterGPUInferenceHour {
+		gpuCost, hourlyRate := r.CalculateGPUCost(detectedGPUType, detectedGPUCount, uint32(usage.Quantity*3600000.0))
+		unitPrice = hourlyRate * float64(detectedGPUCount)
+		listCost = gpuCost
+	} else if meterName == domain.MeterGPUDurationMs {
+		gpuCost, _ := r.CalculateGPUCost(detectedGPUType, detectedGPUCount, uint32(usage.Quantity))
+		listCost = gpuCost
+	} else if rate == nil && isSelfHosted && gpuDurationMs > 0 {
+		gpuCost, _ := r.CalculateGPUCost(detectedGPUType, detectedGPUCount, gpuDurationMs)
+		listCost = gpuCost
+		if usage.Quantity > 0 {
+			unitPrice = gpuCost / usage.Quantity
+		}
+	}
+
 	effectiveCost := listCost
 	var contractDiscount float64
 
@@ -168,6 +242,9 @@ func (r *RatingEngine) RateUsageEvent(usage domain.UsageEvent) domain.CostItem {
 		EffectiveCost:    effectiveCost,
 		IsReconciled:     0,
 		BillingPeriod:    billingPeriod,
+		GPUType:          detectedGPUType,
+		GPUCount:         detectedGPUCount,
+		GPUDurationMs:    gpuDurationMs,
 	}
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TraceTreeNode, TraceDetail, CostItem } from "@/types";
-import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors } from "lucide-react";
 
 interface TraceTreeViewerProps {
   trace: TraceDetail;
@@ -14,10 +14,30 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
       {/* Trace Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               Workflow Trace
             </span>
+            {trace.is_fallback && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1.5">
+                <span>⚡ Dynamic Fallback:</span>
+                <span className="line-through text-zinc-500">{trace.original_model}</span>
+                <span>➔</span>
+                <span className="text-purple-300 font-bold">{trace.actual_model}</span>
+              </span>
+            )}
+            {trace.is_stream_capped && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
+                <AlertOctagon className="h-3.5 w-3.5 text-amber-400" />
+                <span>⚡ Stream Capped ({trace.capped_tokens?.toLocaleString() || "Max"} Tokens)</span>
+              </span>
+            )}
+            {trace.is_prompt_compressed && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                <Scissors className="h-3.5 w-3.5 text-emerald-400" />
+                <span>🌿 Prompt Slimmed (-{trace.prompt_saved_tokens?.toLocaleString() || "0"} Tok)</span>
+              </span>
+            )}
             <span className="text-xs font-mono text-zinc-400">ID: {trace.trace_id}</span>
           </div>
           <h3 className="mt-1 text-lg font-bold text-white flex items-center gap-2">
@@ -31,7 +51,31 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          {trace.is_prompt_compressed && (trace.prompt_saved_usd ?? 0) > 0 && (
+            <div className="rounded-lg bg-emerald-950/40 border border-emerald-500/30 px-4 py-2.5 text-right">
+              <span className="block text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Prompt Slimming Savings</span>
+              <span className="text-xl font-bold font-mono text-emerald-300">
+                +${trace.prompt_saved_usd?.toFixed(4)}
+              </span>
+            </div>
+          )}
+          {trace.is_stream_capped && (trace.avoided_waste_usd ?? 0) > 0 && (
+            <div className="rounded-lg bg-amber-950/40 border border-amber-500/30 px-4 py-2.5 text-right">
+              <span className="block text-[11px] text-amber-400 uppercase tracking-wider font-medium">Avoided Runaway Spend</span>
+              <span className="text-xl font-bold font-mono text-amber-300">
+                +${trace.avoided_waste_usd?.toFixed(4)}
+              </span>
+            </div>
+          )}
+          {trace.is_fallback && (trace.cost_saved ?? 0) > 0 && (
+            <div className="rounded-lg bg-purple-950/40 border border-purple-500/30 px-4 py-2.5 text-right">
+              <span className="block text-[11px] text-purple-400 uppercase tracking-wider font-medium">Avoided / Saved Cost</span>
+              <span className="text-xl font-bold font-mono text-purple-300">
+                +${trace.cost_saved?.toFixed(2)}
+              </span>
+            </div>
+          )}
           <div className="rounded-lg bg-zinc-950/80 border border-zinc-800 px-4 py-2.5 text-right">
             <span className="block text-[11px] text-zinc-400 uppercase tracking-wider font-medium">Unit Economics</span>
             <span className="text-xl font-bold font-mono text-emerald-400">
@@ -96,6 +140,12 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
         return <Layers className="h-4 w-4 text-blue-400" />;
       case "deepseek":
         return <Cpu className="h-4 w-4 text-indigo-400" />;
+      case "vllm":
+        return <Server className="h-4 w-4 text-blue-400" />;
+      case "ollama":
+        return <Cpu className="h-4 w-4 text-amber-400" />;
+      case "self-hosted":
+        return <Zap className="h-4 w-4 text-purple-400" />;
       case "tavily":
         return <Search className="h-4 w-4 text-cyan-400" />;
       default:
@@ -124,13 +174,36 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                 {getProviderIcon(node.provider || "agent")}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-sm text-white">
                     {node.agent_id || node.span_name || "Agent Node"}
                   </span>
                   {node.model && (
                     <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
                       {node.provider}:{node.model}
+                    </span>
+                  )}
+                  {node.is_self_hosted && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 flex items-center gap-1 font-mono">
+                      <Cpu className="h-3 w-3 text-purple-400" />
+                      <span>[Self-Hosted GPU: {node.gpu_count || 1}× {node.gpu_type || "A100"}]</span>
+                    </span>
+                  )}
+                  {node.is_fallback && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      ⚡ Fallback (was {node.original_model})
+                    </span>
+                  )}
+                  {node.is_stream_capped && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1 font-mono">
+                      <AlertOctagon className="h-3 w-3 text-amber-400" />
+                      <span>⚡ Stream Capped ({node.capped_tokens || "Limit"} tokens)</span>
+                    </span>
+                  )}
+                  {node.is_prompt_compressed && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-mono">
+                      <Scissors className="h-3 w-3 text-emerald-400" />
+                      <span>🌿 Prompt Slimmed (-{node.prompt_saved_tokens ?? 0} tok)</span>
                     </span>
                   )}
                   {isRoot && (
@@ -162,6 +235,21 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                   {Math.round(node.total_tokens).toLocaleString()} tokens
                 </span>
               )}
+              {node.is_self_hosted && (node.equivalent_token_rate ?? 0) > 0 && (
+                <span className="block text-[10px] text-purple-400 font-mono">
+                  ~${node.equivalent_token_rate?.toFixed(2)} / 1M
+                </span>
+              )}
+              {node.is_stream_capped && (node.avoided_waste_usd ?? 0) > 0 && (
+                <span className="block text-[10px] text-amber-400 font-mono">
+                  Avoided: +${node.avoided_waste_usd?.toFixed(4)}
+                </span>
+              )}
+              {node.is_prompt_compressed && (node.prompt_saved_usd ?? 0) > 0 && (
+                <span className="block text-[10px] text-emerald-400 font-mono">
+                  Slimmed: +${node.prompt_saved_usd?.toFixed(4)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -178,6 +266,11 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                 <strong className="text-zinc-200">{Math.round(item.quantity).toLocaleString()}</strong>
                 <span className="text-zinc-500">→</span>
                 <span className="text-emerald-400 font-semibold">${item.effective_cost.toFixed(5)}</span>
+                {item.gpu_type && (
+                  <span className="text-purple-300 text-[10px] ml-1">
+                    ({item.gpu_count || 1}× {item.gpu_type})
+                  </span>
+                )}
               </div>
             ))}
           </div>

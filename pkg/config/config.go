@@ -12,6 +12,11 @@ type Config struct {
 	Database  DatabaseConfig `yaml:"database"`
 	Collector CollectorConfig `yaml:"collector"`
 	Rates     RatesConfig    `yaml:"rates"`
+	Auth      AuthConfig     `yaml:"auth"`
+}
+
+type AuthConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type ServerConfig struct {

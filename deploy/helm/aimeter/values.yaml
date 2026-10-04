@@ -1,0 +1,148 @@
+# Default values for aimeter Helm chart.
+# This is a YAML-formatted file.
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# AI Meter Backend Control Plane
+backend:
+  replicaCount: 2
+
+  image:
+    repository: aimeter/backend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    httpPort: 8080
+    otlpGrpcPort: 4317
+    otlpHttpPort: 4318
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  livenessProbe:
+    httpGet:
+      path: /livez
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+
+# AI Meter Next.js Web Console
+frontend:
+  replicaCount: 2
+
+  image:
+    repository: aimeter/frontend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 15
+
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# External High-Availability Databases (Production Default)
+database:
+  clickhouse:
+    addr: "clickhouse.infra.svc.cluster.local:9000"
+    database: "aimeter"
+    username: "default"
+    passwordSecretName: ""
+    passwordSecretKey: ""
+    password: ""
+  postgres:
+    dsn: "postgres://aimeter:aimeter@postgres.infra.svc.cluster.local:5432/aimeter?sslmode=disable"
+    existingSecretName: ""
+    existingSecretKey: ""
+
+# Collector Batching & Rates Configuration
+collector:
+  batchSize: 500
+  flushIntervalMs: 200
+
+rates:
+  seedFile: "/app/configs/rates_seed.json"
+  cacheTTLMinutes: 60
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+  hosts:
+    - host: aimeter.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backendService: frontend
+        - path: /api
+          pathType: Prefix
+          backendService: backend
+        - path: /v1
+          pathType: Prefix
+          backendService: backend
+  tls: []
+
+# Prometheus Operator ServiceMonitor
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus

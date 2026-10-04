@@ -58,9 +58,42 @@ func (s *IngestionService) HandleGatewayLog(c *gin.Context) {
 		attrs["gen_ai.usage.cached_tokens"] = strconv.FormatInt(payload.CachedTokens, 10)
 	}
 
+	isSelfHosted := vendor == "vllm" || vendor == "ollama" || vendor == "self-hosted" || strings.EqualFold(c.GetHeader("X-AIMeter-Self-Hosted"), "true")
+
+	gpuType := c.GetHeader("X-AIMeter-GPU-Type")
+	gpuCount := c.GetHeader("X-AIMeter-GPU-Count")
+	durationMs := payload.LatencyMs
+
 	if payload.Metadata != nil {
 		for k, v := range payload.Metadata {
 			attrs["gateway.meta."+k] = fmt.Sprintf("%v", v)
+			lk := strings.ToLower(k)
+			if gpuType == "" && (lk == "gpu_type" || lk == "gpu") {
+				gpuType = fmt.Sprintf("%v", v)
+			}
+			if gpuCount == "" && (lk == "gpu_count" || lk == "num_gpus" || lk == "gpus") {
+				gpuCount = fmt.Sprintf("%v", v)
+			}
+			// Ollama emits total_duration in nanoseconds
+			if (lk == "total_duration" || lk == "eval_duration") && durationMs == 0 {
+				if ns, err := strconv.ParseInt(fmt.Sprintf("%v", v), 10, 64); err == nil && ns > 0 {
+					durationMs = uint32(ns / 1000000)
+				}
+			}
+		}
+	}
+
+	if isSelfHosted || gpuType != "" {
+		attrs["aimeter.self_hosted"] = "true"
+		attrs["aimeter.framework"] = vendor
+		if gpuType != "" {
+			attrs["aimeter.gpu_type"] = gpuType
+		}
+		if gpuCount != "" {
+			attrs["aimeter.gpu_count"] = gpuCount
+		}
+		if durationMs > 0 {
+			attrs["aimeter.duration_ms"] = strconv.FormatUint(uint64(durationMs), 10)
 		}
 	}
 
@@ -83,7 +116,7 @@ func (s *IngestionService) HandleGatewayLog(c *gin.Context) {
 		SpanID:         spanID,
 		Provider:       provider,
 		Model:          payload.Model,
-		LatencyMs:      payload.LatencyMs,
+		LatencyMs:      durationMs,
 		HTTPStatusCode: 200,
 		Attributes:     attrs,
 	}

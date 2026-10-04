@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { fetchTraces, fetchTraceDetail } from "@/lib/api";
 import { TraceDetail } from "@/types";
 import { TraceTreeViewer } from "@/components/TraceTreeViewer";
-import { Search, RefreshCw, Network, ArrowLeft, Terminal } from "lucide-react";
+import { Search, RefreshCw, Network } from "lucide-react";
 
 function TracesExplorerContent() {
   const searchParams = useSearchParams();
@@ -114,9 +114,26 @@ function TracesExplorerContent() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-white truncate max-w-[180px]">
-                        {t.workflow_id}
-                      </span>
+                      <div className="flex items-center gap-1.5 truncate max-w-[220px]">
+                        <span className="font-semibold text-xs text-white truncate">
+                          {t.workflow_id}
+                        </span>
+                        {t.is_stream_capped && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0">
+                            ⚡ Capped
+                          </span>
+                        )}
+                        {t.is_prompt_compressed && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shrink-0">
+                            🌿 Slimmed
+                          </span>
+                        )}
+                        {t.is_fallback && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                            Fallback
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs font-mono font-bold text-emerald-400">
                         ${t.total_cost.toFixed(4)}
                       </span>
@@ -124,7 +141,24 @@ function TracesExplorerContent() {
 
                     <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-400">
                       <span>{t.customer_id}</span>
-                      <span className="font-mono">{t.total_tokens.toLocaleString()} tokens</span>
+                      <div className="flex items-center gap-2">
+                        {t.is_stream_capped && (t.avoided_waste_usd ?? 0) > 0 && (
+                          <span className="text-[10px] text-amber-400 font-mono font-medium">
+                            Avoided +${t.avoided_waste_usd?.toFixed(4)}
+                          </span>
+                        )}
+                        {t.is_prompt_compressed && (t.prompt_saved_usd ?? 0) > 0 && (
+                          <span className="text-[10px] text-emerald-400 font-mono font-medium">
+                            Slimmed +${t.prompt_saved_usd?.toFixed(4)}
+                          </span>
+                        )}
+                        {t.is_fallback && (t.cost_saved ?? 0) > 0 && (
+                          <span className="text-[10px] text-purple-400 font-mono font-medium">
+                            Saved ${t.cost_saved?.toFixed(2)}
+                          </span>
+                        )}
+                        <span className="font-mono">{t.total_tokens.toLocaleString()} tokens</span>
+                      </div>
                     </div>
 
                     <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
