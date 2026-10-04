@@ -118,6 +118,11 @@ function TracesExplorerContent() {
                         <span className="font-semibold text-xs text-white truncate">
                           {t.workflow_id}
                         </span>
+                        {t.is_smart_routed && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 shrink-0">
+                            🔀 Routed
+                          </span>
+                        )}
                         {t.is_stream_capped && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0">
                             ⚡ Capped
@@ -142,6 +147,11 @@ function TracesExplorerContent() {
                     <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-400">
                       <span>{t.customer_id}</span>
                       <div className="flex items-center gap-2">
+                        {t.is_smart_routed && t.routed_from_model && t.routed_to_model && (
+                          <span className="text-[10px] text-indigo-400 font-mono font-medium truncate max-w-[140px]" title={`${t.routed_from_model} → ${t.routed_to_model}`}>
+                            {t.routed_to_model}
+                          </span>
+                        )}
                         {t.is_stream_capped && (t.avoided_waste_usd ?? 0) > 0 && (
                           <span className="text-[10px] text-amber-400 font-mono font-medium">
                             Avoided +${t.avoided_waste_usd?.toFixed(4)}

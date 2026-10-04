@@ -13,7 +13,8 @@ import {
   Sparkles,
   ZapOff,
   KeyRound,
-  Scissors
+  Scissors,
+  Shuffle
 } from "lucide-react";
 
 export function Navbar() {
@@ -22,6 +23,7 @@ export function Navbar() {
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
     { label: "Traces & Economics", href: "/traces", icon: Network },
+    { label: "Smart Router", href: "/router", icon: Shuffle },
     { label: "Rates", href: "/rates", icon: Layers },
     { label: "Reconciliation", href: "/reconcile", icon: FileCheck2 },
     { label: "FOCUS", href: "/focus", icon: PieChart },

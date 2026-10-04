@@ -19,9 +19,21 @@ import (
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/normalizer"
+	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// SmartRoutingStats captures metrics for multi-provider smart routing
+type SmartRoutingStats struct {
+	IsRouted         bool
+	RequestedModel   string
+	TargetProvider   string
+	TargetModel      string
+	Strategy         domain.RouterStrategy
+	FailoverCount    int
+	ArbiterLatencyMs float64
+}
 
 // PromptCompressionStats captures metrics for semantic prompt slimming
 type PromptCompressionStats struct {
@@ -53,6 +65,7 @@ type ProxyHandler struct {
 	defaultUpstreams map[string]string
 	budgetMgr        *budget.BudgetManager
 	compressEngine   *compress.Engine
+	slaArbiter       *router.SLAArbiter
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -63,6 +76,28 @@ func (h *ProxyHandler) SetBudgetManager(bm *budget.BudgetManager) {
 // SetCompressEngine attaches a custom compress engine
 func (h *ProxyHandler) SetCompressEngine(ce *compress.Engine) {
 	h.compressEngine = ce
+}
+
+// SetSLAArbiter attaches a SLA arbiter for multi-provider smart routing
+func (h *ProxyHandler) SetSLAArbiter(arb *router.SLAArbiter) {
+	h.slaArbiter = arb
+}
+
+func (h *ProxyHandler) resolveTargetURL(provider, headerTarget string) string {
+	if headerTarget != "" {
+		return fmt.Sprintf("%s/v1/chat/completions", strings.TrimRight(headerTarget, "/"))
+	}
+	targetBase := "https://api.openai.com"
+	if provider == "openai" && os.Getenv("AIMETER_UPSTREAM_OPENAI_URL") != "" {
+		targetBase = os.Getenv("AIMETER_UPSTREAM_OPENAI_URL")
+	} else if provider == "vllm" && os.Getenv("AIMETER_UPSTREAM_VLLM_URL") != "" {
+		targetBase = os.Getenv("AIMETER_UPSTREAM_VLLM_URL")
+	} else if provider == "ollama" && os.Getenv("AIMETER_UPSTREAM_OLLAMA_URL") != "" {
+		targetBase = os.Getenv("AIMETER_UPSTREAM_OLLAMA_URL")
+	} else if base, exists := h.defaultUpstreams[provider]; exists {
+		targetBase = base
+	}
+	return fmt.Sprintf("%s/v1/chat/completions", strings.TrimRight(targetBase, "/"))
 }
 
 // NewProxyHandler creates a new ProxyHandler instance
@@ -216,6 +251,62 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		payload["model"] = actualModel
 	}
 
+	// 4.5 Evaluate Smart Multi-Provider Router & SLA Arbiter (Phase 14)
+	routingStats := SmartRoutingStats{}
+	isRouterRequested := strings.HasPrefix(strings.ToLower(actualModel), "router:") ||
+		c.GetHeader("X-AIMeter-Router-Strategy") != "" ||
+		c.GetHeader("X-AIMeter-Router-Pool") != ""
+
+	var routerPool *domain.VirtualModelPool
+	var failedTargets []string
+
+	if isRouterRequested && h.slaArbiter != nil {
+		poolAlias := "router:auto"
+		if strings.HasPrefix(strings.ToLower(actualModel), "router:") {
+			poolAlias = actualModel
+		} else if hdrPool := c.GetHeader("X-AIMeter-Router-Pool"); hdrPool != "" {
+			poolAlias = hdrPool
+		}
+
+		strategy := domain.RouterStrategy(c.GetHeader("X-AIMeter-Router-Strategy"))
+		var poolErr error
+		routerPool, poolErr = h.slaArbiter.GetPool(tenantID, poolAlias)
+		if poolErr == nil && routerPool != nil {
+			inputTokensEst := 1200
+			if rawMsgs, ok := payload["messages"].([]interface{}); ok {
+				var chatMsgs []domain.ChatMessage
+				if msgBytes, err := json.Marshal(rawMsgs); err == nil {
+					if json.Unmarshal(msgBytes, &chatMsgs) == nil {
+						calcTokens := 0
+						for _, m := range chatMsgs {
+							if str, ok := m.Content.(string); ok {
+								calcTokens += compress.EstimateTokens(str)
+							}
+						}
+						if calcTokens > 0 {
+							inputTokensEst = calcTokens
+						}
+					}
+				}
+			}
+
+			target, decision, selectErr := h.slaArbiter.SelectBestTarget(c.Request.Context(), routerPool, strategy, inputTokensEst, 400, nil)
+			if selectErr == nil && target != nil && decision != nil {
+				routingStats.IsRouted = true
+				routingStats.RequestedModel = actualModel
+				routingStats.TargetProvider = target.Provider
+				routingStats.TargetModel = target.Model
+				routingStats.Strategy = decision.Strategy
+				routingStats.ArbiterLatencyMs = decision.ArbiterLatencyMs
+
+				provider = target.Provider
+				actualModel = target.Model
+				model = target.Model
+				payload["model"] = actualModel
+			}
+		}
+	}
+
 	// 5. Prompt Compression & Token Slimming Engine (Phase 13)
 	compStats := PromptCompressionStats{}
 	if h.compressEngine != nil {
@@ -274,7 +365,7 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	}
 
 	// Re-serialize bodyBytes if payload was modified
-	if fbResult.Fallbacked || isStream || compStats.Compressed {
+	if fbResult.Fallbacked || isStream || compStats.Compressed || routingStats.IsRouted {
 		modifiedBody, err := json.Marshal(payload)
 		if err == nil {
 			bodyBytes = modifiedBody
@@ -297,62 +388,94 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		}
 	}
 
-	// 6. Resolve Target Upstream URL
-	targetBase := c.GetHeader("X-AIMeter-Target-URL")
-	if targetBase == "" {
-		if provider == "openai" && os.Getenv("AIMETER_UPSTREAM_OPENAI_URL") != "" {
-			targetBase = os.Getenv("AIMETER_UPSTREAM_OPENAI_URL")
-		} else if provider == "vllm" && os.Getenv("AIMETER_UPSTREAM_VLLM_URL") != "" {
-			targetBase = os.Getenv("AIMETER_UPSTREAM_VLLM_URL")
-		} else if provider == "ollama" && os.Getenv("AIMETER_UPSTREAM_OLLAMA_URL") != "" {
-			targetBase = os.Getenv("AIMETER_UPSTREAM_OLLAMA_URL")
-		} else if base, exists := h.defaultUpstreams[provider]; exists {
-			targetBase = base
-		} else {
-			targetBase = "https://api.openai.com"
-		}
-	}
-	targetURL := fmt.Sprintf("%s/v1/chat/completions", strings.TrimRight(targetBase, "/"))
+	// 7. Execute upstream request with automatic failover support
+	customTargetHeader := c.GetHeader("X-AIMeter-Target-URL")
+	targetURL := h.resolveTargetURL(provider, customTargetHeader)
 
-	// 7. Prepare outbound request with cancelable context
 	upstreamCtx, cancelUpstream := context.WithCancel(c.Request.Context())
 	defer cancelUpstream()
 
-	outReq, err := http.NewRequestWithContext(upstreamCtx, "POST", targetURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{"message": fmt.Sprintf("Failed to construct upstream request: %v", err)},
-		})
-		return
+	var resp *http.Response
+	var upstreamStart time.Time
+
+	maxAttempts := 1
+	if routingStats.IsRouted && routerPool != nil && routerPool.FailoverThreshold > 0 {
+		maxAttempts += routerPool.FailoverThreshold
 	}
 
-	// Propagate required headers
-	if auth := c.GetHeader("Authorization"); auth != "" {
-		outReq.Header.Set("Authorization", auth)
-	}
-	outReq.Header.Set("Content-Type", "application/json")
-	if accept := c.GetHeader("Accept"); accept != "" {
-		outReq.Header.Set("Accept", accept)
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		outReq, reqErr := http.NewRequestWithContext(upstreamCtx, "POST", targetURL, bytes.NewReader(bodyBytes))
+		if reqErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{"message": fmt.Sprintf("Failed to construct upstream request: %v", reqErr)},
+			})
+			return
+		}
+
+		if auth := c.GetHeader("Authorization"); auth != "" {
+			outReq.Header.Set("Authorization", auth)
+		}
+		outReq.Header.Set("Content-Type", "application/json")
+		if accept := c.GetHeader("Accept"); accept != "" {
+			outReq.Header.Set("Accept", accept)
+		}
+
+		upstreamStart = time.Now()
+		currResp, doErr := h.httpClient.Do(outReq)
+
+		shouldFailover := (doErr != nil || (currResp != nil && (currResp.StatusCode == 429 || currResp.StatusCode >= 500))) &&
+			routingStats.IsRouted && routerPool != nil && (attempt < maxAttempts-1)
+
+		if shouldFailover {
+			failStatus := 502
+			if currResp != nil {
+				failStatus = currResp.StatusCode
+				currResp.Body.Close()
+			}
+			if h.slaArbiter != nil {
+				h.slaArbiter.RecordEndpointResult(provider, actualModel, float64(time.Since(upstreamStart).Milliseconds()), false, failStatus)
+			}
+			failedTargets = append(failedTargets, fmt.Sprintf("%s:%s", provider, actualModel))
+
+			nextTgt, _, selectErr := h.slaArbiter.SelectBestTarget(c.Request.Context(), routerPool, routingStats.Strategy, 1000, 400, failedTargets)
+			if selectErr == nil && nextTgt != nil {
+				routingStats.FailoverCount++
+				provider = nextTgt.Provider
+				actualModel = nextTgt.Model
+				routingStats.TargetProvider = nextTgt.Provider
+				routingStats.TargetModel = nextTgt.Model
+				payload["model"] = actualModel
+				if modBytes, err := json.Marshal(payload); err == nil {
+					bodyBytes = modBytes
+				}
+				targetURL = h.resolveTargetURL(provider, customTargetHeader)
+				continue
+			}
+		}
+
+		if doErr != nil {
+			metrics.RecordProxyRequest(provider, actualModel, "502", fbResult.Fallbacked, time.Since(startTime))
+			c.JSON(http.StatusBadGateway, gin.H{
+				"error": gin.H{
+					"message": fmt.Sprintf("Failed to connect to upstream provider (%s): %v", targetURL, doErr),
+					"type":    "upstream_connection_error",
+				},
+			})
+			return
+		}
+
+		resp = currResp
+		break
 	}
 
-	// 8. Execute upstream request
-	upstreamStart := time.Now()
-	resp, err := h.httpClient.Do(outReq)
-	if err != nil {
-		metrics.RecordProxyRequest(provider, actualModel, "502", fbResult.Fallbacked, time.Since(startTime))
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error": gin.H{
-				"message": fmt.Sprintf("Failed to connect to upstream provider (%s): %v", targetURL, err),
-				"type":    "upstream_connection_error",
-			},
-		})
-		return
-	}
 	defer resp.Body.Close()
-
 	roundtripDuration := time.Since(upstreamStart)
 
-	// 9. Attach AI Meter control response headers
+	if h.slaArbiter != nil {
+		h.slaArbiter.RecordEndpointResult(provider, actualModel, float64(roundtripDuration.Milliseconds()), true, resp.StatusCode)
+	}
+
+	// 8. Attach AI Meter control response headers
 	c.Header("X-AIMeter-Trace-ID", traceID)
 	if fbResult.Fallbacked {
 		c.Header("X-AIMeter-Fallback", "true")
@@ -361,6 +484,13 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	} else {
 		c.Header("X-AIMeter-Fallback", "false")
 		c.Header("X-AIMeter-Actual-Model", actualModel)
+	}
+
+	if routingStats.IsRouted {
+		c.Header("X-AIMeter-Routed", "true")
+		c.Header("X-AIMeter-Routed-To", fmt.Sprintf("%s:%s", provider, actualModel))
+		c.Header("X-AIMeter-Routing-Strategy", string(routingStats.Strategy))
+		c.Header("X-AIMeter-Failover-Count", strconv.Itoa(routingStats.FailoverCount))
 	}
 
 	// Extract GPU headers
@@ -373,9 +503,9 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	isSSE := isStream && strings.Contains(strings.ToLower(contentType), "text/event-stream")
 
 	if isSSE {
-		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats)
+		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats)
 	} else {
-		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats)
+		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats)
 	}
 }
 
@@ -388,6 +518,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	gpuType, gpuCount, framework string,
 	duration time.Duration,
 	compStats PromptCompressionStats,
+	routingStats SmartRoutingStats,
 ) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -431,6 +562,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				0, // TTFT not applicable for non-streaming
 				uint16(resp.StatusCode),
 				compStats,
+				routingStats,
 			)
 		}
 	}
@@ -448,6 +580,7 @@ func (h *ProxyHandler) handleStreamingResponse(
 	customNotice string,
 	startTime time.Time,
 	compStats PromptCompressionStats,
+	routingStats SmartRoutingStats,
 ) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -564,6 +697,7 @@ func (h *ProxyHandler) handleStreamingResponse(
 			ttftMs,
 			uint16(resp.StatusCode),
 			compStats,
+			routingStats,
 		)
 	}
 }
@@ -580,6 +714,7 @@ func (h *ProxyHandler) recordUsage(
 	latencyMs, ttftMs uint32,
 	statusCode uint16,
 	compStats PromptCompressionStats,
+	routingStats SmartRoutingStats,
 ) {
 	if h.collectorSvc == nil {
 		return
@@ -592,6 +727,14 @@ func (h *ProxyHandler) recordUsage(
 		"prompt_tokens_details.cached_tokens": strconv.Itoa(usage.PromptTokensDetails.CachedTokens),
 		"completion_tokens_details.reasoning": strconv.Itoa(usage.CompletionTokensDetails.ReasoningTokens),
 		"aimeter.proxy":                       "true",
+	}
+
+	if routingStats.IsRouted {
+		attrs["aimeter.smart_routed"] = "true"
+		attrs["aimeter.routed_from_model"] = routingStats.RequestedModel
+		attrs["aimeter.routed_to_model"] = routingStats.TargetModel
+		attrs["aimeter.router_strategy"] = string(routingStats.Strategy)
+		attrs["aimeter.failover_count"] = strconv.Itoa(routingStats.FailoverCount)
 	}
 
 	if compStats.Compressed {

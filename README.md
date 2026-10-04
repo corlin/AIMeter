@@ -161,6 +161,17 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **网关自动重写与透明回传**：支持请求头 `X-AIMeter-Compress-Prompt: true` 及 `X-AIMeter-Compress-Mode: light|moderate|aggressive` 动态控制；响应头透明回传 `X-AIMeter-Prompt-Compressed`, `X-AIMeter-Tokens-Saved`, `X-AIMeter-Compression-Ratio`。
 * **全生命周期可观测性与交互式实验**：新增 `/compress` 控制台（租户策略纳管 + 交互式在线 Prompt 瘦身 Playground，支持 GPT-4o、Claude 3.5 Sonnet 等多模型节省金额实时对比矩阵）；`/traces` 列表中高亮渲染 `🌿 [Prompt Slimmed]` 徽标与节约账单。
 
+### 17. 跨模型多供应商智能路由与 SLA/成本多目标调度 (Smart Router & SLA Arbiter - Phase 14)
+* **微纳秒级多目标仲裁引擎 (`pkg/router`)**：纯内存并发安全无锁裁决（耗时 `< 0.08ms`），融合 EWMA 动态时延平滑跟踪、供应商可用性健康度与费率目录实时成本，构建 Pareto 最优解。
+* **4 种开箱即用调度策略**：
+  1. `cost_optimized`：成本最优，优先调度单位 Token 费率最低的可用端点；
+  2. `latency_optimized`：延迟最优，基于 EWMA 实时 P99/均值延迟优先选路；
+  3. `balanced`：性价比平衡，多目标综合权重裁决；
+  4. `sla_failover`：高可用优先，端点故障（429/5xx）自适应秒级隔离与备选候选链（Failover Chain）平滑转移重试。
+* **开箱即用虚拟模型别名池**：`router:flagship`（GPT-4o / Claude 3.5 Sonnet / Gemini 1.5 Pro）、`router:standard`、`router:cost-optimized`、`router:fast`、`router:auto`。
+* **反向代理透明重定向与头标记**：支持通过 `model: "router:flagship"` 或 HTTP 请求头 `X-AIMeter-Router-Strategy` 无侵入调用，网关透明回传 `X-AIMeter-Routed`, `X-AIMeter-Routed-To`, `X-AIMeter-Routing-Strategy`, `X-AIMeter-Failover-Count`。
+* **全生命周期路由大盘与仿真沙箱**：控制台 `/router` 呈现虚拟池纳管、供应商实时 EWMA 延迟健康矩阵与在线仿真沙箱；`/traces` 链路清晰点亮 `🔀 Smart Routed` 徽标与模型重定向链路。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -168,7 +179,8 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
-| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
+| `/router` | **智能路由与 SLA 调度大盘** | 虚拟模型池管理、供应商实时 EWMA 时延与可用性监控矩阵、交互式 Prompt 路由决策仿真沙箱 |
+| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
 | `/compress` | **Prompt 瘦身策略与实验室** | 租户级压缩模式配置、阈值设定、交互式在线 Prompt 瘦身与多模型节省金额实时比对矩阵 |
 | `/rates` | **费率目录知识库** | 39+ 预置模型基准价格表、租户阶梯折扣配置、自建 GPU 目录与在线试算 Playground |
 | `/reconcile` | **发票对账与方差拆解** | 账单 PDF/CSV 拖拽上传、实付 vs 观测对比、5 维瀑布图拆解 |

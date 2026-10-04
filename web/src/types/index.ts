@@ -75,6 +75,11 @@ export interface TraceTreeNode {
   prompt_original_tokens?: number;
   prompt_saved_tokens?: number;
   prompt_saved_usd?: number;
+  is_smart_routed?: boolean;
+  routed_from_model?: string;
+  routed_to_model?: string;
+  router_strategy?: string;
+  failover_count?: number;
 }
 
 export interface TraceDetail {
@@ -99,6 +104,11 @@ export interface TraceDetail {
   prompt_original_tokens?: number;
   prompt_saved_tokens?: number;
   prompt_saved_usd?: number;
+  is_smart_routed?: boolean;
+  routed_from_model?: string;
+  routed_to_model?: string;
+  router_strategy?: string;
+  failover_count?: number;
 }
 
 export interface RateEntry {
@@ -401,5 +411,81 @@ export interface PromptCompressionSimulateResponse {
   compressed_messages: ChatMessageItem[];
   model_savings_usd: Record<string, number>;
 }
+
+// Phase 14: Cost-Aware Multi-Provider Router & SLA Arbiter
+export type RouterStrategy = "cost_optimized" | "latency_optimized" | "balanced" | "sla_failover";
+
+export interface ModelTarget {
+  id: string;
+  provider: string;
+  model: string;
+  base_url?: string;
+  priority: number;
+  weight: number;
+  is_active: boolean;
+}
+
+export interface VirtualModelPool {
+  id: string;
+  tenant_id: string;
+  name: string;
+  alias: string;
+  strategy: RouterStrategy;
+  targets: ModelTarget[];
+  failover_threshold: number;
+  cost_weight: number;
+  latency_weight: number;
+  updated_at?: string;
+}
+
+export interface EndpointHealthStats {
+  provider: string;
+  model: string;
+  ewma_latency_ms: number;
+  p95_latency_ms: number;
+  success_rate: number;
+  total_requests: number;
+  failed_requests: number;
+  consecutive_errors: number;
+  is_circuit_broken: boolean;
+  last_active_at?: string;
+}
+
+export interface RouterDecision {
+  pool_alias: string;
+  strategy: RouterStrategy;
+  selected_target: ModelTarget;
+  candidate_scores: Record<string, number>;
+  estimated_cost_usd: number;
+  estimated_latency_ms: number;
+  failover_chain?: string[];
+  arbiter_latency_ms: number;
+}
+
+export interface CandidateComparison {
+  target: ModelTarget;
+  estimated_cost_usd: number;
+  ewma_latency_ms: number;
+  health_status: "HEALTHY" | "DEGRADED" | "DOWN";
+  composite_score: number;
+  is_selected: boolean;
+}
+
+export interface RouterSimulateRequest {
+  pool_alias?: string;
+  strategy: RouterStrategy;
+  custom_targets?: ModelTarget[];
+  input_tokens: number;
+  output_tokens: number;
+  force_failover?: boolean;
+}
+
+export interface RouterSimulateResponse {
+  decision: RouterDecision;
+  candidates: CandidateComparison[];
+  projected_savings_usd: Record<string, number>;
+  reason: string;
+}
+
 
 

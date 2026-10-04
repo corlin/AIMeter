@@ -285,3 +285,47 @@ func buildRateKey(tenantID *string, provider, model, meterName, region, serviceT
 	}
 	return fmt.Sprintf("%s:%s:%s:%s:%s:%s", tStr, strings.ToLower(provider), strings.ToLower(model), meterName, strings.ToLower(region), strings.ToLower(serviceTier))
 }
+
+// EstimateModelCost calculates estimated USD cost for given model and token counts
+func (r *RatingEngine) EstimateModelCost(tenantID, provider, model string, inputTokens, outputTokens int) float64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	now := time.Now()
+	inputRate := r.findBestRate(tenantID, provider, model, domain.MeterLLMInputToken, "global", "default", now)
+	outputRate := r.findBestRate(tenantID, provider, model, domain.MeterLLMOutputToken, "global", "default", now)
+
+	var inputPrice, outputPrice float64
+	if inputRate != nil {
+		inputPrice = inputRate.UnitPrice
+	} else {
+		m := strings.ToLower(model)
+		if strings.Contains(m, "mini") || strings.Contains(m, "haiku") || strings.Contains(m, "v3") {
+			inputPrice = 0.15 / 1000000.0
+		} else if strings.Contains(m, "r1") {
+			inputPrice = 0.55 / 1000000.0
+		} else {
+			inputPrice = 2.50 / 1000000.0
+		}
+	}
+
+	if outputRate != nil {
+		outputPrice = outputRate.UnitPrice
+	} else {
+		m := strings.ToLower(model)
+		if strings.Contains(m, "mini") || strings.Contains(m, "haiku") || strings.Contains(m, "v3") {
+			outputPrice = 0.60 / 1000000.0
+		} else if strings.Contains(m, "r1") {
+			outputPrice = 2.19 / 1000000.0
+		} else {
+			outputPrice = 10.00 / 1000000.0
+		}
+	}
+
+	cost := float64(inputTokens)*inputPrice + float64(outputTokens)*outputPrice
+	if tenant, ok := r.tenants[tenantID]; ok && tenant.GlobalDiscount > 0 {
+		cost -= cost * tenant.GlobalDiscount
+	}
+	return cost
+}
+

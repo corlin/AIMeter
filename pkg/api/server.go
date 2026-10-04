@@ -16,6 +16,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/proxy"
 	"github.com/corlin/AIMeter/pkg/rater"
+	aimeterRouter "github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -53,7 +54,8 @@ func NewServer(
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
@@ -82,6 +84,8 @@ func NewServer(
 	})
 
 	handler := NewAPIHandler(store, pg, r, budgetMgr, detector, costAdvisor, guardSvc, nil, authSvc)
+	slaArbiter := aimeterRouter.NewSLAArbiter(r)
+	handler.SetSLAArbiter(slaArbiter)
 
 	// Prometheus Metrics Endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -150,6 +154,7 @@ func NewServer(
 	fbMgr := proxy.NewFallbackManager(guardSvc, nil)
 	proxyHandler := proxy.NewProxyHandler(fbMgr, collectorSvc, nil)
 	proxyHandler.SetBudgetManager(budgetMgr)
+	proxyHandler.SetSLAArbiter(slaArbiter)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
@@ -204,6 +209,12 @@ func NewServer(
 		apiV1.GET("/compress/policy", handler.GetPromptCompressionPolicy)
 		apiV1.POST("/compress/policy", handler.UpsertPromptCompressionPolicy)
 		apiV1.POST("/compress/simulate", handler.SimulatePromptCompression)
+
+		// Phase 14: Cost-Aware Multi-Provider Router & SLA Arbiter
+		apiV1.GET("/router/pools", handler.GetRouterPools)
+		apiV1.POST("/router/pools", handler.UpsertRouterPool)
+		apiV1.GET("/router/health", handler.GetRouterHealth)
+		apiV1.POST("/router/simulate", handler.SimulateRouter)
 	}
 
 	return &Server{

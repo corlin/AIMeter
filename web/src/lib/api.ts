@@ -24,7 +24,11 @@ import {
   StreamCappingPolicy,
   PromptCompressionPolicy,
   PromptCompressionSimulateRequest,
-  PromptCompressionSimulateResponse
+  PromptCompressionSimulateResponse,
+  VirtualModelPool,
+  EndpointHealthStats,
+  RouterSimulateRequest,
+  RouterSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -496,5 +500,55 @@ export async function simulatePromptCompression(req: PromptCompressionSimulateRe
   }
   return await res.json();
 }
+
+// Phase 14: Cost-Aware Multi-Provider Router & SLA Arbiter
+export async function fetchRouterPools(tenantId = "*"): Promise<VirtualModelPool[]> {
+  try {
+    const res = await fetch(`${API_BASE}/router/pools?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch router pools");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for router pools", err);
+    return [];
+  }
+}
+
+export async function upsertRouterPool(pool: VirtualModelPool): Promise<VirtualModelPool> {
+  const res = await fetch(`${API_BASE}/router/pools`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pool),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save router pool" }));
+    throw new Error(err.error || "Failed to save router pool");
+  }
+  return await res.json();
+}
+
+export async function fetchRouterHealth(): Promise<EndpointHealthStats[]> {
+  try {
+    const res = await fetch(`${API_BASE}/router/health`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch router health");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for router health", err);
+    return [];
+  }
+}
+
+export async function simulateRouter(req: RouterSimulateRequest): Promise<RouterSimulateResponse> {
+  const res = await fetch(`${API_BASE}/router/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate router" }));
+    throw new Error(err.error || "Failed to simulate router");
+  }
+  return await res.json();
+}
+
 
 

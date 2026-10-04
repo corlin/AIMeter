@@ -242,3 +242,45 @@ func TestGPUEndpoints(t *testing.T) {
 		t.Errorf("Expected calculation result, got: %s", w.Body.String())
 	}
 }
+
+func TestSmartRouterEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	engine := rater.NewRatingEngine()
+	server := api.NewServer(8080, memStore, nil, engine, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/router/pools
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/router/pools", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/router/pools, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "router:flagship") || !strings.Contains(w.Body.String(), "router:standard") {
+		t.Errorf("Expected default pools in response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/router/health
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/router/health", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/router/health, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "gpt-4o") || !strings.Contains(w.Body.String(), "ewma_latency_ms") {
+		t.Errorf("Expected health stats in response, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/router/simulate
+	simReq := `{"pool_alias":"router:flagship","strategy":"cost_optimized","input_tokens":1000,"output_tokens":300}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/router/simulate", strings.NewReader(simReq))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/router/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"decision"`) || !strings.Contains(w.Body.String(), `"candidates"`) {
+		t.Errorf("Expected simulation response with decision and candidates, got: %s", w.Body.String())
+	}
+}
+

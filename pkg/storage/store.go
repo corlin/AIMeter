@@ -361,6 +361,12 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 		savedTokens    int
 		savedUSD       float64
 	})
+	smartRoutedMap := make(map[string]struct {
+		fromModel string
+		toModel   string
+		strategy  string
+		failover  int
+	})
 
 	for _, u := range s.usages {
 		if u.RawAttributes != nil {
@@ -391,6 +397,20 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 					savedUSD:       usd,
 				}
 			}
+			if u.RawAttributes["aimeter.smart_routed"] == "true" {
+				fc, _ := strconv.Atoi(u.RawAttributes["aimeter.failover_count"])
+				smartRoutedMap[u.TraceID] = struct {
+					fromModel string
+					toModel   string
+					strategy  string
+					failover  int
+				}{
+					fromModel: u.RawAttributes["aimeter.routed_from_model"],
+					toModel:   u.RawAttributes["aimeter.routed_to_model"],
+					strategy:  u.RawAttributes["aimeter.router_strategy"],
+					failover:  fc,
+				}
+			}
 		}
 	}
 
@@ -412,6 +432,13 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 			td.PromptOriginalTokens = comp.originalTokens
 			td.PromptSavedTokens = comp.savedTokens
 			td.PromptSavedUSD = comp.savedUSD
+		}
+		if sr, ok := smartRoutedMap[td.TraceID]; ok {
+			td.IsSmartRouted = true
+			td.RoutedFromModel = sr.fromModel
+			td.RoutedToModel = sr.toModel
+			td.RouterStrategy = sr.strategy
+			td.FailoverCount = sr.failover
 		}
 		result = append(result, *td)
 	}
@@ -450,6 +477,10 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	var isCompressed bool
 	var promptOrigTokens, promptSavedTokens int
 	var promptSavedUSD float64
+	var isSmartRouted bool
+	var routedFromModel, routedToModel, routerStrategy string
+	var failoverCount int
+
 	for _, u := range s.usages {
 		if u.TraceID == traceID {
 			latencyMap[u.SpanID] = u.LatencyMs
@@ -468,6 +499,13 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 					promptOrigTokens, _ = strconv.Atoi(u.RawAttributes["aimeter.prompt_original_tokens"])
 					promptSavedTokens, _ = strconv.Atoi(u.RawAttributes["aimeter.prompt_saved_tokens"])
 					promptSavedUSD, _ = strconv.ParseFloat(u.RawAttributes["aimeter.prompt_saved_usd"], 64)
+				}
+				if u.RawAttributes["aimeter.smart_routed"] == "true" {
+					isSmartRouted = true
+					routedFromModel = u.RawAttributes["aimeter.routed_from_model"]
+					routedToModel = u.RawAttributes["aimeter.routed_to_model"]
+					routerStrategy = u.RawAttributes["aimeter.router_strategy"]
+					failoverCount, _ = strconv.Atoi(u.RawAttributes["aimeter.failover_count"])
 				}
 			}
 		}
@@ -506,6 +544,11 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 				PromptOriginalTokens: promptOrigTokens,
 				PromptSavedTokens:    promptSavedTokens,
 				PromptSavedUSD:       promptSavedUSD,
+				IsSmartRouted:        isSmartRouted,
+				RoutedFromModel:      routedFromModel,
+				RoutedToModel:        routedToModel,
+				RouterStrategy:       routerStrategy,
+				FailoverCount:        failoverCount,
 			}
 			if node.SpanName == "" {
 				node.SpanName = item.Model
@@ -584,5 +627,10 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 		PromptOriginalTokens: promptOrigTokens,
 		PromptSavedTokens:    promptSavedTokens,
 		PromptSavedUSD:       promptSavedUSD,
+		IsSmartRouted:        isSmartRouted,
+		RoutedFromModel:      routedFromModel,
+		RoutedToModel:        routedToModel,
+		RouterStrategy:       routerStrategy,
+		FailoverCount:        failoverCount,
 	}, nil
 }

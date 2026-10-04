@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TraceTreeNode, TraceDetail, CostItem } from "@/types";
-import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors, Shuffle } from "lucide-react";
 
 interface TraceTreeViewerProps {
   trace: TraceDetail;
@@ -18,6 +18,15 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               Workflow Trace
             </span>
+            {trace.is_smart_routed && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+                <Shuffle className="h-3.5 w-3.5 text-indigo-400" />
+                <span>🔀 Smart Routed: {trace.routed_from_model || "auto"} ➔ {trace.routed_to_model || trace.actual_model}</span>
+                {(trace.failover_count ?? 0) > 0 && (
+                  <span className="text-[10px] text-amber-400 font-mono">({trace.failover_count} failovers)</span>
+                )}
+              </span>
+            )}
             {trace.is_fallback && (
               <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1.5">
                 <span>⚡ Dynamic Fallback:</span>
@@ -204,6 +213,12 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-mono">
                       <Scissors className="h-3 w-3 text-emerald-400" />
                       <span>🌿 Prompt Slimmed (-{node.prompt_saved_tokens ?? 0} tok)</span>
+                    </span>
+                  )}
+                  {node.is_smart_routed && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 flex items-center gap-1 font-mono">
+                      <Shuffle className="h-3 w-3 text-indigo-400" />
+                      <span>🔀 Routed: {node.routed_from_model} ➔ {node.routed_to_model || node.model}</span>
                     </span>
                   )}
                   {isRoot && (

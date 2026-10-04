@@ -620,6 +620,16 @@ AIMeter/
 * [x] 交付全新 Web 页面 `/compress`（Prompt Slim 策略中心与多模型交互式试算对比 Playground）。
 * [x] 升级 `/traces` 列表与 `TraceTreeViewer` 树状层级图：点亮 `🌿 Prompt Slimmed` 徽标、节省 Token 数与节省美元金额（`Slimmed: +$X`）。
 
+### Phase 14: 跨模型多供应商自动化智能路由与 SLA/成本多目标调度引擎 (Cost-Aware Multi-Provider Router & SLA Arbiter)
+* [x] 构建微纳秒级 SLA 智能仲裁与端点健康引擎（`pkg/router/arbiter.go`），支持 EWMA 实时延迟平滑更新（$\alpha=0.2$）、熔断自愈与连续异常自动降级，纯内存裁决耗时 `< 0.08ms`。
+* [x] 实现复合多目标加权评分模型（Pareto Composite Scoring），支持 4 种开箱即用路由策略预设：`cost_optimized`（成本最优）、`latency_optimized`（延迟最优）、`balanced`（性价比平衡）与 `sla_failover`（高可用容灾优先）。
+* [x] 内置 5 大开箱即用虚拟模型路由别名池：`router:flagship`（跨厂商旗舰模型调度）、`router:standard`（高性价比生产主力调度）、`router:cost-optimized`（极低成本任务调度）、`router:fast`（极致低时延调度）与 `router:auto`（全能自适应调度）。
+* [x] 双模网关集成与自动容灾转移（Failover）：反向代理网关支持虚拟模型别名拦截与请求头 `X-AIMeter-Router-Strategy` 动态策略覆盖；当主端点异常（429/5xx/连接失败）时，自动沿备选候选链（Failover Chain）无缝转移重试并施加健康惩罚。
+* [x] 响应头透明回传全链路路由审计指标：`X-AIMeter-Routed`, `X-AIMeter-Routed-To`, `X-AIMeter-Routing-Strategy`, `X-AIMeter-Failover-Count`。
+* [x] 建立路由策略管理与仿真 REST API：`GET/POST /api/v1/router/pools`、`GET /api/v1/router/health`、`POST /api/v1/router/simulate`。
+* [x] 交付 Web 控制台全新一级看板 `/router`（虚拟模型池策略管理、供应商实时 EWMA 时延与健康度监控矩阵、交互式在线 Prompt 路由决策仿真沙箱）。
+* [x] 升级 `/traces` 列表及 `TraceTreeViewer` 节点：点亮 `🔀 Smart Routed` 徽标、原模型/目标模型重定向映射、调度策略说明与容灾跳数。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

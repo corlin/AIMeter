@@ -19,6 +19,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reconcile"
+	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -35,6 +36,12 @@ type APIHandler struct {
 	guardSvc        *guard.GuardService
 	alertDispatcher *alert.AlertDispatcher
 	authSvc         *auth.AuthService
+	slaArbiter      *router.SLAArbiter
+}
+
+// SetSLAArbiter attaches a SLA arbiter to the API handler
+func (h *APIHandler) SetSLAArbiter(arb *router.SLAArbiter) {
+	h.slaArbiter = arb
 }
 
 func NewAPIHandler(
@@ -851,4 +858,64 @@ func (h *APIHandler) SimulatePromptCompression(c *gin.Context) {
 		ModelSavings:       modelSavings,
 	})
 }
+
+// ==========================================
+// Phase 14: Smart Router & SLA Arbiter APIs
+// ==========================================
+
+// GetRouterPools returns all virtual model pools
+func (h *APIHandler) GetRouterPools(c *gin.Context) {
+	if h.slaArbiter == nil {
+		c.JSON(http.StatusOK, []domain.VirtualModelPool{})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "*")
+	pools := h.slaArbiter.GetAllPools(tenantID)
+	c.JSON(http.StatusOK, pools)
+}
+
+// UpsertRouterPool creates or updates a virtual model pool
+func (h *APIHandler) UpsertRouterPool(c *gin.Context) {
+	if h.slaArbiter == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "SLA Arbiter not initialized"})
+		return
+	}
+	var pool domain.VirtualModelPool
+	if err := c.ShouldBindJSON(&pool); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.slaArbiter.UpsertPool(&pool)
+	c.JSON(http.StatusOK, pool)
+}
+
+// GetRouterHealth returns real-time EWMA latency and availability matrix
+func (h *APIHandler) GetRouterHealth(c *gin.Context) {
+	if h.slaArbiter == nil {
+		c.JSON(http.StatusOK, []domain.EndpointHealthStats{})
+		return
+	}
+	stats := h.slaArbiter.GetHealthStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// SimulateRouter runs arbitration on request targets or pool and generates an interactive report
+func (h *APIHandler) SimulateRouter(c *gin.Context) {
+	if h.slaArbiter == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "SLA Arbiter not initialized"})
+		return
+	}
+	var req domain.RouterSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.slaArbiter.Simulate(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 

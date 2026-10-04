@@ -143,6 +143,11 @@ type TraceTreeNode struct {
 	PromptOriginalTokens int              `json:"prompt_original_tokens,omitempty"`
 	PromptSavedTokens    int              `json:"prompt_saved_tokens,omitempty"`
 	PromptSavedUSD       float64          `json:"prompt_saved_usd,omitempty"`
+	IsSmartRouted        bool             `json:"is_smart_routed,omitempty"`
+	RoutedFromModel      string           `json:"routed_from_model,omitempty"`
+	RoutedToModel        string           `json:"routed_to_model,omitempty"`
+	RouterStrategy       string           `json:"router_strategy,omitempty"`
+	FailoverCount        int              `json:"failover_count,omitempty"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
@@ -168,6 +173,11 @@ type TraceDetail struct {
 	PromptOriginalTokens int            `json:"prompt_original_tokens,omitempty"`
 	PromptSavedTokens    int            `json:"prompt_saved_tokens,omitempty"`
 	PromptSavedUSD       float64        `json:"prompt_saved_usd,omitempty"`
+	IsSmartRouted        bool           `json:"is_smart_routed,omitempty"`
+	RoutedFromModel      string         `json:"routed_from_model,omitempty"`
+	RoutedToModel        string         `json:"routed_to_model,omitempty"`
+	RouterStrategy       string         `json:"router_strategy,omitempty"`
+	FailoverCount        int            `json:"failover_count,omitempty"`
 }
 
 // OverviewStats provides high level aggregate metrics for the dashboard
@@ -506,4 +516,98 @@ type PromptCompressionSimulateResponse struct {
 	CompressedMessages []ChatMessage      `json:"compressed_messages"`
 	ModelSavings       map[string]float64 `json:"model_savings_usd"`
 }
+
+// ==========================================
+// Phase 14: Cost-Aware Multi-Provider Router & SLA Arbiter
+// ==========================================
+
+// RouterStrategy represents the routing goal policy
+type RouterStrategy string
+
+const (
+	StrategyCostOptimized    RouterStrategy = "cost_optimized"
+	StrategyLatencyOptimized RouterStrategy = "latency_optimized"
+	StrategyBalanced         RouterStrategy = "balanced"
+	StrategySLAFailover      RouterStrategy = "sla_failover"
+)
+
+// ModelTarget defines a candidate target endpoint in a virtual pool
+type ModelTarget struct {
+	ID       string `json:"id"`
+	Provider string `json:"provider"` // openai, anthropic, deepseek, vllm, bedrock
+	Model    string `json:"model"`    // gpt-4o, claude-3-5-sonnet, deepseek-r1
+	BaseURL  string `json:"base_url,omitempty"`
+	Priority int    `json:"priority"` // lower number = higher priority
+	Weight   int    `json:"weight"`   // weight 1-100 for round-robin / probabilistic selection
+	IsActive bool   `json:"is_active"`
+}
+
+// VirtualModelPool defines a group of candidate targets with a routing strategy
+type VirtualModelPool struct {
+	ID                string         `json:"id"`
+	TenantID          string         `json:"tenant_id"`
+	Name              string         `json:"name"`
+	Alias             string         `json:"alias"` // e.g., router:flagship, router:standard, router:auto
+	Strategy          RouterStrategy `json:"strategy"`
+	Targets           []ModelTarget  `json:"targets"`
+	FailoverThreshold int            `json:"failover_threshold"` // Max failover attempts before error (default 2)
+	CostWeight        float64        `json:"cost_weight"`        // 0.0 - 1.0 (default 0.6)
+	LatencyWeight     float64        `json:"latency_weight"`     // 0.0 - 1.0 (default 0.4)
+	UpdatedAt         time.Time      `json:"updated_at"`
+}
+
+// EndpointHealthStats tracks real-time EWMA latency and availability for a provider/model
+type EndpointHealthStats struct {
+	Provider          string    `json:"provider"`
+	Model             string    `json:"model"`
+	EWMALatencyMs     float64   `json:"ewma_latency_ms"`
+	P95LatencyMs      float64   `json:"p95_latency_ms"`
+	SuccessRate       float64   `json:"success_rate"` // 0.0 - 1.0 (e.g. 0.998)
+	TotalRequests     int64     `json:"total_requests"`
+	FailedRequests    int64     `json:"failed_requests"`
+	ConsecutiveErrors int       `json:"consecutive_errors"`
+	IsCircuitBroken   bool      `json:"is_circuit_broken"`
+	LastActiveAt      time.Time `json:"last_active_at"`
+}
+
+// RouterDecision records the result of an arbitration decision
+type RouterDecision struct {
+	PoolAlias          string             `json:"pool_alias"`
+	Strategy           RouterStrategy     `json:"strategy"`
+	SelectedTarget     ModelTarget        `json:"selected_target"`
+	CandidateScores    map[string]float64 `json:"candidate_scores"`
+	EstimatedCostUSD   float64            `json:"estimated_cost_usd"`
+	EstimatedLatencyMs float64            `json:"estimated_latency_ms"`
+	FailoverChain      []string           `json:"failover_chain,omitempty"`
+	ArbiterLatencyMs   float64            `json:"arbiter_latency_ms"`
+}
+
+// RouterSimulateRequest represents request payload to simulate router selection
+type RouterSimulateRequest struct {
+	PoolAlias     string         `json:"pool_alias,omitempty"` // if empty, uses custom targets
+	Strategy      RouterStrategy `json:"strategy"`
+	CustomTargets []ModelTarget  `json:"custom_targets,omitempty"`
+	InputTokens   int            `json:"input_tokens"`
+	OutputTokens  int            `json:"output_tokens"`
+	ForceFailover bool           `json:"force_failover,omitempty"` // simulate primary endpoint failure
+}
+
+// CandidateComparison shows per-candidate score breakdown in playground
+type CandidateComparison struct {
+	Target         ModelTarget `json:"target"`
+	EstimatedCost  float64     `json:"estimated_cost_usd"`
+	EWMALatencyMs  float64     `json:"ewma_latency_ms"`
+	HealthStatus   string      `json:"health_status"` // HEALTHY, DEGRADED, DOWN
+	CompositeScore float64     `json:"composite_score"`
+	IsSelected     bool        `json:"is_selected"`
+}
+
+// RouterSimulateResponse represents the arbitration result for playground
+type RouterSimulateResponse struct {
+	Decision         RouterDecision        `json:"decision"`
+	Candidates       []CandidateComparison `json:"candidates"`
+	ProjectedSavings map[string]float64    `json:"projected_savings_usd"`
+	Reason           string                `json:"reason"`
+}
+
 
