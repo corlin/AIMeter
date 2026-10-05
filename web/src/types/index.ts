@@ -967,3 +967,87 @@ export interface ExperimentSimulateResponse {
   roi_multiplier: number;
   insights: string[];
 }
+
+// ==========================================
+// Phase 21: AI Data Privacy & DLP Guard Engine
+// ==========================================
+
+export type DLPAction = "audit" | "mask" | "block";
+
+export type DLPEntityType =
+  | "phone"
+  | "email"
+  | "id_card"
+  | "bank_card"
+  | "api_key"
+  | "jwt_token"
+  | "private_ip"
+  | "connection_string"
+  | "custom_keyword";
+
+export interface DLPPolicy {
+  id?: string;
+  tenant_id: string;
+  name?: string;
+  description?: string;
+  enabled: boolean;
+  default_action: DLPAction;
+  entity_actions: Record<string, DLPAction>;
+  enable_unmasking: boolean;
+  custom_keywords: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DLPDetectedEntity {
+  type: DLPEntityType;
+  raw_text?: string;
+  masked_placeholder: string;
+  start_idx: number;
+  end_idx: number;
+  action_taken: DLPAction;
+}
+
+export interface DLPAuditLogEntry {
+  id: string;
+  tenant_id: string;
+  request_id: string;
+  trace_id?: string;
+  action_taken: DLPAction;
+  entities?: DLPDetectedEntity[];
+  entities_detected?: string[];
+  violations_count: number;
+  redacted_preview: string;
+  scan_duration_us: number;
+  timestamp: string;
+  operator_ip?: string;
+}
+
+export interface DLPStatsSummary {
+  total_scans: number;
+  total_violations: number;
+  blocked_count: number;
+  masked_count: number;
+  audited_count: number;
+  avg_scan_duration_us: number;
+  active_policy_count: number;
+  violations_by_type: Record<string, number>;
+}
+
+export interface DLPSimulateRequest {
+  tenant_id?: string;
+  text?: string;
+  prompt_text?: string;
+  policy_override?: DLPPolicy;
+}
+
+export interface DLPSimulateResponse {
+  has_violations: boolean;
+  action_taken: DLPAction;
+  detected_entities: DLPDetectedEntity[];
+  sanitized_text: string;
+  placeholder_vault: Record<string, string>;
+  scan_duration_us: number;
+  simulated_unmasked_response?: string;
+}
+

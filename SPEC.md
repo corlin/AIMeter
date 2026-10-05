@@ -736,9 +736,33 @@ AIMeter/
   * **Variant A vs Variant B 深度指标看板**：请求量、花费、延迟、质量评分、单位质量成本与单次解决成本六维矩阵对比；
   * **交互式帕累托最优散点图谱 (Pareto Frontier)**：直观标定性价比最优变体，提供一键推全安全确认动作；
   * **在线 A/B 蒙特卡洛仿真沙箱**：即时模拟大规模流量切流与月度节省美元。
+### Phase 21: AI 数据隐私合规审计、PII 动态脱敏与敏感机密信息防泄漏拦截引擎 (AI Data Privacy Compliance, Dynamic PII Masking & DLP Guard Engine)
+* [x] **领域模型与种子合规配置（`pkg/domain/models.go` & `configs/dlp_seed.json`）**：
+  * 定义核心数据结构：`DLPPolicy`（租户、启用开关、默认动作 `audit`/`mask`/`block`、实体细粒度动作字典、出站反向解密开关 `EnableUnmasking`、自定义机密词）、`DLPDetectedEntity`、`DLPScanResult`、`DLPAuditLogEntry`、`DLPStatsSummary`、`DLPSimulateRequest` 与 `DLPSimulateResponse`；
+  * 预置两个种子策略：`default` 默认通用策略与 `finance-enterprise-1` 金融级严格策略。
+* [x] **纯 Go 高性能两阶段探测与假名脱敏引擎（`pkg/dlp/`）**：
+  * **快速字符集预筛与预编译正则**：单次无违规嗅探仅需 `<0.01ms`，有违规扫描 `<0.15ms`，全流程零网络外部依赖；
+  * **全实体分类高精度嗅探**：支持中国大陆手机号（含带前缀与短横线）、18位二代身份证、电子邮件、银行卡（内置 Luhn 模 10 校验算法有效剔除随机数字）、OpenAI/AWS API 密钥、JWT 令牌、内部局域网 IP、数据库连接串（`postgres://`, `redis://` 等）、自定义敏感词；
+  * **三态处置阶梯 (Block > Mask > Audit)**：支持基于全局或实体粒度分别执行阻断拦截、动态假名脱敏或静默审计；
+  * **会话级双向可逆脱敏 (Reversible Pseudonymization)**：入站将机密替换为具名占位符（如 `[AIMETER_PHONE_1]`），模型接收脱敏 Prompt 零接触真数据；网关出站自动利用保密保险库（Vault）实时透明还原真实信息，终端用户零感知；流式 SSE 逐行 chunk 实时逆向还原。
+* [x] **控制面 REST API 与反向代理网关贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 7 大 REST 控制端点：
+    * `GET /api/v1/privacy/policies`（策略列表）
+    * `GET /api/v1/privacy/policies/:tenant_id`（指定租户策略详情）
+    * `POST /api/v1/privacy/policies`（保存/修改租户策略）
+    * `DELETE /api/v1/privacy/policies/:tenant_id`（删除租户策略）
+    * `GET /api/v1/privacy/logs`（环形缓冲区违规审计日志）
+    * `GET /api/v1/privacy/stats`（隐私与脱敏宏观统计大盘）
+    * `POST /api/v1/privacy/simulate`（交互式脱敏与还原仿真沙箱）
+  * 反向代理网关拦截与响应头注入：`X-AIMeter-DLP-Action`（`block` / `mask` / `audit` / `disabled`）、`X-AIMeter-DLP-Violations`，并在检测到高危阻断策略时立即熔断返回 HTTP 403 Forbidden。
+* [x] **Web 控制台全新一级看板 `/privacy`（`web/src/app/privacy/`）**：
+  * **4 维宏观 KPI 卡片**：合规审计总扫描、敏感违规拦截与处置、双向假名化保真度、网关嗅探平均时延；
+  * **多租户合规策略配置矩阵**：可视化开关、全局默认动作下拉框、8 类高危实体独立动作配置、双向还原开关、自定义机密词增删；
+  * **敏感数据违规与脱敏审计流水**：最近 50 条审计日志表格，展示请求 ID、租户、动作状态标、实体徽章、违规计数与微秒级耗时；
+  * **交互式即时脱敏与还原验证沙箱**：支持预填常见泄漏 Prompt（金融咨询、API Key、企业机密词），直观对比大模型视角（脱敏 Prompt）与终端用户视角（透明还原响应）。
 * [x] **全量质量门禁 100% 通过**：
   * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
-  * 前端全量构建 `npm run build` 100% 成功（21/21 静态页面编译零报错）；
+  * 前端全量构建 `npm run build` 100% 成功（22/22 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
 ---

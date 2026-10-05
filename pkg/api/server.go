@@ -15,6 +15,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
+	"github.com/corlin/AIMeter/pkg/dlp"
 	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
@@ -61,8 +62,8 @@ func NewServer(
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-API-Key, X-AIMeter-API-Key, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache, X-AIMeter-Cache-Threshold, X-AIMeter-Cache-Refresh, X-AIMeter-Cache-TTL, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment, X-AIMeter-Variant, X-AIMeter-Session-Id, X-AIMeter-User-Id")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment-Id, X-AIMeter-Variant, X-AIMeter-Variant-Model")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-API-Key, X-AIMeter-API-Key, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache, X-AIMeter-Cache-Threshold, X-AIMeter-Cache-Refresh, X-AIMeter-Cache-TTL, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment, X-AIMeter-Variant, X-AIMeter-Session-Id, X-AIMeter-User-Id, X-AIMeter-DLP-Bypass")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment-Id, X-AIMeter-Variant, X-AIMeter-Variant-Model, X-AIMeter-DLP-Action, X-AIMeter-DLP-Violations")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
@@ -183,6 +184,9 @@ func NewServer(
 	experimentEngine := experiment.NewEngine("configs/experiments_seed.json")
 	handler.SetExperimentEngine(experimentEngine)
 	proxyHandler.SetExperimentEngine(experimentEngine)
+	dlpManager := dlp.NewManager("configs/dlp_seed.json")
+	handler.SetDLPManager(dlpManager)
+	proxyHandler.SetDLPManager(dlpManager)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
@@ -293,6 +297,15 @@ func NewServer(
 		apiV1.POST("/experiments/feedback", handler.RecordExperimentFeedback)
 		apiV1.GET("/experiments/stats", handler.GetExperimentStats)
 		apiV1.POST("/experiments/simulate", handler.SimulateExperiment)
+
+		// Phase 21: AI Data Privacy Compliance & DLP Guard Engine
+		apiV1.GET("/privacy/policies", handler.GetDLPPolicies)
+		apiV1.GET("/privacy/policies/:tenant_id", handler.GetDLPPolicy)
+		apiV1.POST("/privacy/policies", handler.UpsertDLPPolicy)
+		apiV1.DELETE("/privacy/policies/:tenant_id", handler.DeleteDLPPolicy)
+		apiV1.GET("/privacy/logs", handler.GetDLPLogs)
+		apiV1.GET("/privacy/stats", handler.GetDLPStats)
+		apiV1.POST("/privacy/simulate", handler.SimulateDLP)
 	}
 
 	return &Server{

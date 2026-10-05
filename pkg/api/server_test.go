@@ -845,5 +845,96 @@ func TestExperimentEndpoints(t *testing.T) {
 	}
 }
 
+func TestPrivacyEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/privacy/policies
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/privacy/policies", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/privacy/policies, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "default") {
+		t.Errorf("Expected default policy in list, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/privacy/policies/default
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/privacy/policies/default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/privacy/policies/default, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "mask") {
+		t.Errorf("Expected mask in default policy, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/privacy/policies (Upsert)
+	newPolicyJSON := `{
+		"tenant_id": "fintech-test-tenant",
+		"name": "Fintech Strict Policy",
+		"enabled": true,
+		"default_action": "mask",
+		"entity_actions": {
+			"api_key": "block",
+			"phone": "mask",
+			"email": "mask"
+		},
+		"enable_unmasking": true,
+		"custom_keywords": ["TopSecretInternalProject"]
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/privacy/policies", strings.NewReader(newPolicyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/privacy/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 4. GET /api/v1/privacy/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/privacy/stats?tenant_id=fintech-test-tenant", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/privacy/stats, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. GET /api/v1/privacy/logs
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/privacy/logs?tenant_id=fintech-test-tenant", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/privacy/logs, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 6. POST /api/v1/privacy/simulate
+	simJSON := `{
+		"tenant_id": "fintech-test-tenant",
+		"prompt_text": "Please wire bonus to phone 13812345678 and email user@fintech.io. Key is TopSecretInternalProject"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/privacy/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/privacy/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "[AIMETER_PHONE_1]") || !strings.Contains(body, "[AIMETER_EMAIL_1]") {
+		t.Errorf("Expected masked prompt in simulate response, got: %s", body)
+	}
+
+	// 7. DELETE /api/v1/privacy/policies/fintech-test-tenant
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/api/v1/privacy/policies/fintech-test-tenant", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for DELETE policy, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+
 
 

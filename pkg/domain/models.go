@@ -1221,3 +1221,113 @@ type ExperimentSimulateResponse struct {
 	ROIMultiplier               float64           `json:"roi_multiplier"`
 	Insights                    []string          `json:"insights"`
 }
+
+// ==========================================
+// Phase 21: AI Data Privacy Compliance & DLP Guard Engine
+// ==========================================
+
+// DLPAction defines policy actions for detected sensitive data
+type DLPAction string
+
+const (
+	DLPActionAudit DLPAction = "audit"
+	DLPActionMask  DLPAction = "mask"
+	DLPActionBlock DLPAction = "block"
+)
+
+// DLPEntityType enumerates standard supported PII and secret categories
+type DLPEntityType string
+
+const (
+	DLPEntityPhone            DLPEntityType = "phone"
+	DLPEntityIDCard           DLPEntityType = "id_card"
+	DLPEntityEmail            DLPEntityType = "email"
+	DLPEntityBankCard         DLPEntityType = "bank_card"
+	DLPEntityAPIKey           DLPEntityType = "api_key"
+	DLPEntityJWTToken         DLPEntityType = "jwt_token"
+	DLPEntityPrivateIP        DLPEntityType = "private_ip"
+	DLPEntityConnectionString DLPEntityType = "connection_string"
+	DLPEntityCustomKeyword    DLPEntityType = "custom_keyword"
+)
+
+// DLPPolicy configures privacy rules per tenant
+type DLPPolicy struct {
+	ID              string               `json:"id,omitempty"`
+	TenantID        string               `json:"tenant_id"`
+	Name            string               `json:"name,omitempty"`
+	Description     string               `json:"description,omitempty"`
+	Enabled         bool                 `json:"enabled"`
+	DefaultAction   DLPAction            `json:"default_action"`   // audit, mask, block
+	EntityActions   map[string]DLPAction `json:"entity_actions"`    // specific action per entity type
+	EnableUnmasking bool                 `json:"enable_unmasking"`  // reverse mask back to original in responses
+	CustomKeywords  []string             `json:"custom_keywords"`
+	CreatedAt       time.Time            `json:"created_at,omitempty"`
+	UpdatedAt       time.Time            `json:"updated_at"`
+}
+
+// DLPDetectedEntity captures a matched sensitive item in prompt
+type DLPDetectedEntity struct {
+	Type              DLPEntityType `json:"type"`
+	RawText           string        `json:"raw_text"`           // only internal for vaulting
+	MaskedPlaceholder string        `json:"masked_placeholder"` // e.g. [AIMETER_PHONE_1]
+	StartIdx          int           `json:"start_idx"`
+	EndIdx            int           `json:"end_idx"`
+	ActionTaken       DLPAction     `json:"action_taken"`
+}
+
+// DLPScanResult summarizes the scan, actions taken, and replaced text
+type DLPScanResult struct {
+	HasViolations    bool                `json:"has_violations"`
+	ActionTaken      DLPAction           `json:"action_taken"`
+	DetectedEntities []DLPDetectedEntity `json:"detected_entities"`
+	SanitizedText    string              `json:"sanitized_text"`
+	PlaceholderVault map[string]string   `json:"placeholder_vault"` // placeholder -> rawText
+	ScanDurationUs   int64               `json:"scan_duration_us"`
+}
+
+// DLPAuditLogEntry records security violation events
+type DLPAuditLogEntry struct {
+	ID               string              `json:"id"`
+	TenantID         string              `json:"tenant_id"`
+	RequestID        string              `json:"request_id"`
+	TraceID          string              `json:"trace_id,omitempty"`
+	ActionTaken      DLPAction           `json:"action_taken"`
+	Entities         []DLPDetectedEntity `json:"entities,omitempty"`
+	EntitiesDetected []string            `json:"entities_detected,omitempty"`
+	ViolationsCount  int                 `json:"violations_count"`
+	RedactedPreview  string              `json:"redacted_preview"`
+	ScanDurationUs   int64               `json:"scan_duration_us"`
+	Timestamp        time.Time           `json:"timestamp"`
+	OperatorIP       string              `json:"operator_ip,omitempty"`
+}
+
+// DLPStatsSummary reports macro compliance figures
+type DLPStatsSummary struct {
+	TotalScans         int64            `json:"total_scans"`
+	TotalViolations    int64            `json:"total_violations"`
+	BlockedCount       int64            `json:"blocked_count"`
+	MaskedCount        int64            `json:"masked_count"`
+	AuditedCount       int64            `json:"audited_count"`
+	AvgScanDurationUs  float64          `json:"avg_scan_duration_us"`
+	ActivePolicyCount  int              `json:"active_policy_count"`
+	ViolationsByType   map[string]int64 `json:"violations_by_type"`
+}
+
+// DLPSimulateRequest feeds an interactive prompt to test DLP inspection
+type DLPSimulateRequest struct {
+	TenantID       string     `json:"tenant_id,omitempty"`
+	Text           string     `json:"text"`
+	PromptText     string     `json:"prompt_text,omitempty"`
+	PolicyOverride *DLPPolicy `json:"policy_override,omitempty"`
+}
+
+// DLPSimulateResponse returns preview of masked prompt and unmasking
+type DLPSimulateResponse struct {
+	HasViolations              bool                `json:"has_violations"`
+	ActionTaken                DLPAction           `json:"action_taken"`
+	DetectedEntities           []DLPDetectedEntity `json:"detected_entities"`
+	SanitizedText              string              `json:"sanitized_text"`
+	PlaceholderVault           map[string]string   `json:"placeholder_vault"`
+	ScanDurationUs             int64               `json:"scan_duration_us"`
+	SimulatedUnmaskedResponse string              `json:"simulated_unmasked_response,omitempty"`
+}

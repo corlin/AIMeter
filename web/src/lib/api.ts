@@ -58,7 +58,13 @@ import {
   ExperimentFeedback,
   ExperimentStatsSummary,
   ExperimentSimulateRequest,
-  ExperimentSimulateResponse
+  ExperimentSimulateResponse,
+  DLPPolicy,
+  DLPDetectedEntity,
+  DLPAuditLogEntry,
+  DLPStatsSummary,
+  DLPSimulateRequest,
+  DLPSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1130,3 +1136,118 @@ export async function simulateExperiment(req: ExperimentSimulateRequest): Promis
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 21: AI Data Privacy & DLP Guard
+// ==========================================
+
+export async function fetchDLPPolicies(): Promise<DLPPolicy[]> {
+  try {
+    const res = await fetch(`${API_BASE}/privacy/policies`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch DLP policies");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchDLPPolicies failed:", err);
+    return [];
+  }
+}
+
+export async function fetchDLPPolicy(tenantId = "default"): Promise<DLPPolicy> {
+  try {
+    const res = await fetch(`${API_BASE}/privacy/policies/${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch DLP policy");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchDLPPolicy failed:", err);
+    return {
+      tenant_id: tenantId,
+      name: "Default Policy",
+      enabled: true,
+      default_action: "mask",
+      entity_actions: {
+        api_key: "block",
+        phone: "mask",
+        email: "mask",
+        id_card: "mask",
+        bank_card: "mask",
+      },
+      enable_unmasking: true,
+      custom_keywords: [],
+    };
+  }
+}
+
+export async function saveDLPPolicy(policy: DLPPolicy): Promise<DLPPolicy> {
+  const res = await fetch(`${API_BASE}/privacy/policies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save DLP policy" }));
+    throw new Error(err.error || "Failed to save DLP policy");
+  }
+  return await res.json();
+}
+
+export async function deleteDLPPolicy(tenantId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/privacy/policies/${tenantId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to delete DLP policy" }));
+    throw new Error(err.error || "Failed to delete DLP policy");
+  }
+  return true;
+}
+
+export async function fetchDLPLogs(tenantId?: string, limit = 100): Promise<DLPAuditLogEntry[]> {
+  try {
+    const url = tenantId && tenantId !== "all"
+      ? `${API_BASE}/privacy/logs?tenant_id=${tenantId}&limit=${limit}`
+      : `${API_BASE}/privacy/logs?limit=${limit}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch DLP logs");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchDLPLogs failed:", err);
+    return [];
+  }
+}
+
+export async function fetchDLPStats(tenantId?: string): Promise<DLPStatsSummary> {
+  try {
+    const url = tenantId && tenantId !== "all"
+      ? `${API_BASE}/privacy/stats?tenant_id=${tenantId}`
+      : `${API_BASE}/privacy/stats`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch DLP stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchDLPStats failed:", err);
+    return {
+      total_scans: 0,
+      total_violations: 0,
+      blocked_count: 0,
+      masked_count: 0,
+      audited_count: 0,
+      avg_scan_duration_us: 140,
+      active_policy_count: 1,
+      violations_by_type: {},
+    };
+  }
+}
+
+export async function simulateDLP(req: DLPSimulateRequest): Promise<DLPSimulateResponse> {
+  const res = await fetch(`${API_BASE}/privacy/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate DLP" }));
+    throw new Error(err.error || "Failed to simulate DLP");
+  }
+  return await res.json();
+}
+

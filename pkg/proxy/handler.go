@@ -18,6 +18,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
+	"github.com/corlin/AIMeter/pkg/dlp"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/forecast"
@@ -91,6 +92,17 @@ type ProxyHandler struct {
 	forecastEngine     *forecast.ForecastEngine
 	clusterCoordinator *cluster.ClusterCoordinator
 	experimentEngine   *experiment.Engine
+	dlpManager         *dlp.Manager
+}
+
+// SetDLPManager attaches a DLP manager
+func (h *ProxyHandler) SetDLPManager(dm *dlp.Manager) {
+	h.dlpManager = dm
+}
+
+// GetDLPManager returns the attached DLP manager
+func (h *ProxyHandler) GetDLPManager() *dlp.Manager {
+	return h.dlpManager
 }
 
 // SetExperimentEngine attaches an experiment engine
@@ -456,6 +468,51 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 				model = activeVariant.Model
 				payload["model"] = actualModel
 			}
+		}
+	}
+
+	// 4.3 Evaluate AI Data Privacy, PII Masking & DLP Guard Engine (Phase 21)
+	var dlpVault map[string]string
+	enableUnmasking := false
+	if h.dlpManager != nil {
+		pol := h.dlpManager.GetPolicy(tenantID)
+		if pol.Enabled {
+			enableUnmasking = pol.EnableUnmasking
+			if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+				var chatMsgs []domain.ChatMessage
+				msgBytes, mErr := json.Marshal(rawMsgs)
+				if mErr == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
+					sanitized, vault, blocked, dlpResult := h.dlpManager.ScanMessages(tenantID, traceID, chatMsgs)
+					dlpVault = vault
+					c.Header("X-AIMeter-DLP-Action", string(dlpResult.ActionTaken))
+					if dlpResult.HasViolations {
+						c.Header("X-AIMeter-DLP-Violations", strconv.Itoa(len(dlpResult.DetectedEntities)))
+					}
+
+					if blocked {
+						metrics.RecordProxyRequest(provider, actualModel, "403", false, time.Since(startTime))
+						c.JSON(http.StatusForbidden, gin.H{
+							"error": gin.H{
+								"message":           "Request blocked by AI Meter DLP guard: sensitive data violation detected",
+								"type":              "dlp_violation_error",
+								"code":              "sensitive_data_blocked",
+								"action":            "block",
+								"detected_entities": dlpResult.DetectedEntities,
+							},
+						})
+						return
+					}
+
+					if dlpResult.ActionTaken == domain.DLPActionMask {
+						payload["messages"] = sanitized
+						if modBytes, err := json.Marshal(payload); err == nil {
+							bodyBytes = modBytes
+						}
+					}
+				}
+			}
+		} else {
+			c.Header("X-AIMeter-DLP-Action", "disabled")
 		}
 	}
 
@@ -922,9 +979,9 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	isSSE := isStream && strings.Contains(strings.ToLower(contentType), "text/event-stream")
 
 	if isSSE {
-		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec, apiKeyID, estTotalTokens, estCost, throttlingDecision)
+		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec, apiKeyID, estTotalTokens, estCost, throttlingDecision, dlpVault, enableUnmasking)
 	} else {
-		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec, apiKeyID, estTotalTokens, estCost, throttlingDecision)
+		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec, apiKeyID, estTotalTokens, estCost, throttlingDecision, dlpVault, enableUnmasking)
 	}
 }
 
@@ -946,6 +1003,8 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	estTotalTokens int,
 	estCost float64,
 	throttlingDecision domain.ThrottlingDecision,
+	dlpVault map[string]string,
+	enableUnmasking bool,
 ) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -953,6 +1012,12 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			"error": gin.H{"message": "Failed to read response from upstream"},
 		})
 		return
+	}
+
+	// Transparent reverse pseudonymization: unmask placeholders in outbound response (Phase 21)
+	if enableUnmasking && len(dlpVault) > 0 && h.dlpManager != nil {
+		unmaskedStr := h.dlpManager.UnmaskText(string(respBody), dlpVault)
+		respBody = []byte(unmaskedStr)
 	}
 
 	// Forward upstream status and headers
@@ -1091,6 +1156,8 @@ func (h *ProxyHandler) handleStreamingResponse(
 	estTotalTokens int,
 	estCost float64,
 	throttlingDecision domain.ThrottlingDecision,
+	dlpVault map[string]string,
+	enableUnmasking bool,
 ) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -1117,8 +1184,12 @@ func (h *ProxyHandler) handleStreamingResponse(
 				firstTokenTime = time.Now()
 			}
 
-			// Forward chunk to client immediately (zero buffering delay)
-			_, _ = c.Writer.Write(line)
+			// Forward chunk to client with reversible unmasking if enabled (Phase 21)
+			outLine := line
+			if enableUnmasking && len(dlpVault) > 0 && h.dlpManager != nil {
+				outLine = []byte(h.dlpManager.UnmaskText(string(line), dlpVault))
+			}
+			_, _ = c.Writer.Write(outLine)
 			if ok {
 				flusher.Flush()
 			}

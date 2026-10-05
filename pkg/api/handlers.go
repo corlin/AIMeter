@@ -15,6 +15,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/cache"
 	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/compress"
+	"github.com/corlin/AIMeter/pkg/dlp"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/focus"
@@ -49,6 +50,17 @@ type APIHandler struct {
 	forecastEngine     *forecast.ForecastEngine
 	clusterCoordinator *cluster.ClusterCoordinator
 	experimentEngine   *experiment.Engine
+	dlpManager         *dlp.Manager
+}
+
+// SetDLPManager attaches a DLP manager to the API handler
+func (h *APIHandler) SetDLPManager(dm *dlp.Manager) {
+	h.dlpManager = dm
+}
+
+// GetDLPManager returns the attached DLP manager
+func (h *APIHandler) GetDLPManager() *dlp.Manager {
+	return h.dlpManager
 }
 
 // SetExperimentEngine attaches an experiment engine to the API handler
@@ -1584,6 +1596,108 @@ func (h *APIHandler) SimulateExperiment(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 21: AI Data Privacy & DLP Endpoints
+// ==========================================
+
+// GetDLPPolicies lists all configured DLP policies
+func (h *APIHandler) GetDLPPolicies(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusOK, []domain.DLPPolicy{})
+		return
+	}
+	policies := h.dlpManager.ListPolicies()
+	c.JSON(http.StatusOK, policies)
+}
+
+// GetDLPPolicy returns the policy for a specific tenant
+func (h *APIHandler) GetDLPPolicy(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
+		return
+	}
+	tenantID := c.Param("tenant_id")
+	if tenantID == "" {
+		tenantID = "default"
+	}
+	policy := h.dlpManager.GetPolicy(tenantID)
+	c.JSON(http.StatusOK, policy)
+}
+
+// UpsertDLPPolicy creates or updates a DLP policy for a tenant
+func (h *APIHandler) UpsertDLPPolicy(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
+		return
+	}
+	var policy domain.DLPPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	saved := h.dlpManager.SetPolicy(policy)
+	c.JSON(http.StatusOK, saved)
+}
+
+// DeleteDLPPolicy removes a tenant's policy configuration
+func (h *APIHandler) DeleteDLPPolicy(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
+		return
+	}
+	tenantID := c.Param("tenant_id")
+	if tenantID == "default" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete default policy"})
+		return
+	}
+	deleted := h.dlpManager.DeletePolicy(tenantID)
+	if !deleted {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Policy not found for tenant"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "deleted": true})
+}
+
+// GetDLPLogs returns the circular buffer of sensitive data violation audit logs
+func (h *APIHandler) GetDLPLogs(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusOK, []domain.DLPAuditLogEntry{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+	logs := h.dlpManager.ListAuditLogs(tenantID, limit)
+	c.JSON(http.StatusOK, logs)
+}
+
+// GetDLPStats returns macro privacy & DLP statistics
+func (h *APIHandler) GetDLPStats(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusOK, domain.DLPStatsSummary{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	stats := h.dlpManager.GetStats(tenantID)
+	c.JSON(http.StatusOK, stats)
+}
+
+// SimulateDLP performs on-the-fly privacy scanning, remediation, and reversible unmasking simulation
+func (h *APIHandler) SimulateDLP(c *gin.Context) {
+	if h.dlpManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
+		return
+	}
+	var req domain.DLPSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.dlpManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 
