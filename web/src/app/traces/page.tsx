@@ -143,6 +143,11 @@ function TracesExplorerContent() {
                             Fallback
                           </span>
                         )}
+                        {t.has_multimodal && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/30 shrink-0 font-mono">
+                            🎙️/🛠️ Multi
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs font-mono font-bold text-emerald-400">
                         ${t.total_cost.toFixed(4)}

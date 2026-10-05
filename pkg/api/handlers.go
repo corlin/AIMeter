@@ -12,12 +12,13 @@ import (
 	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
+	"github.com/corlin/AIMeter/pkg/cache"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/focus"
 	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/metrics"
-	"github.com/corlin/AIMeter/pkg/cache"
+	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/router"
@@ -26,19 +27,20 @@ import (
 )
 
 type APIHandler struct {
-	store           storage.Store
-	postgres        *storage.PostgresClient
-	rater           *rater.RatingEngine
-	budgetMgr       *budget.BudgetManager
-	reconciler      *reconcile.ReconciliationEngine
-	focusExport     *focus.FocusExporter
-	detector        *anomaly.AnomalyDetector
-	advisor         *advisor.CostAdvisor
-	guardSvc        *guard.GuardService
-	alertDispatcher *alert.AlertDispatcher
-	authSvc         *auth.AuthService
-	slaArbiter      *router.SLAArbiter
-	cacheMgr        *cache.SemanticCacheManager
+	store            storage.Store
+	postgres         *storage.PostgresClient
+	rater            *rater.RatingEngine
+	budgetMgr        *budget.BudgetManager
+	reconciler       *reconcile.ReconciliationEngine
+	focusExport      *focus.FocusExporter
+	detector         *anomaly.AnomalyDetector
+	advisor          *advisor.CostAdvisor
+	guardSvc         *guard.GuardService
+	alertDispatcher  *alert.AlertDispatcher
+	authSvc          *auth.AuthService
+	slaArbiter       *router.SLAArbiter
+	cacheMgr         *cache.SemanticCacheManager
+	multimodalEngine *multimodal.MultimodalEngine
 }
 
 // SetSLAArbiter attaches a SLA arbiter to the API handler
@@ -49,6 +51,16 @@ func (h *APIHandler) SetSLAArbiter(arb *router.SLAArbiter) {
 // SetCacheManager attaches a semantic cache manager to the API handler
 func (h *APIHandler) SetCacheManager(cm *cache.SemanticCacheManager) {
 	h.cacheMgr = cm
+}
+
+// SetMultimodalEngine attaches a multimodal engine to the API handler
+func (h *APIHandler) SetMultimodalEngine(me *multimodal.MultimodalEngine) {
+	h.multimodalEngine = me
+}
+
+// GetMultimodalEngine returns the attached multimodal engine
+func (h *APIHandler) GetMultimodalEngine() *multimodal.MultimodalEngine {
+	return h.multimodalEngine
 }
 
 func NewAPIHandler(
@@ -76,17 +88,18 @@ func NewAPIHandler(
 	}
 
 	return &APIHandler{
-		store:           store,
-		postgres:        pg,
-		rater:           r,
-		budgetMgr:       bm,
-		reconciler:      reconcile.NewReconciliationEngine(),
-		focusExport:     focus.NewFocusExporter(),
-		detector:        det,
-		advisor:         adv,
-		guardSvc:        g,
-		alertDispatcher: alertDisp,
-		authSvc:         authSvc,
+		store:            store,
+		postgres:         pg,
+		rater:            r,
+		budgetMgr:        bm,
+		reconciler:       reconcile.NewReconciliationEngine(),
+		focusExport:      focus.NewFocusExporter(),
+		detector:         det,
+		advisor:          adv,
+		guardSvc:         g,
+		alertDispatcher:  alertDisp,
+		authSvc:          authSvc,
+		multimodalEngine: multimodal.NewMultimodalEngine(),
 	}
 }
 
@@ -1022,5 +1035,78 @@ func (h *APIHandler) SimulateCache(c *gin.Context) {
 	resp := h.cacheMgr.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// Phase 16: Multimodal Audio/Vision & Tool Calls Cost Ledger Handlers
+
+// GetMultimodalStats returns macro stats and top tools for multimodal and tool usage
+func (h *APIHandler) GetMultimodalStats(c *gin.Context) {
+	if h.multimodalEngine == nil {
+		c.JSON(http.StatusOK, domain.MultimodalStatsSummary{})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "all")
+	stats := h.multimodalEngine.GetStats(tenantID)
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetToolRates returns configured tool billing rates
+func (h *APIHandler) GetToolRates(c *gin.Context) {
+	if h.multimodalEngine == nil {
+		c.JSON(http.StatusOK, []domain.ToolRateConfig{})
+		return
+	}
+	rates := h.multimodalEngine.GetTools()
+	c.JSON(http.StatusOK, rates)
+}
+
+// UpsertToolRate registers or updates a tool billing rate
+func (h *APIHandler) UpsertToolRate(c *gin.Context) {
+	if h.multimodalEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Multimodal engine not initialized"})
+		return
+	}
+	var cfg domain.ToolRateConfig
+	if err := c.ShouldBindJSON(&cfg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if cfg.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tool name is required"})
+		return
+	}
+	h.multimodalEngine.SetTool(cfg)
+	c.JSON(http.StatusOK, cfg)
+}
+
+// DeleteToolRate removes a tool rate configuration
+func (h *APIHandler) DeleteToolRate(c *gin.Context) {
+	if h.multimodalEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Multimodal engine not initialized"})
+		return
+	}
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tool name is required"})
+		return
+	}
+	h.multimodalEngine.DeleteTool(name)
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "deleted": name})
+}
+
+// SimulateMultimodal runs calculation simulation for vision, audio, and tools
+func (h *APIHandler) SimulateMultimodal(c *gin.Context) {
+	if h.multimodalEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Multimodal engine not initialized"})
+		return
+	}
+	var req domain.MultimodalSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.multimodalEngine.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 

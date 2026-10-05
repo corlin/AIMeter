@@ -19,6 +19,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/metrics"
+	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/router"
@@ -62,9 +63,11 @@ type OpenAIUsage struct {
 	TotalTokens             int `json:"total_tokens"`
 	PromptTokensDetails     struct {
 		CachedTokens int `json:"cached_tokens"`
+		AudioTokens  int `json:"audio_tokens"`
 	} `json:"prompt_tokens_details"`
 	CompletionTokensDetails struct {
 		ReasoningTokens int `json:"reasoning_tokens"`
+		AudioTokens     int `json:"audio_tokens"`
 	} `json:"completion_tokens_details"`
 }
 
@@ -79,6 +82,7 @@ type ProxyHandler struct {
 	slaArbiter       *router.SLAArbiter
 	cacheMgr         *cache.SemanticCacheManager
 	raterEngine      *rater.RatingEngine
+	multimodalEngine *multimodal.MultimodalEngine
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -104,6 +108,16 @@ func (h *ProxyHandler) SetCacheManager(cm *cache.SemanticCacheManager) {
 // SetRaterEngine attaches a rater engine
 func (h *ProxyHandler) SetRaterEngine(re *rater.RatingEngine) {
 	h.raterEngine = re
+}
+
+// SetMultimodalEngine attaches a multimodal engine
+func (h *ProxyHandler) SetMultimodalEngine(me *multimodal.MultimodalEngine) {
+	h.multimodalEngine = me
+}
+
+// GetMultimodalEngine returns the attached multimodal engine
+func (h *ProxyHandler) GetMultimodalEngine() *multimodal.MultimodalEngine {
+	return h.multimodalEngine
 }
 
 func (h *ProxyHandler) resolveTargetURL(provider, headerTarget string) string {
@@ -154,7 +168,8 @@ func NewProxyHandler(
 			"vllm":      "http://localhost:8000",
 			"ollama":    "http://localhost:11434",
 		},
-		compressEngine: compress.NewEngine(),
+		compressEngine:   compress.NewEngine(),
+		multimodalEngine: multimodal.NewMultimodalEngine(),
 	}
 }
 
@@ -489,6 +504,13 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		}
 	}
 
+	// 6.4 Inspect Multimodal Request Payload (Phase 16)
+	var reqLowRes, reqHighRes, reqTiles int
+	var reqAudioSec float64
+	if h.multimodalEngine != nil {
+		reqLowRes, reqHighRes, reqTiles, reqAudioSec, _ = h.multimodalEngine.InspectRequest(bodyBytes)
+	}
+
 	// Resolve Stream Capping Policy (Tenant default + Header overrides)
 	maxTokensLimit := 0
 	customNotice := ""
@@ -589,6 +611,7 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 				compStats,
 				routingStats,
 				cacheStats,
+				nil,
 			)
 			return
 		}
@@ -709,9 +732,9 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	isSSE := isStream && strings.Contains(strings.ToLower(contentType), "text/event-stream")
 
 	if isSSE {
-		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride)
+		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec)
 	} else {
-		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride)
+		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec)
 	}
 }
 
@@ -727,6 +750,8 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	routingStats SmartRoutingStats,
 	promptText string,
 	cacheTTLOverride int,
+	reqLowRes, reqHighRes, reqTiles int,
+	reqAudioSec float64,
 ) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -742,6 +767,41 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	// Record proxy metric
 	statusStr := strconv.Itoa(resp.StatusCode)
 	metrics.RecordProxyRequest(provider, fbResult.ActualModel, statusStr, fbResult.Fallbacked, duration)
+
+	var mmDetail *domain.MultimodalUsageDetail
+	if h.multimodalEngine != nil && resp.StatusCode == http.StatusOK {
+		tools, audioOutTok, audioInTok, audioSec := h.multimodalEngine.InspectResponse(respBody)
+		if audioSec == 0 && reqAudioSec > 0 {
+			audioSec = reqAudioSec
+		}
+		if reqTiles > 0 || reqLowRes > 0 || reqHighRes > 0 || audioInTok+audioOutTok > 0 || audioSec > 0 || len(tools) > 0 {
+			mmDetail = &domain.MultimodalUsageDetail{
+				ImageLowResCount:   reqLowRes,
+				ImageHighResCount:  reqHighRes,
+				ImageTilesCount:    reqTiles,
+				AudioInputSeconds:  reqAudioSec,
+				AudioInputTokens:   audioInTok,
+				AudioOutputTokens:  audioOutTok,
+				AudioOutputSeconds: audioSec,
+				ToolExecutions:     tools,
+			}
+			h.multimodalEngine.CalculateCost(fbResult.ActualModel, mmDetail)
+			h.multimodalEngine.RecordInvocation(mmDetail)
+
+			if len(tools) > 0 {
+				c.Header("X-AIMeter-Tool-Calls", strconv.Itoa(len(tools)))
+			}
+			if audioInTok+audioOutTok > 0 {
+				c.Header("X-AIMeter-Audio-Tokens", strconv.Itoa(audioInTok+audioOutTok))
+			}
+			if reqTiles > 0 {
+				c.Header("X-AIMeter-Vision-Tiles", strconv.Itoa(reqTiles))
+			}
+			if mmDetail.TotalMultimodalCost > 0 {
+				c.Header("X-AIMeter-Multimodal-Cost", fmt.Sprintf("$%.4f", mmDetail.TotalMultimodalCost))
+			}
+		}
+	}
 
 	if resp.StatusCode == http.StatusOK {
 		var respData struct {
@@ -786,6 +846,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				compStats,
 				routingStats,
 				ProxyCacheStats{},
+				mmDetail,
 			)
 		}
 	}
@@ -806,6 +867,8 @@ func (h *ProxyHandler) handleStreamingResponse(
 	routingStats SmartRoutingStats,
 	promptText string,
 	cacheTTLOverride int,
+	reqLowRes, reqHighRes, reqTiles int,
+	reqAudioSec float64,
 ) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -919,6 +982,18 @@ func (h *ProxyHandler) handleStreamingResponse(
 		h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, accumulatedContent.String(), nil, inTokens, outTokens, costUSD, cacheTTLOverride)
 	}
 
+	var mmDetail *domain.MultimodalUsageDetail
+	if h.multimodalEngine != nil && (reqTiles > 0 || reqLowRes > 0 || reqHighRes > 0 || reqAudioSec > 0) {
+		mmDetail = &domain.MultimodalUsageDetail{
+			ImageLowResCount:   reqLowRes,
+			ImageHighResCount:  reqHighRes,
+			ImageTilesCount:    reqTiles,
+			AudioInputSeconds:  reqAudioSec,
+		}
+		h.multimodalEngine.CalculateCost(fbResult.ActualModel, mmDetail)
+		h.multimodalEngine.RecordInvocation(mmDetail)
+	}
+
 	if extractedUsage != nil && extractedUsage.TotalTokens > 0 {
 		go h.recordUsage(
 			provider,
@@ -943,6 +1018,7 @@ func (h *ProxyHandler) handleStreamingResponse(
 			compStats,
 			routingStats,
 			ProxyCacheStats{},
+			mmDetail,
 		)
 	}
 }
@@ -961,6 +1037,7 @@ func (h *ProxyHandler) recordUsage(
 	compStats PromptCompressionStats,
 	routingStats SmartRoutingStats,
 	cacheStats ProxyCacheStats,
+	mmDetail *domain.MultimodalUsageDetail,
 ) {
 	if h.collectorSvc == nil {
 		return
@@ -1025,6 +1102,19 @@ func (h *ProxyHandler) recordUsage(
 		attrs["aimeter.original_model"] = originalModel
 		attrs["aimeter.actual_model"] = actualModel
 		attrs["aimeter.fallback_reason"] = fallbackReason
+	}
+
+	if mmDetail != nil && (mmDetail.TotalMultimodalCost > 0 || len(mmDetail.ToolExecutions) > 0 || mmDetail.ImageTilesCount > 0 || mmDetail.ImageLowResCount > 0 || mmDetail.AudioCostUSD > 0) {
+		attrs["aimeter.has_multimodal"] = "true"
+		attrs["aimeter.audio_duration_seconds"] = fmt.Sprintf("%.2f", mmDetail.AudioInputSeconds+mmDetail.AudioOutputSeconds)
+		attrs["aimeter.audio_tokens"] = strconv.Itoa(mmDetail.AudioInputTokens + mmDetail.AudioOutputTokens)
+		attrs["aimeter.image_count"] = strconv.Itoa(mmDetail.ImageLowResCount + mmDetail.ImageHighResCount)
+		attrs["aimeter.image_tiles_count"] = strconv.Itoa(mmDetail.ImageTilesCount)
+		attrs["aimeter.tool_calls_count"] = strconv.Itoa(len(mmDetail.ToolExecutions))
+		attrs["aimeter.multimodal_cost_usd"] = fmt.Sprintf("%.5f", mmDetail.TotalMultimodalCost)
+		if b, err := json.Marshal(mmDetail); err == nil {
+			attrs["aimeter.multimodal_details_json"] = string(b)
+		}
 	}
 
 	rawInput := normalizer.RawUsageInput{

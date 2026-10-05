@@ -349,5 +349,95 @@
     "unit": "Count",
     "currency": "USD",
     "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-realtime-preview",
+    "meter_name": "Audio.InputToken",
+    "unit_price": 0.000040,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-realtime-preview",
+    "meter_name": "Audio.OutputToken",
+    "unit_price": 0.000080,
+    "unit": "Count",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-audio-preview",
+    "meter_name": "Audio.InputSecond",
+    "unit_price": 0.0010,
+    "unit": "Second",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o-audio-preview",
+    "meter_name": "Audio.OutputSecond",
+    "unit_price": 0.0040,
+    "unit": "Second",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "whisper-1",
+    "meter_name": "Audio.InputSecond",
+    "unit_price": 0.0001,
+    "unit": "Second",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "tts-1",
+    "meter_name": "Audio.OutputSecond",
+    "unit_price": 0.00025,
+    "unit": "Second",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "meter_name": "Vision.Input.LowRes",
+    "unit_price": 0.0002125,
+    "unit": "Image",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "meter_name": "Vision.Input.HighResTile",
+    "unit_price": 0.0004250,
+    "unit": "Tile",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "openai",
+    "model": "tool:code_interpreter",
+    "meter_name": "Tool.CodeInterpreter",
+    "unit_price": 0.030,
+    "unit": "Call",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "provider": "tavily",
+    "model": "tool:web_search",
+    "meter_name": "Tool.WebSearch",
+    "unit_price": 0.005,
+    "unit": "Call",
+    "currency": "USD",
+    "effective_start_at": "2024-01-01T00:00:00Z"
   }
 ]

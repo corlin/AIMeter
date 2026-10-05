@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { TraceTreeNode, TraceDetail, CostItem } from "@/types";
-import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors, Shuffle } from "lucide-react";
+import { TraceTreeNode, TraceDetail, CostItem, ToolExecutionDetail } from "@/types";
+import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors, Shuffle, Wrench } from "lucide-react";
 
 interface TraceTreeViewerProps {
   trace: TraceDetail;
@@ -25,6 +25,15 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
                 {(trace.failover_count ?? 0) > 0 && (
                   <span className="text-[10px] text-amber-400 font-mono">({trace.failover_count} failovers)</span>
                 )}
+              </span>
+            )}
+            {trace.has_multimodal && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 flex items-center gap-1.5 font-mono">
+                <Wrench className="h-3.5 w-3.5 text-purple-400" />
+                <span>Multimodal & Tools</span>
+                {trace.audio_duration_seconds ? <span>🎙️ {trace.audio_duration_seconds.toFixed(1)}s</span> : null}
+                {trace.image_tiles_count ? <span>🖼️ {trace.image_tiles_count} tiles</span> : null}
+                {trace.tool_calls_count ? <span>🛠️ {trace.tool_calls_count} tools</span> : null}
               </span>
             )}
             {trace.is_fallback && (
@@ -96,6 +105,14 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
               <span className="block text-[11px] text-purple-400 uppercase tracking-wider font-medium">Avoided / Saved Cost</span>
               <span className="text-xl font-bold font-mono text-purple-300">
                 +${trace.cost_saved?.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {trace.has_multimodal && (trace.multimodal_cost_usd ?? 0) > 0 && (
+            <div className="rounded-lg bg-purple-950/40 border border-purple-500/30 px-4 py-2.5 text-right">
+              <span className="block text-[11px] text-purple-400 uppercase tracking-wider font-medium">Multimodal Cost</span>
+              <span className="text-xl font-bold font-mono text-purple-300">
+                ${trace.multimodal_cost_usd?.toFixed(4)}
               </span>
             </div>
           )}
@@ -241,6 +258,16 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                       <span>⚡ Cached ({node.cache_match_type?.toUpperCase() || "HIT"}{node.cache_similarity ? ` ${(node.cache_similarity * 100).toFixed(0)}%` : ""})</span>
                     </span>
                   )}
+                  {node.has_multimodal && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30 flex items-center gap-1 font-mono">
+                      <Wrench className="h-3 w-3 text-purple-400" />
+                      <span>
+                        {node.audio_duration_seconds ? `🎙️ ${node.audio_duration_seconds.toFixed(1)}s ` : ""}
+                        {node.image_tiles_count ? `🖼️ ${node.image_tiles_count} tiles ` : ""}
+                        {node.tool_calls_count ? `🛠️ ${node.tool_calls_count} tools` : ""}
+                      </span>
+                    </span>
+                  )}
                   {isRoot && (
                     <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                       Orchestrator
@@ -315,12 +342,51 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
             ))}
           </div>
         )}
+
+        {/* Multimodal & Tool Execution Breakdown */}
+        {node.multimodal_details && (
+          <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-purple-400">
+              <Wrench className="h-3.5 w-3.5" />
+              <span>细粒度多模态与 Tool 执行清单 (Multimodal & Tool Ledger)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+              {node.multimodal_details.vision_cost_usd > 0 && (
+                <div className="p-2 rounded bg-zinc-900/80 border border-zinc-800">
+                  <span className="text-zinc-400">🖼️ 视觉 ({node.multimodal_details.image_tiles_count} tiles): </span>
+                  <strong className="text-indigo-400">${node.multimodal_details.vision_cost_usd.toFixed(5)}</strong>
+                </div>
+              )}
+              {node.multimodal_details.audio_cost_usd > 0 && (
+                <div className="p-2 rounded bg-zinc-900/80 border border-zinc-800">
+                  <span className="text-zinc-400">🎙️ 音频 ({(node.multimodal_details.audio_input_seconds + node.multimodal_details.audio_output_seconds).toFixed(1)}s): </span>
+                  <strong className="text-amber-400">${node.multimodal_details.audio_cost_usd.toFixed(5)}</strong>
+                </div>
+              )}
+              {node.multimodal_details.tool_cost_usd > 0 && (
+                <div className="p-2 rounded bg-zinc-900/80 border border-zinc-800">
+                  <span className="text-zinc-400">🛠️ 工具 ({node.multimodal_details.tool_executions?.length || 0} tools): </span>
+                  <strong className="text-purple-400">${node.multimodal_details.tool_cost_usd.toFixed(5)}</strong>
+                </div>
+              )}
+            </div>
+            {node.multimodal_details.tool_executions && node.multimodal_details.tool_executions.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {node.multimodal_details.tool_executions.map((tool: ToolExecutionDetail, tIdx: number) => (
+                  <div key={tIdx} className="px-2 py-0.5 rounded bg-purple-950/30 border border-purple-500/30 text-[10px] font-mono text-purple-300">
+                    🛠️ {tool.name} ×{tool.call_count} (${tool.estimated_cost_usd.toFixed(4)})
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Recursive Render Children */}
       {hasChildren && expanded && (
         <div className="mt-3 space-y-3">
-          {node.children.map((child) => (
+          {node.children.map((child: TraceTreeNode) => (
             <TreeNodeItem key={child.span_id} node={child} depth={depth + 1} />
           ))}
         </div>

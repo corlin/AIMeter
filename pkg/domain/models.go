@@ -16,10 +16,17 @@ const (
 	MeterImageGeneration    = "Image.Generation"
 	MeterSearchQuery        = "Search.Query"
 	MeterToolExecution      = "Tool.Execution"
-	MeterAudioInputSecond   = "Audio.InputSecond"
-	MeterAudioOutputSecond  = "Audio.OutputSecond"
-	MeterGPUInferenceHour   = "GPU.InferenceHour"
-	MeterGPUDurationMs      = "GPU.DurationMs"
+	MeterAudioInputSecond       = "Audio.InputSecond"
+	MeterAudioOutputSecond      = "Audio.OutputSecond"
+	MeterAudioInputToken        = "Audio.InputToken"
+	MeterAudioOutputToken       = "Audio.OutputToken"
+	MeterVisionInputLowRes      = "Vision.Input.LowRes"
+	MeterVisionInputHighResTile = "Vision.Input.HighResTile"
+	MeterToolCodeInterpreter   = "Tool.CodeInterpreter"
+	MeterToolWebSearch          = "Tool.WebSearch"
+	MeterToolCustom             = "Tool.CustomAPI"
+	MeterGPUInferenceHour       = "GPU.InferenceHour"
+	MeterGPUDurationMs          = "GPU.DurationMs"
 )
 
 // AttributionContext represents the 8-level business context hierarchy
@@ -153,6 +160,14 @@ type TraceTreeNode struct {
 	CacheSimilarity      float64          `json:"cache_similarity,omitempty"`
 	CacheAvoidedCostUSD  float64          `json:"cache_avoided_cost_usd,omitempty"`
 	CacheAvoidedLatencyMs int64           `json:"cache_avoided_latency_ms,omitempty"`
+	HasMultimodal        bool             `json:"has_multimodal,omitempty"`
+	AudioDurationSeconds float64          `json:"audio_duration_seconds,omitempty"`
+	AudioTokens          int              `json:"audio_tokens,omitempty"`
+	ImageCount           int              `json:"image_count,omitempty"`
+	ImageTilesCount      int              `json:"image_tiles_count,omitempty"`
+	ToolCallsCount       int              `json:"tool_calls_count,omitempty"`
+	MultimodalCostUSD    float64          `json:"multimodal_cost_usd,omitempty"`
+	MultimodalDetails    *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
@@ -188,6 +203,14 @@ type TraceDetail struct {
 	CacheSimilarity      float64        `json:"cache_similarity,omitempty"`
 	CacheAvoidedCostUSD  float64        `json:"cache_avoided_cost_usd,omitempty"`
 	CacheAvoidedLatencyMs int64         `json:"cache_avoided_latency_ms,omitempty"`
+	HasMultimodal        bool           `json:"has_multimodal,omitempty"`
+	AudioDurationSeconds float64        `json:"audio_duration_seconds,omitempty"`
+	AudioTokens          int            `json:"audio_tokens,omitempty"`
+	ImageCount           int            `json:"image_count,omitempty"`
+	ImageTilesCount      int            `json:"image_tiles_count,omitempty"`
+	ToolCallsCount       int            `json:"tool_calls_count,omitempty"`
+	MultimodalCostUSD    float64        `json:"multimodal_cost_usd,omitempty"`
+	MultimodalDetails    *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
 }
 
 // OverviewStats provides high level aggregate metrics for the dashboard
@@ -704,5 +727,89 @@ type CacheSimulateResponse struct {
 	HammingDistance         int     `json:"hamming_distance"`
 	Analysis                string  `json:"analysis"`
 }
+
+// ==========================================
+// Phase 16: Multimodal & Tool Execution Cost
+// ==========================================
+
+// ToolExecutionDetail represents an executed tool/function call within a span
+type ToolExecutionDetail struct {
+	Name             string  `json:"name"`
+	Type             string  `json:"type"` // "code_interpreter", "web_search", "custom"
+	CallCount        int     `json:"call_count"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+}
+
+// MultimodalUsageDetail captures fine-grained audio, vision and tool usages
+type MultimodalUsageDetail struct {
+	AudioInputTokens    int                   `json:"audio_input_tokens"`
+	AudioOutputTokens   int                   `json:"audio_output_tokens"`
+	AudioInputSeconds   float64               `json:"audio_input_seconds"`
+	AudioOutputSeconds  float64               `json:"audio_output_seconds"`
+	AudioCostUSD        float64               `json:"audio_cost_usd"`
+	ImageLowResCount    int                   `json:"image_low_res_count"`
+	ImageHighResCount   int                   `json:"image_high_res_count"`
+	ImageTilesCount     int                   `json:"image_tiles_count"`
+	VisionCostUSD       float64               `json:"vision_cost_usd"`
+	ToolExecutions      []ToolExecutionDetail `json:"tool_executions"`
+	ToolCostUSD         float64               `json:"tool_cost_usd"`
+	TotalMultimodalCost float64               `json:"total_multimodal_cost_usd"`
+}
+
+// ToolRateConfig defines pricing and metadata for a tool
+type ToolRateConfig struct {
+	Name         string    `json:"name"`
+	Type         string    `json:"type"` // "code_interpreter", "web_search", "custom"
+	UnitPriceUSD float64   `json:"unit_price_usd"`
+	Unit         string    `json:"unit"` // "Call", "Session", "Query"
+	Description  string    `json:"description"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// TopToolMetric represents aggregated spend for top tools
+type TopToolMetric struct {
+	Name         string  `json:"name"`
+	Type         string  `json:"type"`
+	TotalCalls   int64   `json:"total_calls"`
+	TotalCostUSD float64 `json:"total_cost_usd"`
+	Percentage   float64 `json:"percentage"`
+}
+
+// MultimodalStatsSummary provides aggregated metrics for the dashboard
+type MultimodalStatsSummary struct {
+	TenantID               string          `json:"tenant_id"`
+	TotalMultimodalCostUSD float64         `json:"total_multimodal_cost_usd"`
+	TotalAudioCostUSD      float64         `json:"total_audio_cost_usd"`
+	TotalVisionCostUSD     float64         `json:"total_vision_cost_usd"`
+	TotalToolCostUSD       float64         `json:"total_tool_cost_usd"`
+	TotalAudioSeconds      float64         `json:"total_audio_seconds"`
+	TotalAudioTokens       int64           `json:"total_audio_tokens"`
+	TotalImages            int64           `json:"total_images"`
+	TotalImageTiles        int64           `json:"total_image_tiles"`
+	TotalToolCalls         int64           `json:"total_tool_calls"`
+	TopTools               []TopToolMetric `json:"top_tools"`
+}
+
+// MultimodalSimulateRequest represents a request to simulate multimodal and tool costs
+type MultimodalSimulateRequest struct {
+	Model              string   `json:"model"` // e.g. "gpt-4o", "gpt-4o-audio-preview"
+	AudioInputSeconds  float64  `json:"audio_input_seconds"`
+	AudioOutputSeconds float64  `json:"audio_output_seconds"`
+	ImageLowResCount   int      `json:"image_low_res_count"`
+	ImageHighResCount  int      `json:"image_high_res_count"`
+	ImageWidth         int      `json:"image_width,omitempty"`
+	ImageHeight        int      `json:"image_height,omitempty"`
+	Tools              []string `json:"tools"` // e.g. ["code_interpreter", "web_search", "db_query"]
+}
+
+// MultimodalSimulateResponse represents the calculated cost breakdown
+type MultimodalSimulateResponse struct {
+	Model              string                `json:"model"`
+	Breakdown          MultimodalUsageDetail `json:"breakdown"`
+	EstimatedTokens    int                   `json:"estimated_tokens"`
+	TotalCostUSD       float64               `json:"total_cost_usd"`
+	FormulaExplanation string                `json:"formula_explanation"`
+}
+
 
 

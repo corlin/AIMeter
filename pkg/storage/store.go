@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -373,6 +374,16 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 		avoidedUSD float64
 		avoidedLat int64
 	})
+	multimodalMap := make(map[string]struct {
+		hasMM      bool
+		audioSec   float64
+		audioTok   int
+		imgCount   int
+		tilesCount int
+		toolCalls  int
+		mmCost     float64
+		detail     *domain.MultimodalUsageDetail
+	})
 
 	for _, u := range s.usages {
 		if u.RawAttributes != nil {
@@ -433,6 +444,42 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 					avoidedLat: lat,
 				}
 			}
+			if u.RawAttributes["aimeter.has_multimodal"] == "true" {
+				audioSec, _ := strconv.ParseFloat(u.RawAttributes["aimeter.audio_duration_seconds"], 64)
+				audioTok, _ := strconv.Atoi(u.RawAttributes["aimeter.audio_tokens"])
+				imgCount, _ := strconv.Atoi(u.RawAttributes["aimeter.image_count"])
+				tiles, _ := strconv.Atoi(u.RawAttributes["aimeter.image_tiles_count"])
+				toolCalls, _ := strconv.Atoi(u.RawAttributes["aimeter.tool_calls_count"])
+				costUSD, _ := strconv.ParseFloat(u.RawAttributes["aimeter.multimodal_cost_usd"], 64)
+
+				var mmDetail *domain.MultimodalUsageDetail
+				if jsonStr := u.RawAttributes["aimeter.multimodal_details_json"]; jsonStr != "" {
+					var d domain.MultimodalUsageDetail
+					if err := json.Unmarshal([]byte(jsonStr), &d); err == nil {
+						mmDetail = &d
+					}
+				}
+
+				multimodalMap[u.TraceID] = struct {
+					hasMM      bool
+					audioSec   float64
+					audioTok   int
+					imgCount   int
+					tilesCount int
+					toolCalls  int
+					mmCost     float64
+					detail     *domain.MultimodalUsageDetail
+				}{
+					hasMM:      true,
+					audioSec:   audioSec,
+					audioTok:   audioTok,
+					imgCount:   imgCount,
+					tilesCount: tiles,
+					toolCalls:  toolCalls,
+					mmCost:     costUSD,
+					detail:     mmDetail,
+				}
+			}
 		}
 	}
 
@@ -468,6 +515,16 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 			td.CacheSimilarity = ch.similarity
 			td.CacheAvoidedCostUSD = ch.avoidedUSD
 			td.CacheAvoidedLatencyMs = ch.avoidedLat
+		}
+		if mm, ok := multimodalMap[td.TraceID]; ok {
+			td.HasMultimodal = mm.hasMM
+			td.AudioDurationSeconds = mm.audioSec
+			td.AudioTokens = mm.audioTok
+			td.ImageCount = mm.imgCount
+			td.ImageTilesCount = mm.tilesCount
+			td.ToolCallsCount = mm.toolCalls
+			td.MultimodalCostUSD = mm.mmCost
+			td.MultimodalDetails = mm.detail
 		}
 		result = append(result, *td)
 	}
@@ -514,6 +571,14 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	var cacheSimilarity float64
 	var cacheAvoidedCostUSD float64
 	var cacheAvoidedLatencyMs int64
+	var hasMultimodal bool
+	var audioDurationSec float64
+	var audioTokens int
+	var imageCount int
+	var imageTilesCount int
+	var toolCallsCount int
+	var multimodalCostUSD float64
+	var multimodalDetail *domain.MultimodalUsageDetail
 
 	for _, u := range s.usages {
 		if u.TraceID == traceID {
@@ -547,6 +612,21 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 					cacheSimilarity, _ = strconv.ParseFloat(u.RawAttributes["aimeter.cache_similarity"], 64)
 					cacheAvoidedCostUSD, _ = strconv.ParseFloat(u.RawAttributes["aimeter.cache_avoided_cost_usd"], 64)
 					cacheAvoidedLatencyMs, _ = strconv.ParseInt(u.RawAttributes["aimeter.cache_avoided_latency_ms"], 10, 64)
+				}
+				if u.RawAttributes["aimeter.has_multimodal"] == "true" {
+					hasMultimodal = true
+					audioDurationSec, _ = strconv.ParseFloat(u.RawAttributes["aimeter.audio_duration_seconds"], 64)
+					audioTokens, _ = strconv.Atoi(u.RawAttributes["aimeter.audio_tokens"])
+					imageCount, _ = strconv.Atoi(u.RawAttributes["aimeter.image_count"])
+					imageTilesCount, _ = strconv.Atoi(u.RawAttributes["aimeter.image_tiles_count"])
+					toolCallsCount, _ = strconv.Atoi(u.RawAttributes["aimeter.tool_calls_count"])
+					multimodalCostUSD, _ = strconv.ParseFloat(u.RawAttributes["aimeter.multimodal_cost_usd"], 64)
+					if jsonStr := u.RawAttributes["aimeter.multimodal_details_json"]; jsonStr != "" {
+						var d domain.MultimodalUsageDetail
+						if err := json.Unmarshal([]byte(jsonStr), &d); err == nil {
+							multimodalDetail = &d
+						}
+					}
 				}
 			}
 		}
@@ -595,6 +675,14 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 				CacheSimilarity:      cacheSimilarity,
 				CacheAvoidedCostUSD:  cacheAvoidedCostUSD,
 				CacheAvoidedLatencyMs: cacheAvoidedLatencyMs,
+				HasMultimodal:        hasMultimodal,
+				AudioDurationSeconds: audioDurationSec,
+				AudioTokens:          audioTokens,
+				ImageCount:           imageCount,
+				ImageTilesCount:      imageTilesCount,
+				ToolCallsCount:       toolCallsCount,
+				MultimodalCostUSD:    multimodalCostUSD,
+				MultimodalDetails:    multimodalDetail,
 			}
 			if node.SpanName == "" {
 				node.SpanName = item.Model
@@ -683,5 +771,13 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 		CacheSimilarity:      cacheSimilarity,
 		CacheAvoidedCostUSD:  cacheAvoidedCostUSD,
 		CacheAvoidedLatencyMs: cacheAvoidedLatencyMs,
+		HasMultimodal:        hasMultimodal,
+		AudioDurationSeconds: audioDurationSec,
+		AudioTokens:          audioTokens,
+		ImageCount:           imageCount,
+		ImageTilesCount:      imageTilesCount,
+		ToolCallsCount:       toolCallsCount,
+		MultimodalCostUSD:    multimodalCostUSD,
+		MultimodalDetails:    multimodalDetail,
 	}, nil
 }

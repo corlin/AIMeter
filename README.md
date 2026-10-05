@@ -180,6 +180,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **全链路审计透传与 0 成本经济学**：响应头透明回显 `X-AIMeter-Cache-Hit`, `X-AIMeter-Cache-Match-Type`, `X-AIMeter-Cache-Similarity`, `X-AIMeter-Cost-Avoided`, `X-AIMeter-Latency-Saved-Ms`；命中请求在 Ledger 中记录为 0 成本调用并核算规避支出。
 * **全生命周期可观测性与交互式实验**：全新一级看板 `/cache`（4 维核心 KPI 概览、租户策略滑块配置、交互式双 Prompt 相似度 Playground、活跃条目实时检索与一键失效）；`/traces` 清晰点亮 `⚡ Cached` 徽标与 Avoided Spend 规避支出。
 
+### 19. 多模态与 Tool/Agent 工具调用细粒度计量与计费引擎 (Multimodal Audio/Vision & Tool Calls Cost Ledger - Phase 16)
+* **双轨混合全量模型**：物理单位（语音物理时长 `Audio.InputSecond/OutputSecond`、图像切片 `Vision.Input.HighResTile`）与厂商等效 Token 自动转换，无缝对齐最新主流多模态模型计价规则。
+* **分级外部工具执行费率 (Tool Pricing Registry)**：预置沙箱代码解释器（`Tool.CodeInterpreter` $0.03/次）、联网搜索（`Tool.WebSearch` $0.005/次、Tavily $0.005/次）以及企业私有自定义 API 动态定价注册表，支持并发安全热增删改查。
+* **全链路自适应深度嗅探**：网关反向代理自适应嗅探请求体 `messages` 中的图像 detail / 512×512 瓦片算法、输入语音时长，并嗅探响应体 `tool_calls` 执行频次与 `usage.audio_tokens`。
+* **响应头透明审计透传**：`X-AIMeter-Tool-Calls`, `X-AIMeter-Audio-Tokens`, `X-AIMeter-Vision-Tiles`, `X-AIMeter-Multimodal-Cost`。
+* **全生命周期大盘与在线沙箱**：全新一级看板 `/multimodal`（4 维核心宏观 KPI、Top 5 热门工具排行、Tool 费率管理表格与编辑 Modal、多模态与 Tool 在线仿真沙箱）；`/traces` 树状层级图实时点亮 `🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 彩色徽标与分项卡片。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -187,9 +194,10 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/multimodal` | **多模态与工具调用计费大盘** | 4 维宏观 KPI（音频、视觉、工具与全口径支出）、Top 5 热门工具执行排行、Tool 费率管理表格、多模态与 Tool 在线仿真试算沙箱 |
 | `/cache` | **语义级响应缓存大盘** | 4 维核心 KPI 概览（命中率、规避支出、节约时延、活跃条目）、租户策略配置、双 Prompt 相似度在线测试 Playground 与活跃条目失效控制 |
 | `/router` | **智能路由与 SLA 调度大盘** | 虚拟模型池管理、供应商实时 EWMA 时延与可用性监控矩阵、交互式 Prompt 路由决策仿真沙箱 |
-| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `⚡ Cached` 缓存徽标、`🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
+| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 多模态徽标、`⚡ Cached` 缓存徽标、`🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
 | `/compress` | **Prompt 瘦身策略与实验室** | 租户级压缩模式配置、阈值设定、交互式在线 Prompt 瘦身与多模型节省金额实时比对矩阵 |
 | `/rates` | **费率目录知识库** | 39+ 预置模型基准价格表、租户阶梯折扣配置、自建 GPU 目录与在线试算 Playground |
 | `/reconcile` | **发票对账与方差拆解** | 账单 PDF/CSV 拖拽上传、实付 vs 观测对比、5 维瀑布图拆解 |

@@ -85,6 +85,14 @@ export interface TraceTreeNode {
   cache_similarity?: number;
   cache_avoided_cost_usd?: number;
   cache_avoided_latency_ms?: number;
+  has_multimodal?: boolean;
+  audio_duration_seconds?: number;
+  audio_tokens?: number;
+  image_count?: number;
+  image_tiles_count?: number;
+  tool_calls_count?: number;
+  multimodal_cost_usd?: number;
+  multimodal_details?: MultimodalUsageDetail;
 }
 
 export interface TraceDetail {
@@ -119,6 +127,14 @@ export interface TraceDetail {
   cache_similarity?: number;
   cache_avoided_cost_usd?: number;
   cache_avoided_latency_ms?: number;
+  has_multimodal?: boolean;
+  audio_duration_seconds?: number;
+  audio_tokens?: number;
+  image_count?: number;
+  image_tiles_count?: number;
+  tool_calls_count?: number;
+  multimodal_cost_usd?: number;
+  multimodal_details?: MultimodalUsageDetail;
 }
 
 export interface RateEntry {
@@ -553,6 +569,83 @@ export interface CacheSimulateResponse {
   hamming_distance: number;
   analysis: string;
 }
+
+// ==========================================
+// Phase 16: Multimodal & Tool Execution Cost
+// ==========================================
+
+export interface ToolExecutionDetail {
+  name: string;
+  type: string;
+  call_count: number;
+  estimated_cost_usd: number;
+}
+
+export interface MultimodalUsageDetail {
+  audio_input_tokens: number;
+  audio_output_tokens: number;
+  audio_input_seconds: number;
+  audio_output_seconds: number;
+  audio_cost_usd: number;
+  image_low_res_count: number;
+  image_high_res_count: number;
+  image_tiles_count: number;
+  vision_cost_usd: number;
+  tool_executions: ToolExecutionDetail[];
+  tool_cost_usd: number;
+  total_multimodal_cost_usd: number;
+}
+
+export interface ToolRateConfig {
+  name: string;
+  type: string;
+  unit_price_usd: number;
+  unit: string;
+  description: string;
+  updated_at?: string;
+}
+
+export interface TopToolMetric {
+  name: string;
+  type: string;
+  total_calls: number;
+  total_cost_usd: number;
+  percentage: number;
+}
+
+export interface MultimodalStatsSummary {
+  tenant_id: string;
+  total_multimodal_cost_usd: number;
+  total_audio_cost_usd: number;
+  total_vision_cost_usd: number;
+  total_tool_cost_usd: number;
+  total_audio_seconds: number;
+  total_audio_tokens: number;
+  total_images: number;
+  total_image_tiles: number;
+  total_tool_calls: number;
+  top_tools: TopToolMetric[];
+}
+
+export interface MultimodalSimulateRequest {
+  model: string;
+  audio_input_seconds: number;
+  audio_output_seconds: number;
+  image_low_res_count: number;
+  image_high_res_count: number;
+  image_width?: number;
+  image_height?: number;
+  tools: string[];
+}
+
+export interface MultimodalSimulateResponse {
+  model: string;
+  breakdown: MultimodalUsageDetail;
+  estimated_tokens: number;
+  total_cost_usd: number;
+  formula_explanation: string;
+}
+
 
 
 

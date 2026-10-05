@@ -33,7 +33,11 @@ import {
   CacheEntrySummary,
   CacheStats,
   CacheSimulateRequest,
-  CacheSimulateResponse
+  CacheSimulateResponse,
+  ToolRateConfig,
+  MultimodalStatsSummary,
+  MultimodalSimulateRequest,
+  MultimodalSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -638,6 +642,78 @@ export async function simulateCache(req: CacheSimulateRequest): Promise<CacheSim
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 16: Multimodal Audio/Vision & Tool Calls Cost Ledger
+// ==========================================
+
+export async function fetchMultimodalStats(tenantId = "all"): Promise<MultimodalStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/multimodal/stats?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch multimodal stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for multimodal stats", err);
+    return {
+      tenant_id: tenantId,
+      total_multimodal_cost_usd: 0,
+      total_audio_cost_usd: 0,
+      total_vision_cost_usd: 0,
+      total_tool_cost_usd: 0,
+      total_audio_seconds: 0,
+      total_audio_tokens: 0,
+      total_images: 0,
+      total_image_tiles: 0,
+      total_tool_calls: 0,
+      top_tools: [],
+    };
+  }
+}
+
+export async function fetchToolRates(): Promise<ToolRateConfig[]> {
+  try {
+    const res = await fetch(`${API_BASE}/multimodal/tools`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch tool rates");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for tool rates", err);
+    return [];
+  }
+}
+
+export async function upsertToolRate(tool: ToolRateConfig): Promise<ToolRateConfig> {
+  const res = await fetch(`${API_BASE}/multimodal/tools`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(tool),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to upsert tool rate" }));
+    throw new Error(err.error || "Failed to upsert tool rate");
+  }
+  return await res.json();
+}
+
+export async function deleteToolRate(name: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/multimodal/tools/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
+  return res.ok;
+}
+
+export async function simulateMultimodal(req: MultimodalSimulateRequest): Promise<MultimodalSimulateResponse> {
+  const res = await fetch(`${API_BASE}/multimodal/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate multimodal costs" }));
+    throw new Error(err.error || "Failed to simulate multimodal costs");
+  }
+  return await res.json();
+}
+
 
 
 

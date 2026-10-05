@@ -15,7 +15,8 @@ import {
   KeyRound,
   Scissors,
   Shuffle,
-  Zap
+  Zap,
+  Wrench
 } from "lucide-react";
 
 export function Navbar() {
@@ -26,6 +27,7 @@ export function Navbar() {
     { label: "Traces & Economics", href: "/traces", icon: Network },
     { label: "Smart Router", href: "/router", icon: Shuffle },
     { label: "Semantic Cache", href: "/cache", icon: Zap },
+    { label: "Multimodal & Tools", href: "/multimodal", icon: Wrench },
     { label: "Rates", href: "/rates", icon: Layers },
     { label: "Reconciliation", href: "/reconcile", icon: FileCheck2 },
     { label: "FOCUS", href: "/focus", icon: PieChart },

@@ -349,3 +349,68 @@ func TestSemanticCacheEndpoints(t *testing.T) {
 	}
 }
 
+func TestMultimodalEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/multimodal/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/multimodal/stats?tenant_id=all", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/multimodal/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_tool_calls"`) {
+		t.Errorf("Expected total_tool_calls in stats response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/multimodal/tools
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/multimodal/tools", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/multimodal/tools, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "code_interpreter") {
+		t.Errorf("Expected code_interpreter in default tools, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/multimodal/tools (Register new custom tool)
+	customToolJSON := `{"name":"custom_rag_search","type":"search","rate_usd":0.008,"unit":"Call","description":"Custom Enterprise RAG Search"}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/multimodal/tools", strings.NewReader(customToolJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/multimodal/tools, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "custom_rag_search") {
+		t.Errorf("Expected custom_rag_search in response, got: %s", w.Body.String())
+	}
+
+	// 4. DELETE /api/v1/multimodal/tools/:name
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/api/v1/multimodal/tools/custom_rag_search", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for DELETE /api/v1/multimodal/tools/custom_rag_search, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"status":"ok"`) {
+		t.Errorf("Expected status ok, got: %s", w.Body.String())
+	}
+
+	// 5. POST /api/v1/multimodal/simulate
+	simReq := `{"model":"gpt-4o","image_low_res_count":2,"image_high_res_count":1,"image_width":1024,"image_height":1024,"audio_input_seconds":15.0,"audio_output_seconds":5.0,"tools":["code_interpreter","web_search"]}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/multimodal/simulate", strings.NewReader(simReq))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/multimodal/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_multimodal_cost_usd"`) || !strings.Contains(w.Body.String(), `"tool_cost_usd"`) {
+		t.Errorf("Expected total_multimodal_cost_usd and tool_cost_usd in response, got: %s", w.Body.String())
+	}
+}
+
+

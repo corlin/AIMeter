@@ -641,6 +641,16 @@ AIMeter/
 * [x] 交付 Web 控制台全新一级看板 `/cache`：4 维核心 KPI 概览（命中率、累计规避支出、节约时延、活跃条目）、租户策略滑块配置、交互式双 Prompt 相似度 Playground、活跃缓存条目表格与一键失效。
 * [x] 升级 `/traces` 列表及 `TraceTreeViewer` 节点：点亮 `⚡ Cached` 徽标、匹配模式（EXACT/SEMANTIC）、相似度百分比与 Avoided Spend 规避支出核算。
 
+### Phase 16: 多模态与 Tool/Agent 工具调用细粒度计量与计费引擎 (Multimodal Audio/Vision & Tool Calls Cost Ledger)
+* [x] 构建高性能多模态与工具解析及计费引擎（`pkg/multimodal/`）：支持双轨混合全量模型，覆盖物理单位（`Audio.InputSecond/OutputSecond`，图像瓦片 `Vision.Input.HighResTile`）与厂商等效 Token 自动转换，以及 Tool 分级执行费率（`Tool.CodeInterpreter` $0.03/次, `Tool.WebSearch` $0.005/次, `Tool.Custom`）。
+* [x] 扩展领域模型（`pkg/domain/models.go`）与预置费率种子数据（`configs/rates_seed.json`）：增补多模态计量分类 MeterTaxonomy（`MeterAudioInputToken`, `MeterAudioOutputToken`, `MeterVisionInputLowRes`, `MeterVisionInputHighResTile`, `MeterToolCodeInterpreter`, `MeterToolWebSearch`, `MeterToolCustom` 等），以及 `gpt-4o-realtime-preview` / `gpt-4o-audio-preview` / `whisper-1` / `tts-1` / 视觉 512×512 瓦片与工具预置费率。
+* [x] 网关深度自适应拦截与嗅探：请求体深度解析多模态输入（`messages` 中的 `image_url` detail 及 512×512 瓦片切片算法，`input_audio` base64 与时长估算）；响应体深度提取 `tool_calls`（提取工具名、执行次数并匹配费率），以及 `usage.prompt_tokens_details.audio_tokens`。
+* [x] 网关响应头透明透传多模态指标：`X-AIMeter-Tool-Calls`, `X-AIMeter-Audio-Tokens`, `X-AIMeter-Vision-Tiles`, `X-AIMeter-Multimodal-Cost`。
+* [x] 存储层与遥测管道端到端联动：将 `aimeter.has_multimodal`, `aimeter.audio_duration_seconds`, `aimeter.audio_tokens`, `aimeter.image_count`, `aimeter.image_tiles_count`, `aimeter.tool_calls_count`, `aimeter.multimodal_cost_usd`, `aimeter.multimodal_details_json` 注入 RawAttributes 并反序列化回填至各 `TraceTreeNode` 与 `TraceDetail`。
+* [x] 建立控制面 REST API（`pkg/api/`）：暴露 `GET /api/v1/multimodal/stats`（宏观多模态支出与 Top 5 工具排行）、`GET /api/v1/multimodal/tools`（工具费率清单）、`POST /api/v1/multimodal/tools`（新增或修改工具费率）、`DELETE /api/v1/multimodal/tools/:name`（删除工具费率）、`POST /api/v1/multimodal/simulate`（在线仿真试算）。
+* [x] 交付 Web 控制台全新一级看板 `/multimodal`：4 维宏观 KPI（音频、视觉、工具与全口径支出）、Top 5 热门工具执行排行榜、Tool 费率管理表格与新增/编辑 Modal、以及多模态与 Tool 在线仿真沙箱。
+* [x] 升级 `/traces` 列表与 `TraceTreeViewer` 树状层级图：点亮 `🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 彩色徽标，并在树状节点中渲染多模态分项开销卡片与外部工具调用执行明细。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)
