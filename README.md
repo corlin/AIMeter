@@ -194,6 +194,18 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **网关透明代理与 TrueUp 动态纠偏**：在请求执行前评估预估 Token/成本并执行决策，请求完成后根据真实上游消费执行 `TrueUp` 动态差额补偿纠偏，保证账本与额度精准一致。
 * **全生命周期限流大盘与仿真沙箱**：全新一级看板 `/throttling`（4 维核心宏观 KPI、多级配额策略管理表与新建/编辑模态窗、在线突发压力仿真沙箱与逐步执行时间线）；`/traces` 实时点亮 `🚦 429 Rate-Limited` 与 `⏳ Throttled (Queue: Xms)` 彩色徽标。
 
+### 21. 企业级智能预算预测与自动自愈降本引擎 (Predictive Budget Forecasting & Automated Remediation Engine - Phase 18)
+* **多维混合时序外推数学模型 (`pkg/forecast`)**：纯 Go 原生实现 EWMA 指数加权移动平均平滑、OLS 普通最小二乘趋势斜率拟合与工作日/周末潮汐因子加权，支持自然月对齐与未来 30 天消耗外推，计算延迟 `< 1ms`。
+* **预算穿透精准预警与置信区间投影**：计算未来 30 天 P50 预期值与 P90 悲观上限值，分钟级精准推算月内预算穿透时刻时间戳（Breach Timestamp）。
+* **四级渐进式闭环自愈状态机 (Progressive Remediation Matrix)**：
+  1. `L0 健康正常 (<80%)`：常规运行，维持既定配置；
+  2. `L1 无损瘦身 (80%~95%)`：Prompt 压缩自适应升级至 `aggressive`，语义缓存 TTL 与敏感度倾斜提升，实现 20%~40% 快速降本；
+  3. `L2 平替与微排队 (95%~100%)`：联动 `slaArbiter` 自动将非核心流量导流至廉价平替模型，收紧 `throttlerEngine` 突发倍率至 1.0x 并开启毫秒级微排队；
+  4. `L3 硬封顶熔断 (>100%)`：联动 `StreamCappingPolicy` 强制封顶单请求 Token/费用上限，非核心请求触发 429 配额保护，阻止账单无底洞。
+* **自动闭环 (Auto-Pilot) 与干运行/人工审批双模切换**：支持租户级自治升降级与控制台一键覆写/恢复。
+* **反向代理请求头贯通注入**：在网关响应头自动透传 `X-AIMeter-Remediation-Level` 与 `X-AIMeter-Remediation-Actions`。
+* **全生命周期预测大盘与仿真沙箱**：全新一级看板 `/forecasting`（4 维核心宏观 KPI、SVG 交互式时序投影图、多租户自愈阶梯矩阵监控表与执行审计 Drawer、以及交互式 What-If 压力仿真沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -201,6 +213,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/forecasting` | **预算时序预测与自愈大盘** | 4 维宏观 KPI（预算使用率、月末预测、穿透预警、自愈节省）、SVG 时序投影图（实线/虚线/P50-P90 置信区间）、四级自愈矩阵与 What-If 突发沙箱 |
 | `/throttling` | **分布式速率限制与配额大盘** | 4 维宏观 KPI（评估请求数、429 拦截数、微排队缓冲数、避免 runaway 保护金额）、配额策略管理表、在线令牌桶突发压力仿真沙箱 |
 | `/multimodal` | **多模态与工具调用计费大盘** | 4 维宏观 KPI（音频、视觉、工具与全口径支出）、Top 5 热门工具执行排行、Tool 费率管理表格、多模态与 Tool 在线仿真试算沙箱 |
 | `/cache` | **语义级响应缓存大盘** | 4 维核心 KPI 概览（命中率、规避支出、节约时延、活跃条目）、租户策略配置、双 Prompt 相似度在线测试 Playground 与活跃条目失效控制 |

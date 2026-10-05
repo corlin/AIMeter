@@ -18,6 +18,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/normalizer"
@@ -85,6 +86,7 @@ type ProxyHandler struct {
 	raterEngine      *rater.RatingEngine
 	multimodalEngine *multimodal.MultimodalEngine
 	throttlerEngine  *throttler.ThrottlerEngine
+	forecastEngine   *forecast.ForecastEngine
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -130,6 +132,16 @@ func (h *ProxyHandler) SetThrottlerEngine(te *throttler.ThrottlerEngine) {
 // GetThrottlerEngine returns the attached throttler engine
 func (h *ProxyHandler) GetThrottlerEngine() *throttler.ThrottlerEngine {
 	return h.throttlerEngine
+}
+
+// SetForecastEngine attaches a forecast and remediation engine
+func (h *ProxyHandler) SetForecastEngine(fe *forecast.ForecastEngine) {
+	h.forecastEngine = fe
+}
+
+// GetForecastEngine returns the attached forecast engine
+func (h *ProxyHandler) GetForecastEngine() *forecast.ForecastEngine {
+	return h.forecastEngine
 }
 
 func (h *ProxyHandler) resolveTargetURL(provider, headerTarget string) string {
@@ -678,6 +690,16 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		c.Header("X-RateLimit-Limit-CPM", fmt.Sprintf("%.2f", policy.LimitCPM))
 		c.Header("X-RateLimit-Remaining-CPM", fmt.Sprintf("%.4f", throttlingDecision.RemainingCPM))
 		c.Header("X-RateLimit-Reset", strconv.FormatInt(throttlingDecision.ResetTimestamp, 10))
+
+		if h.forecastEngine != nil {
+			status := h.forecastEngine.GetStatus(tenantID)
+			if status.CurrentLevel > domain.RemediationLevelNormal {
+				c.Header("X-AIMeter-Remediation-Level", strconv.Itoa(int(status.CurrentLevel)))
+				if len(status.ActiveActions) > 0 {
+					c.Header("X-AIMeter-Remediation-Actions", strings.Join(status.ActiveActions, ","))
+				}
+			}
+		}
 
 		if throttlingDecision.Action == domain.ActionReject {
 			metrics.RecordProxyRequest(provider, actualModel, "429", fbResult.Fallbacked, time.Since(startTime))

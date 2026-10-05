@@ -661,6 +661,24 @@ AIMeter/
 * [x] 交付 Web 控制台全新一级看板 `/throttling`：4 维宏观 KPI（总评估请求数、429 拦截数、微排队缓冲数、避免 runaway 破产保护金额）、多级配额策略管理表与新建/编辑模态窗、在线突发压力仿真沙箱与逐步执行时间线。
 * [x] 升级 `/traces` 列表及 `TraceTreeViewer` 节点：点亮 `🚦 429 Rate-Limited` 与 `⏳ Throttled (Queue: Xms)` 彩色徽标。
 
+### Phase 18: 企业级智能预算预测与自动自愈降本引擎 (Predictive Budget Forecasting & Automated Remediation Engine)
+* [x] 多维混合时序外推数学模型（`pkg/forecast/`）：纯 Go 原生实现 EWMA 指数加权移动平均平滑、OLS 普通最小二乘趋势斜率拟合与工作日/周末潮汐因子加权，支持自然月对齐与未来 30 天消耗外推。
+* [x] 预算穿透精准预警与置信区间投影：计算未来 30 天 P50 预期值与 P90 悲观上限值，分钟级精准推算月内预算穿透时刻时间戳（Breach Timestamp）。
+* [x] 四级渐进式闭环自愈状态机：
+  * **L0 健康正常 (<80%)**：常规运行，保留租户既定默认配置；
+  * **L1 无损瘦身 (80%~95%)**：Prompt 压缩自适应升级至 `aggressive`，语义缓存 TTL 与敏感度倾斜提升；
+  * **L2 平替与微排队 (95%~100%)**：联动 `slaArbiter` 自动将非核心流量导流至廉价平替模型，收紧 `throttlerEngine` 突发倍率至 1.0x 并开启微排队；
+  * **L3 硬封顶熔断 (>100%)**：联动 `StreamCappingPolicy` 强制封顶单请求 Token/费用上限，非核心请求触发 429 配额保护。
+* [x] 自动闭环 (Auto-Pilot) 与干运行/人工审批双模切换：支持租户级自治升降级与控制台一键覆写/恢复。
+* [x] 控制面 REST API 交付（`pkg/api/`）：
+  * `GET /api/v1/forecast/projections`（时序投影曲线与穿透预测）
+  * `GET /api/v1/forecast/remediations`（各租户自愈状态与执行审计日志）
+  * `POST /api/v1/forecast/remediations/apply`（手动审批与强制重置自愈状态）
+  * `POST /api/v1/forecast/simulate`（实时 What-If 突发流量压力沙箱）
+  * `GET /api/v1/forecast/policies` 与 `POST /api/v1/forecast/policies`（自愈策略规则维护）
+* [x] 反向代理请求头贯通注入：在网关响应头自动透传 `X-AIMeter-Remediation-Level` 与 `X-AIMeter-Remediation-Actions`。
+* [x] 交付 Web 控制台全新一级看板 `/forecasting`：4 维宏观 KPI（月度预算消耗率、月末预测总花费、高风险穿透租户数、自愈累计节省金额）、SVG 交互式时序投影图（实线消耗、虚线预测、P50-P90 置信区间带、穿透点高亮）、多租户自愈阶梯矩阵监控表与执行审计 Drawer、以及交互式 What-If 压力仿真沙箱。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

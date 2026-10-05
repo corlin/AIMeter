@@ -16,6 +16,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/focus"
+	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
@@ -43,6 +44,7 @@ type APIHandler struct {
 	cacheMgr         *cache.SemanticCacheManager
 	multimodalEngine *multimodal.MultimodalEngine
 	throttlerEngine  *throttler.ThrottlerEngine
+	forecastEngine   *forecast.ForecastEngine
 }
 
 // SetSLAArbiter attaches a SLA arbiter to the API handler
@@ -63,6 +65,16 @@ func (h *APIHandler) SetMultimodalEngine(me *multimodal.MultimodalEngine) {
 // SetThrottlerEngine attaches a throttler engine to the API handler
 func (h *APIHandler) SetThrottlerEngine(te *throttler.ThrottlerEngine) {
 	h.throttlerEngine = te
+}
+
+// SetForecastEngine attaches a forecast engine to the API handler
+func (h *APIHandler) SetForecastEngine(fe *forecast.ForecastEngine) {
+	h.forecastEngine = fe
+}
+
+// GetForecastEngine returns the attached forecast engine
+func (h *APIHandler) GetForecastEngine() *forecast.ForecastEngine {
+	return h.forecastEngine
 }
 
 // GetMultimodalEngine returns the attached multimodal engine
@@ -1187,6 +1199,133 @@ func (h *APIHandler) SimulateThrottling(c *gin.Context) {
 	}
 	resp := h.throttlerEngine.Simulate(req)
 	c.JSON(http.StatusOK, resp)
+}
+
+// ==========================================
+// Phase 18: Predictive Budget Forecasting & Automated Remediation Handlers
+// ==========================================
+
+// GetForecastProjections returns time-series budget projections and breach forecasts
+func (h *APIHandler) GetForecastProjections(c *gin.Context) {
+	if h.forecastEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "default")
+	period := c.DefaultQuery("period", "current")
+
+	proj, err := h.forecastEngine.PredictTenant(c.Request.Context(), tenantID, period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, proj)
+}
+
+// GetRemediationStatuses returns current mitigation stages and audit entries
+func (h *APIHandler) GetRemediationStatuses(c *gin.Context) {
+	if h.forecastEngine == nil {
+		c.JSON(http.StatusOK, []domain.RemediationStatus{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	if tenantID != "" && tenantID != "all" {
+		status := h.forecastEngine.GetStatus(tenantID)
+		c.JSON(http.StatusOK, []domain.RemediationStatus{status})
+		return
+	}
+	statuses := h.forecastEngine.ListStatuses()
+	c.JSON(http.StatusOK, statuses)
+}
+
+type ApplyRemediationRequest struct {
+	TenantID string                  `json:"tenant_id" binding:"required"`
+	Level    domain.RemediationLevel `json:"level"`
+	Reason   string                  `json:"reason"`
+	Operator string                  `json:"operator"`
+}
+
+// ApplyRemediation manually transitions or overrides a tenant's remediation stage
+func (h *APIHandler) ApplyRemediation(c *gin.Context) {
+	if h.forecastEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
+		return
+	}
+	var req ApplyRemediationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Operator == "" {
+		req.Operator = "admin"
+	}
+	if req.Reason == "" {
+		req.Reason = "Manual operator intervention"
+	}
+
+	status, err := h.forecastEngine.Remediate(c.Request.Context(), req.TenantID, req.Level, req.Operator, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, status)
+}
+
+// SimulateForecast performs interactive What-If traffic surge simulations
+func (h *APIHandler) SimulateForecast(c *gin.Context) {
+	if h.forecastEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
+		return
+	}
+	var req domain.ForecastSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.TenantID == "" {
+		req.TenantID = "default"
+	}
+	resp, err := h.forecastEngine.Simulate(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetForecastPolicies lists or returns proactive mitigation policies
+func (h *APIHandler) GetForecastPolicies(c *gin.Context) {
+	if h.forecastEngine == nil {
+		c.JSON(http.StatusOK, []domain.RemediationPolicy{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	if tenantID != "" && tenantID != "all" {
+		p := h.forecastEngine.GetPolicy(tenantID)
+		c.JSON(http.StatusOK, []domain.RemediationPolicy{p})
+		return
+	}
+	policies := h.forecastEngine.ListPolicies()
+	c.JSON(http.StatusOK, policies)
+}
+
+// UpsertForecastPolicy saves or updates a tenant's proactive mitigation policy
+func (h *APIHandler) UpsertForecastPolicy(c *gin.Context) {
+	if h.forecastEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
+		return
+	}
+	var policy domain.RemediationPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if policy.TenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		return
+	}
+	h.forecastEngine.SetPolicy(policy)
+	c.JSON(http.StatusOK, policy)
 }
 
 

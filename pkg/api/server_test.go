@@ -492,5 +492,107 @@ func TestThrottlingEndpoints(t *testing.T) {
 	}
 }
 
+func TestForecastEndpoints(t *testing.T) {
+	store := storage.NewMemoryStore()
+	server := api.NewServer(
+		8080,
+		store,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+	)
+
+	// 1. GET /api/v1/forecast/projections
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/forecast/projections?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/forecast/projections, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"projected_spend_usd"`) || !strings.Contains(w.Body.String(), `"data_points"`) {
+		t.Errorf("Expected projection data in response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/forecast/remediations
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/forecast/remediations", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/forecast/remediations, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 3. POST /api/v1/forecast/remediations/apply
+	applyJSON := `{
+		"tenant_id": "test-org",
+		"level": 2,
+		"reason": "Test active throttle",
+		"operator": "test-admin"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/forecast/remediations/apply", strings.NewReader(applyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/forecast/remediations/apply, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"current_level":2`) {
+		t.Errorf("Expected current_level 2 in response, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/forecast/simulate
+	simJSON := `{
+		"tenant_id": "test-org",
+		"traffic_multiplier": 1.5,
+		"daily_spend_add_usd": 10.0,
+		"simulated_days": 30
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/forecast/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/forecast/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"simulated_projected_spend_usd"`) || !strings.Contains(w.Body.String(), `"projected_points"`) {
+		t.Errorf("Expected simulation results, got: %s", w.Body.String())
+	}
+
+	// 5. POST /api/v1/forecast/policies & GET /api/v1/forecast/policies
+	policyJSON := `{
+		"tenant_id": "test-org",
+		"auto_pilot_enabled": true,
+		"soft_mitigate_threshold": 0.82,
+		"active_throttle_threshold": 0.94,
+		"hard_cap_threshold": 1.00,
+		"allow_compression_boost": true,
+		"allow_model_downgrade": true,
+		"allow_rate_limit_tighten": true,
+		"allow_stream_capping": true
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/forecast/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/forecast/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/forecast/policies?tenant_id=test-org", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/forecast/policies, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"soft_mitigate_threshold":0.82`) {
+		t.Errorf("Expected saved policy threshold in response, got: %s", w.Body.String())
+	}
+}
+
 
 

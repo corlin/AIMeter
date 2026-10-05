@@ -720,7 +720,90 @@ export interface ThrottlingSimulateResponse {
   analysis: string;
 }
 
+// ==========================================
+// Phase 18: Predictive Budget Forecasting & Automated Remediation
+// ==========================================
 
+export type RemediationLevel = 0 | 1 | 2 | 3;
 
+export interface ForecastDataPoint {
+  date: string;
+  actual_spend_usd?: number;
+  predicted_spend_usd: number;
+  upper_bound_p90_usd: number;
+  lower_bound_p50_usd: number;
+  is_projected: boolean;
+}
 
+export interface ForecastProjection {
+  tenant_id: string;
+  period: string;
+  currency: string;
+  current_spend_usd: number;
+  monthly_budget_usd: number;
+  projected_spend_usd: number;
+  projected_spend_p90_usd: number;
+  projected_spend_p50_usd: number;
+  is_breach_predicted: boolean;
+  breach_estimated_at?: string;
+  confidence_score: number;
+  remediation_level: RemediationLevel;
+  trend_slope_usd_per_day: number;
+  data_points: ForecastDataPoint[];
+  evaluated_at: string;
+}
 
+export interface RemediationLogEntry {
+  id: string;
+  tenant_id: string;
+  from_level: RemediationLevel;
+  to_level: RemediationLevel;
+  trigger_reason: string;
+  actions_taken: string[];
+  triggered_at: string;
+  operator: string;
+}
+
+export interface RemediationPolicy {
+  tenant_id: string;
+  auto_pilot_enabled: boolean;
+  soft_mitigate_threshold: number;
+  active_throttle_threshold: number;
+  hard_cap_threshold: number;
+  allow_compression_boost: boolean;
+  allow_model_downgrade: boolean;
+  allow_rate_limit_tighten: boolean;
+  allow_stream_capping: boolean;
+  updated_at?: string;
+}
+
+export interface RemediationStatus {
+  tenant_id: string;
+  current_level: RemediationLevel;
+  auto_pilot_enabled: boolean;
+  active_actions: string[];
+  last_evaluated_at: string;
+  last_action_triggered_at?: string;
+  estimated_savings_usd: number;
+  audit_log: RemediationLogEntry[];
+}
+
+export interface ForecastSimulateRequest {
+  tenant_id?: string;
+  traffic_multiplier: number;
+  daily_spend_add_usd: number;
+  simulated_days: number;
+}
+
+export interface ForecastSimulateResponse {
+  tenant_id: string;
+  original_projected_spend_usd: number;
+  simulated_projected_spend_usd: number;
+  monthly_budget_usd: number;
+  original_breach_estimated_at?: string;
+  simulated_breach_estimated_at?: string;
+  recommended_remediation_level: RemediationLevel;
+  simulated_savings_usd: number;
+  projected_points: ForecastDataPoint[];
+  analysis: string;
+}

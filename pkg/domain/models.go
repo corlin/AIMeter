@@ -900,6 +900,105 @@ type ThrottlingSimulateResponse struct {
 	Analysis         string              `json:"analysis"`
 }
 
+// ==========================================
+// Phase 18: Predictive Budget Forecasting & Automated Remediation Engine
+// ==========================================
 
+// RemediationLevel defines the 4 progressive mitigation stages
+type RemediationLevel int
 
+const (
+	RemediationLevelNormal         RemediationLevel = 0 // <80%: Regular operation
+	RemediationLevelSoftMitigate   RemediationLevel = 1 // 80%-95%: Prompt compression boost & cache prioritization
+	RemediationLevelActiveThrottle RemediationLevel = 2 // 95%-100%: SLA cheaper model routing & token-bucket tightening
+	RemediationLevelHardCap        RemediationLevel = 3 // >100%: Stream capping & 429 quota exhaustion
+)
 
+// ForecastDataPoint represents historical or projected daily spend
+type ForecastDataPoint struct {
+	Date              string  `json:"date"` // "YYYY-MM-DD"
+	ActualSpendUSD    float64 `json:"actual_spend_usd,omitempty"`
+	PredictedSpendUSD float64 `json:"predicted_spend_usd"`
+	UpperBoundP90USD  float64 `json:"upper_bound_p90_usd"`
+	LowerBoundP50USD  float64 `json:"lower_bound_p50_usd"`
+	IsProjected       bool    `json:"is_projected"`
+}
+
+// ForecastProjection encapsulates time-series projection and breach estimation
+type ForecastProjection struct {
+	TenantID            string              `json:"tenant_id"`
+	Period              string              `json:"period"` // e.g. "2026-10" or "current"
+	Currency            string              `json:"currency"`
+	CurrentSpendUSD     float64             `json:"current_spend_usd"`
+	MonthlyBudgetUSD    float64             `json:"monthly_budget_usd"`
+	ProjectedSpendUSD   float64             `json:"projected_spend_usd"`
+	ProjectedSpendP90   float64             `json:"projected_spend_p90_usd"`
+	ProjectedSpendP50   float64             `json:"projected_spend_p50_usd"`
+	IsBreachPredicted   bool                `json:"is_breach_predicted"`
+	BreachEstimatedAt   *time.Time          `json:"breach_estimated_at,omitempty"`
+	ConfidenceScore     float64             `json:"confidence_score"` // 0.0 - 1.0 (e.g. 0.94)
+	RemediationLevel    RemediationLevel    `json:"remediation_level"`
+	TrendSlopeUSDPerDay float64             `json:"trend_slope_usd_per_day"`
+	DataPoints          []ForecastDataPoint `json:"data_points"`
+	EvaluatedAt         time.Time           `json:"evaluated_at"`
+}
+
+// RemediationLogEntry records an automated or manual remediation event
+type RemediationLogEntry struct {
+	ID            string           `json:"id"`
+	TenantID      string           `json:"tenant_id"`
+	FromLevel     RemediationLevel `json:"from_level"`
+	ToLevel       RemediationLevel `json:"to_level"`
+	TriggerReason string           `json:"trigger_reason"`
+	ActionsTaken  []string         `json:"actions_taken"`
+	TriggeredAt   time.Time        `json:"triggered_at"`
+	Operator      string           `json:"operator"` // "auto-pilot" or username
+}
+
+// RemediationPolicy controls how proactive mitigation behaves for a tenant
+type RemediationPolicy struct {
+	TenantID                 string    `json:"tenant_id"`
+	AutoPilotEnabled         bool      `json:"auto_pilot_enabled"`
+	SoftMitigateThreshold    float64   `json:"soft_mitigate_threshold"`   // default 0.80
+	ActiveThrottleThreshold float64   `json:"active_throttle_threshold"` // default 0.95
+	HardCapThreshold         float64   `json:"hard_cap_threshold"`         // default 1.00
+	AllowCompressionBoost    bool      `json:"allow_compression_boost"`
+	AllowModelDowngrade      bool      `json:"allow_model_downgrade"`
+	AllowRateLimitTighten    bool      `json:"allow_rate_limit_tighten"`
+	AllowStreamCapping       bool      `json:"allow_stream_capping"`
+	UpdatedAt                time.Time `json:"updated_at"`
+}
+
+// RemediationStatus captures active mitigation state and savings
+type RemediationStatus struct {
+	TenantID              string                `json:"tenant_id"`
+	CurrentLevel          RemediationLevel      `json:"current_level"`
+	AutoPilotEnabled      bool                  `json:"auto_pilot_enabled"`
+	ActiveActions         []string              `json:"active_actions"`
+	LastEvaluatedAt       time.Time             `json:"last_evaluated_at"`
+	LastActionTriggeredAt time.Time             `json:"last_action_triggered_at,omitempty"`
+	EstimatedSavingsUSD   float64               `json:"estimated_savings_usd"`
+	AuditLog              []RemediationLogEntry `json:"audit_log"`
+}
+
+// ForecastSimulateRequest simulates what-if surge traffic
+type ForecastSimulateRequest struct {
+	TenantID          string  `json:"tenant_id"`
+	TrafficMultiplier float64 `json:"traffic_multiplier"` // e.g. 1.5 = +50%
+	DailySpendAddUSD  float64 `json:"daily_spend_add_usd"`
+	SimulatedDays     int     `json:"simulated_days"` // default 30
+}
+
+// ForecastSimulateResponse returns simulated projection and remediation recommendations
+type ForecastSimulateResponse struct {
+	TenantID                    string              `json:"tenant_id"`
+	OriginalProjectedSpendUSD   float64             `json:"original_projected_spend_usd"`
+	SimulatedProjectedSpendUSD  float64             `json:"simulated_projected_spend_usd"`
+	MonthlyBudgetUSD            float64             `json:"monthly_budget_usd"`
+	OriginalBreachEstimatedAt   *time.Time          `json:"original_breach_estimated_at,omitempty"`
+	SimulatedBreachEstimatedAt  *time.Time          `json:"simulated_breach_estimated_at,omitempty"`
+	RecommendedRemediationLevel RemediationLevel    `json:"recommended_remediation_level"`
+	SimulatedSavingsUSD         float64             `json:"simulated_savings_usd"`
+	ProjectedPoints             []ForecastDataPoint `json:"projected_points"`
+	Analysis                    string              `json:"analysis"`
+}

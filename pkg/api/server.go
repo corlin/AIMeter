@@ -13,6 +13,8 @@ import (
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/cache"
 	"github.com/corlin/AIMeter/pkg/collector"
+	"github.com/corlin/AIMeter/pkg/compress"
+	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
@@ -168,6 +170,11 @@ func NewServer(
 	throttlerEngine := throttler.NewThrottlerEngine()
 	proxyHandler.SetThrottlerEngine(throttlerEngine)
 	handler.SetThrottlerEngine(throttlerEngine)
+	compressEngine := compress.NewEngine()
+	proxyHandler.SetCompressEngine(compressEngine)
+	forecastEngine := forecast.NewForecastEngine(store, budgetMgr, compressEngine, slaArbiter, throttlerEngine, handler.alertDispatcher)
+	proxyHandler.SetForecastEngine(forecastEngine)
+	handler.SetForecastEngine(forecastEngine)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
@@ -250,6 +257,15 @@ func NewServer(
 		apiV1.DELETE("/throttling/policies/:id", handler.DeleteThrottlingPolicy)
 		apiV1.GET("/throttling/stats", handler.GetThrottlingStats)
 		apiV1.POST("/throttling/simulate", handler.SimulateThrottling)
+
+		// Phase 18: Predictive Budget Forecasting & Automated Remediation Engine
+		apiV1.GET("/forecast/projections", handler.GetForecastProjections)
+		apiV1.GET("/forecast/remediations", handler.GetRemediationStatuses)
+		apiV1.POST("/forecast/remediations/apply", handler.ApplyRemediation)
+		apiV1.POST("/forecast/simulate", handler.SimulateForecast)
+		apiV1.GET("/forecast/policies", handler.GetForecastPolicies)
+		apiV1.POST("/forecast/policies", handler.UpsertForecastPolicy)
+		apiV1.PUT("/forecast/policies", handler.UpsertForecastPolicy)
 	}
 
 	return &Server{
