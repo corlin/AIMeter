@@ -22,6 +22,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/forecast"
+	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/normalizer"
@@ -95,6 +96,17 @@ type ProxyHandler struct {
 	experimentEngine   *experiment.Engine
 	dlpManager         *dlp.Manager
 	swarmManager       *swarm.Manager
+	memoryManager      *memory.MemoryManager
+}
+
+// SetMemoryManager attaches a memory manager
+func (h *ProxyHandler) SetMemoryManager(mm *memory.MemoryManager) {
+	h.memoryManager = mm
+}
+
+// GetMemoryManager returns the attached memory manager
+func (h *ProxyHandler) GetMemoryManager() *memory.MemoryManager {
+	return h.memoryManager
 }
 
 // SetSwarmManager attaches a swarm manager
@@ -586,6 +598,25 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 						if modBytes, err := json.Marshal(payload); err == nil {
 							bodyBytes = modBytes
 						}
+					}
+				}
+			}
+		}
+	}
+
+	// 4.6 Evaluate Agent Memory Lifecycle & Tiered Compression (Phase 23)
+	if h.memoryManager != nil && sessionID != "" {
+		if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 4 {
+			var chatMsgs []domain.ChatMessage
+			msgBytes, mErr := json.Marshal(rawMsgs)
+			if mErr == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
+				transformed, _, memSaved := h.memoryManager.TransformMessagesForSession(tenantID, sessionID, chatMsgs)
+				if memSaved > 0 {
+					payload["messages"] = transformed
+					c.Header("X-AIMeter-Memory-Tokens", strconv.Itoa(memSaved))
+					c.Header("X-AIMeter-Memory-Active-Tier", "warm")
+					if modBytes, err := json.Marshal(payload); err == nil {
+						bodyBytes = modBytes
 					}
 				}
 			}
@@ -1180,6 +1211,15 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				h.experimentEngine.RecordResult(expID, variantID, int64(respData.Usage.TotalTokens), costUSD, float64(duration.Milliseconds()), heuristicScore, true)
 			}
 
+			// Evaluate Agent Memory Output Utilization (Phase 23)
+			sessID := c.GetHeader("X-AIMeter-Session-Id")
+			if sessID == "" {
+				sessID = c.GetHeader("X-Session-ID")
+			}
+			if h.memoryManager != nil && sessID != "" && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
+				go h.memoryManager.EvaluateSessionOutput(sessID, respData.Choices[0].Message.Content)
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1359,6 +1399,15 @@ func (h *ProxyHandler) handleStreamingResponse(
 	// Populate cache on successful, uncapped streaming completion
 	if !isCapped && resp.StatusCode == http.StatusOK && accumulatedContent.Len() > 0 && h.cacheMgr != nil && len(promptText) > 0 {
 		h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, accumulatedContent.String(), nil, inTokens, outTokens, costUSD, cacheTTLOverride)
+	}
+
+	// Evaluate Agent Memory Output Utilization (Phase 23)
+	streamSessID := c.GetHeader("X-AIMeter-Session-Id")
+	if streamSessID == "" {
+		streamSessID = c.GetHeader("X-Session-ID")
+	}
+	if h.memoryManager != nil && streamSessID != "" && accumulatedContent.Len() > 0 {
+		go h.memoryManager.EvaluateSessionOutput(streamSessID, accumulatedContent.String())
 	}
 
 	var mmDetail *domain.MultimodalUsageDetail

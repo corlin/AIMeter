@@ -21,6 +21,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/focus"
 	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
+	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/rater"
@@ -53,6 +54,17 @@ type APIHandler struct {
 	experimentEngine   *experiment.Engine
 	dlpManager         *dlp.Manager
 	swarmManager       *swarm.Manager
+	memoryManager      *memory.MemoryManager
+}
+
+// SetMemoryManager attaches a memory manager to the API handler
+func (h *APIHandler) SetMemoryManager(mm *memory.MemoryManager) {
+	h.memoryManager = mm
+}
+
+// GetMemoryManager returns the attached memory manager
+func (h *APIHandler) GetMemoryManager() *memory.MemoryManager {
+	return h.memoryManager
 }
 
 // SetSwarmManager attaches a swarm manager to the API handler
@@ -1795,6 +1807,96 @@ func (h *APIHandler) SimulateSwarm(c *gin.Context) {
 	resp := h.swarmManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 23: Agent Memory Lifecycle & Tiered Compression Endpoints
+// ==========================================
+
+// GetMemoryItems lists managed memory items with optional tier/session filtering
+func (h *APIHandler) GetMemoryItems(c *gin.Context) {
+	if h.memoryManager == nil {
+		c.JSON(http.StatusOK, []*domain.MemoryItem{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	sessionID := c.Query("session_id")
+	tierStr := c.Query("tier")
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+
+	items := h.memoryManager.ListItems(tenantID, sessionID, domain.MemoryTier(tierStr), limit)
+	c.JSON(http.StatusOK, items)
+}
+
+// GetMemoryStats returns aggregated memory token, cost and utility metrics
+func (h *APIHandler) GetMemoryStats(c *gin.Context) {
+	if h.memoryManager == nil {
+		c.JSON(http.StatusOK, domain.MemoryStatsSummary{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	stats := h.memoryManager.GetStats(tenantID)
+	c.JSON(http.StatusOK, stats)
+}
+
+// UpsertMemoryPolicy creates or modifies memory lifecycle rules
+func (h *APIHandler) UpsertMemoryPolicy(c *gin.Context) {
+	if h.memoryManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Memory manager not initialized"})
+		return
+	}
+	var policy domain.MemoryPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.memoryManager.SavePolicy(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, policy)
+}
+
+// CompactMemory manually triggers tiering and Fact Memo compression for a session
+func (h *APIHandler) CompactMemory(c *gin.Context) {
+	if h.memoryManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Memory manager not initialized"})
+		return
+	}
+	var body struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.SessionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})
+		return
+	}
+	updated, err := h.memoryManager.CompactSession(body.SessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"session_id":     body.SessionID,
+		"compacted_items": len(updated),
+		"items":          updated,
+	})
+}
+
+// SimulateMemory runs multi-turn memory accumulation and compression sandbox
+func (h *APIHandler) SimulateMemory(c *gin.Context) {
+	if h.memoryManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Memory manager not initialized"})
+		return
+	}
+	var req domain.MemorySimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.memoryManager.Simulate(&req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

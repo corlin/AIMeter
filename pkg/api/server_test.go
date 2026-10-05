@@ -1003,6 +1003,77 @@ func TestSwarmEndpoints(t *testing.T) {
 	}
 }
 
+func TestMemoryEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/memory/items
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/memory/items", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/memory/items, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 2. POST /api/v1/memory/policies
+	policyJSON := `{
+		"tenant_id": "memory-test-tenant",
+		"enabled": true,
+		"max_hot_turns": 4,
+		"warm_compression_ratio": 0.20,
+		"half_life_hours": 18.0,
+		"noise_threshold": 0.12,
+		"auto_compaction": true
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/memory/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/memory/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 3. GET /api/v1/memory/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/memory/stats?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/memory/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_items"`) {
+		t.Errorf("Expected total_items in stats, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/memory/compact
+	compactJSON := `{"session_id": "sess_agent_demo_1"}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/memory/compact", strings.NewReader(compactJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/memory/compact, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/memory/simulate
+	simJSON := `{
+		"tenant_id": "memory-test-tenant",
+		"conversation_turns": 15,
+		"avg_tokens_per_turn": 400
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/memory/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/memory/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"baseline_total_tokens"`) || !strings.Contains(body, `"managed_total_tokens"`) {
+		t.Errorf("Expected baseline/managed tokens in simulate response, got: %s", body)
+	}
+}
+
+
 
 
 

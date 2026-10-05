@@ -22,7 +22,8 @@ import {
   Globe,
   FlaskConical,
   ShieldCheck,
-  Share2
+  Share2,
+  BrainCircuit
 } from "lucide-react";
 
 export function Navbar() {
@@ -30,6 +31,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Agent Memory", href: "/memory", icon: BrainCircuit },
     { label: "Agent Swarm", href: "/swarm", icon: Share2 },
     { label: "Privacy DLP", href: "/privacy", icon: ShieldCheck },
     { label: "Experiments", href: "/experiments", icon: FlaskConical },

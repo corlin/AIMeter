@@ -1460,3 +1460,100 @@ type SwarmSimulateResponse struct {
 	GraphEdges         []*SwarmEdge            `json:"graph_edges"`
 	Timeline           []SwarmTransitionRecord `json:"timeline"`
 }
+
+// ==========================================
+// Phase 23: Agent Memory Lifecycle & Tiered Compression Engine
+// ==========================================
+
+// MemoryTier defines the 3-tier storage hierarchy
+type MemoryTier string
+
+const (
+	MemoryTierHot  MemoryTier = "hot"  // Active working window, uncompressed full fidelity
+	MemoryTierWarm MemoryTier = "warm" // Fact Memo / compressed structural summary
+	MemoryTierCold MemoryTier = "cold" // Archived / external vector store index
+)
+
+// MemoryItem represents an atomic memory unit managed by AI Meter
+type MemoryItem struct {
+	ID               string     `json:"id"`
+	TenantID         string     `json:"tenant_id"`
+	SessionID        string     `json:"session_id"`
+	AgentName        string     `json:"agent_name"`
+	Role             string     `json:"role"` // "user", "assistant", "system", "tool"
+	Content          string     `json:"content"`
+	SummaryContent   string     `json:"summary_content,omitempty"`
+	Tier             MemoryTier `json:"tier"`
+	Tokens           int        `json:"tokens"`
+	CompressedTokens int        `json:"compressed_tokens"`
+	EstimatedSpendUSD float64   `json:"estimated_spend_usd"`
+	SavedSpendUSD    float64    `json:"saved_spend_usd"`
+	AccessCount      int        `json:"access_count"`
+	UtilityScore     float64    `json:"utility_score"` // 0.0 - 1.0, based on output token overlap
+	IsNoise          bool       `json:"is_noise"`      // true if repeatedly retrieved with 0 utility
+	HalfLifeScore    float64    `json:"half_life_score"`
+	CreatedAt        time.Time  `json:"created_at"`
+	LastAccessedAt   time.Time  `json:"last_accessed_at"`
+}
+
+// MemoryPolicy configures tiering thresholds and eviction parameters
+type MemoryPolicy struct {
+	TenantID              string    `json:"tenant_id"`
+	Enabled               bool      `json:"enabled"`
+	MaxHotTurns           int       `json:"max_hot_turns"`           // e.g. 6 recent turns stay hot
+	WarmCompressionRatio  float64   `json:"warm_compression_ratio"`  // e.g. 0.25 (target 75% compression)
+	HalfLifeHours         float64   `json:"half_life_hours"`         // e.g. 24.0 hours
+	NoiseThreshold        float64   `json:"noise_threshold"`         // utility < 0.10 marked as noise
+	MinRecallUtilityPct   float64   `json:"min_recall_utility_pct"`  // e.g. 0.15
+	AutoCompaction        bool      `json:"auto_compaction"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+// MemoryStatsSummary provides high-level metrics for memory asset dashboard
+type MemoryStatsSummary struct {
+	TotalItems            int     `json:"total_items"`
+	HotItemsCount         int     `json:"hot_items_count"`
+	WarmItemsCount        int     `json:"warm_items_count"`
+	ColdItemsCount        int     `json:"cold_items_count"`
+	TotalTokensManaged    int     `json:"total_tokens_managed"`
+	TokensSaved           int     `json:"tokens_saved"`
+	TotalMemorySpendUSD   float64 `json:"total_memory_spend_usd"`
+	TotalAvoidedSpendUSD  float64 `json:"total_avoided_spend_usd"`
+	AvgUtilityScore       float64 `json:"avg_utility_score"`
+	IdentifiedNoiseCount  int     `json:"identified_noise_count"`
+}
+
+// MemorySimulateRequest simulates conversation memory accumulation & tiering
+type MemorySimulateRequest struct {
+	TenantID          string        `json:"tenant_id,omitempty"`
+	ConversationTurns int           `json:"conversation_turns"` // e.g. 20 turns
+	AvgTokensPerTurn  int           `json:"avg_tokens_per_turn"`  // e.g. 450
+	Model             string        `json:"model,omitempty"`
+	PolicyOverride    *MemoryPolicy `json:"policy_override,omitempty"`
+}
+
+// MemorySimulateTurn records per-turn token comparison in simulation
+type MemorySimulateTurn struct {
+	Turn                    int        `json:"turn"`
+	RawTokensAccumulated    int        `json:"raw_tokens_accumulated"`
+	TieredTokensWithAIMeter int        `json:"tiered_tokens_with_aimeter"`
+	TokensSaved             int        `json:"tokens_saved"`
+	RawCostUSD              float64    `json:"raw_cost_usd"`
+	TieredCostUSD           float64    `json:"tiered_cost_usd"`
+	AvoidedCostUSD          float64    `json:"avoided_cost_usd"`
+	ActiveTier              MemoryTier `json:"active_tier"`
+}
+
+// MemorySimulateResponse returns the simulation curves and savings
+type MemorySimulateResponse struct {
+	TotalTurns              int                  `json:"total_turns"`
+	BaselineTotalTokens     int                  `json:"baseline_total_tokens"`
+	ManagedTotalTokens      int                  `json:"managed_total_tokens"`
+	CompressionSavingsPct   float64              `json:"compression_savings_pct"`
+	BaselineSpendUSD        float64              `json:"baseline_spend_usd"`
+	ManagedSpendUSD         float64              `json:"managed_spend_usd"`
+	NetAvoidedSpendUSD      float64              `json:"net_avoided_spend_usd"`
+	TurnBreakdown           []MemorySimulateTurn `json:"turn_breakdown"`
+	Recommendations         []string             `json:"recommendations"`
+}
+

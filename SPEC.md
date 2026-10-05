@@ -798,6 +798,38 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（23/23 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 23: AI Agent 记忆生命周期、长期上下文向量检索成本归因与分级分层冷热压缩归档引擎 (Agent Memory Lifecycle, Semantic Recall Attribution & Tiered Compression Engine)
+* [x] **领域模型与种子数据（`pkg/domain/models.go` & `configs/memory_seed.json`）**：
+  * 定义核心数据结构：`MemoryTier`（`hot`, `warm`, `cold`）、`MemoryItem`（会话、角色、原始内容、事实摘要、温层状态、代币开销、压缩代币、节约支出、访问计数、半衰期衰减分、语义利用率、低效噪声判定标记）、`MemoryPolicy`（租户策略、活跃 K 轮窗口、Fact Memo 压缩比、半衰期小时数、噪声判定阈值、网关自动压实开关）、`MemoryStatsSummary`、`MemorySimulateTurn`、`MemorySimulateRequest` 与 `MemorySimulateResponse`；
+  * 预置种子数据：`configs/memory_seed.json` 提供默认与金融租户策略，以及覆盖 Hot/Warm/Cold 三温层的典型智能体记忆资产。
+* [x] **纯 Go 高性能三层自适应冷热调度与价值评估引擎（`pkg/memory/`）**：
+  * **三层自适应温层架构**：
+    * **Hot 活跃工作记忆**：最近 $K$ 轮（默认 5 轮）原始保留，直插模型 Prompt，微秒级即时响应；
+    * **Warm 结构化事实卡片 (Fact Memo)**：超出 $K$ 轮历史自动提取结构化关键事实（键值/实体/决策），压降 75% 代币消耗；
+    * **Cold 向量外部归档**：基于访问半衰期动态衰减 $S = \text{Hits} \times e^{-\lambda \cdot \Delta t}$，非活跃记忆移出主动上下文转入外部冷存，按需召回；
+  * **微秒级语义利用率度量与负反馈噪声淘汰**：基于中英文分词与 N-Gram 语义重合度测算输出对注入记忆的引用率（Memory Utility & ROI），自动标识 $<25\%$ 的低效背景噪声，并在压实阶段实施负反馈淘汰，杜绝长上下文二次方发散；
+  * **并发安全存储池与推演沙箱（`Manager`）**：并发安全管理会话历史、自适应重构上下文（`TransformMessagesForSession`）、多轮膨胀对比沙箱（`Simulate`）。
+* [x] **控制面 REST API 与反向代理网关贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 5 大 REST 控制端点：
+    * `GET /api/v1/memory/items`（多租户/会话分层记忆资产清单）
+    * `GET /api/v1/memory/stats`（记忆资产、代币节约与噪声拦截大盘）
+    * `POST /api/v1/memory/policies`（保存/下发租户记忆生命周期策略）
+    * `POST /api/v1/memory/compact`（手动/定时触发指定会话记忆压实）
+    * `POST /api/v1/memory/simulate`（长程记忆膨胀与分级压缩账单推演沙箱）
+  * 反向代理网关双向协同：
+    * **入站消息自适应瘦身**：网关自动嗅探 `X-AIMeter-Memory-Session`，将超出 Hot 窗口的历史消息替换为紧凑的 Fact Memo 摘要卡片，并注入 `X-AIMeter-Memory-Tokens`、`X-AIMeter-Memory-Cost` 等响应头；
+    * **出站异步利用率评估**：模型响应结束后在后台异步协程评估输出文本与注入记忆的语义重合度，零延迟阻塞正常流量。
+* [x] **Web 控制台全新一级看板 `/memory`（`web/src/app/memory/`）**：
+  * **4 维宏观 KPI 卡片**：记忆资产总量与温层分布、节省 Context Tokens、规避长程浪费支出、平均记忆有效率与噪声拦截数；
+  * **三层记忆资产泳道看板 (Tiering Kanban)**：分 Hot、Warm、Cold 三列直观呈现记忆卡片，支持按会话过滤、实时检索与一键手动压实；
+  * **有效率与低效噪声审计 (Utility Audit)**：高亮对比低效背景噪声记忆与高价值黄金记忆，清晰透视负反馈淘汰机制；
+  * **生命周期与淘汰策略配置 (Policy Config)**：表单化配置 Hot 轮次、压缩比、半衰期衰减与噪声过滤线；
+  * **长程记忆膨胀对比沙箱 (Playground)**：模拟 10~100 轮长程对话，对比传统未分层 $O(N^2)$ 成本发散与 AIMeter 稳定分层模式的账单节约明细。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（24/24 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

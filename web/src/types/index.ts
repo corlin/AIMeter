@@ -1165,4 +1165,88 @@ export interface SwarmSimulateResponse {
   timeline: SwarmTransitionRecord[];
 }
 
+// ==========================================
+// Phase 23: Agent Memory Lifecycle & Tiered Compression
+// ==========================================
+
+export type MemoryTier = "hot" | "warm" | "cold";
+
+export interface MemoryItem {
+  id: string;
+  tenant_id: string;
+  session_id: string;
+  agent_name: string;
+  role: string;
+  content: string;
+  summary_content?: string;
+  tier: MemoryTier;
+  tokens: number;
+  compressed_tokens: number;
+  estimated_spend_usd: number;
+  saved_spend_usd: number;
+  access_count: number;
+  utility_score: number;
+  is_noise: boolean;
+  half_life_score: number;
+  created_at: string;
+  last_accessed_at: string;
+}
+
+export interface MemoryPolicy {
+  tenant_id: string;
+  enabled: boolean;
+  max_hot_turns: number;
+  warm_compression_ratio: number;
+  half_life_hours: number;
+  noise_threshold: number;
+  min_recall_utility_pct: number;
+  auto_compaction: boolean;
+  updated_at?: string;
+}
+
+export interface MemoryStatsSummary {
+  total_items: number;
+  hot_items_count: number;
+  warm_items_count: number;
+  cold_items_count: number;
+  total_tokens_managed: number;
+  tokens_saved: number;
+  total_memory_spend_usd: number;
+  total_avoided_spend_usd: number;
+  avg_utility_score: number;
+  identified_noise_count: number;
+}
+
+export interface MemorySimulateTurn {
+  turn: number;
+  raw_tokens_accumulated: number;
+  tiered_tokens_with_aimeter: number;
+  tokens_saved: number;
+  raw_cost_usd: number;
+  tiered_cost_usd: number;
+  avoided_cost_usd: number;
+  active_tier: MemoryTier;
+}
+
+export interface MemorySimulateRequest {
+  tenant_id?: string;
+  conversation_turns: number;
+  avg_tokens_per_turn: number;
+  model?: string;
+  policy_override?: MemoryPolicy;
+}
+
+export interface MemorySimulateResponse {
+  total_turns: number;
+  baseline_total_tokens: number;
+  managed_total_tokens: number;
+  compression_savings_pct: number;
+  baseline_spend_usd: number;
+  managed_spend_usd: number;
+  net_avoided_spend_usd: number;
+  turn_breakdown: MemorySimulateTurn[];
+  recommendations: string[];
+}
+
+
 

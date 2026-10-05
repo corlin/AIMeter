@@ -73,7 +73,13 @@ import {
   SwarmLoopEvent,
   SwarmStatsSummary,
   SwarmSimulateRequest,
-  SwarmSimulateResponse
+  SwarmSimulateResponse,
+  MemoryItem,
+  MemoryPolicy,
+  MemoryStatsSummary,
+  MemorySimulateRequest,
+  MemorySimulateResponse,
+  MemoryTier
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1351,5 +1357,96 @@ export async function simulateSwarm(req: SwarmSimulateRequest): Promise<SwarmSim
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 23: Agent Memory Lifecycle & Tiered Compression
+// ==========================================
+
+export async function fetchMemoryItems(
+  tenantId?: string,
+  sessionId?: string,
+  tier?: string,
+  limit = 100
+): Promise<MemoryItem[]> {
+  try {
+    const params = new URLSearchParams();
+    if (tenantId && tenantId !== "all") params.append("tenant_id", tenantId);
+    if (sessionId) params.append("session_id", sessionId);
+    if (tier && tier !== "all") params.append("tier", tier);
+    params.append("limit", limit.toString());
+
+    const res = await fetch(`${API_BASE}/memory/items?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch memory items");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchMemoryItems failed:", err);
+    return [];
+  }
+}
+
+export async function fetchMemoryStats(tenantId?: string): Promise<MemoryStatsSummary> {
+  try {
+    const url = tenantId && tenantId !== "all"
+      ? `${API_BASE}/memory/stats?tenant_id=${tenantId}`
+      : `${API_BASE}/memory/stats`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch memory stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchMemoryStats failed:", err);
+    return {
+      total_items: 0,
+      hot_items_count: 0,
+      warm_items_count: 0,
+      cold_items_count: 0,
+      total_tokens_managed: 0,
+      tokens_saved: 0,
+      total_memory_spend_usd: 0,
+      total_avoided_spend_usd: 0,
+      avg_utility_score: 0.85,
+      identified_noise_count: 0,
+    };
+  }
+}
+
+export async function saveMemoryPolicy(policy: MemoryPolicy): Promise<MemoryPolicy> {
+  const res = await fetch(`${API_BASE}/memory/policies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save memory policy" }));
+    throw new Error(err.error || "Failed to save memory policy");
+  }
+  return await res.json();
+}
+
+export async function compactMemory(sessionId: string): Promise<{ session_id: string; compacted_items: number; items: MemoryItem[] }> {
+  const res = await fetch(`${API_BASE}/memory/compact`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to compact memory session" }));
+    throw new Error(err.error || "Failed to compact memory session");
+  }
+  return await res.json();
+}
+
+export async function simulateMemory(req: MemorySimulateRequest): Promise<MemorySimulateResponse> {
+  const res = await fetch(`${API_BASE}/memory/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate memory compression" }));
+    throw new Error(err.error || "Failed to simulate memory compression");
+  }
+  return await res.json();
+}
+
 
 
