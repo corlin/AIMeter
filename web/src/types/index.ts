@@ -93,6 +93,9 @@ export interface TraceTreeNode {
   tool_calls_count?: number;
   multimodal_cost_usd?: number;
   multimodal_details?: MultimodalUsageDetail;
+  is_rate_limited?: boolean;
+  rate_limit_type?: string;
+  rate_limit_queued_ms?: number;
 }
 
 export interface TraceDetail {
@@ -135,6 +138,9 @@ export interface TraceDetail {
   tool_calls_count?: number;
   multimodal_cost_usd?: number;
   multimodal_details?: MultimodalUsageDetail;
+  is_rate_limited?: boolean;
+  rate_limit_type?: string;
+  rate_limit_queued_ms?: number;
 }
 
 export interface RateEntry {
@@ -645,6 +651,75 @@ export interface MultimodalSimulateResponse {
   total_cost_usd: number;
   formula_explanation: string;
 }
+
+// Phase 17: Distributed Rate Limiting & Token-Bucket Cost Throttler
+export interface RateLimitPolicy {
+  id: string;
+  tenant_id: string;
+  api_key_id?: string;
+  tier: string;
+  enabled: boolean;
+  limit_rpm: number;
+  limit_tpm: number;
+  limit_cpm_usd: number;
+  burst_multiplier: number;
+  max_queue_delay_ms: number;
+  updated_at?: string;
+}
+
+export type ThrottlingAction = "allow" | "queue" | "reject";
+
+export interface ThrottlingDecision {
+  action: ThrottlingAction;
+  limit_breached?: string;
+  current_usage: number;
+  limit_value: number;
+  remaining_rpm: number;
+  remaining_tpm: number;
+  remaining_cpm_usd: number;
+  queue_wait_ms?: number;
+  retry_after_sec?: number;
+  reset_timestamp: number;
+}
+
+export interface ThrottlingStatsSummary {
+  tenant_id: string;
+  total_requests_checked: number;
+  total_throttled_count: number;
+  total_queued_count: number;
+  total_cost_protected_usd: number;
+  active_buckets_count: number;
+}
+
+export interface ThrottlingStepLog {
+  request_index: number;
+  action: ThrottlingAction;
+  breach_type?: string;
+  delay_ms?: number;
+  remaining_rpm: number;
+  remaining_tpm: number;
+  remaining_cpm_usd: number;
+}
+
+export interface ThrottlingSimulateRequest {
+  tier?: string;
+  custom_policy?: RateLimitPolicy;
+  burst_requests: number;
+  tokens_per_request: number;
+  cost_per_request_usd: number;
+}
+
+export interface ThrottlingSimulateResponse {
+  policy: RateLimitPolicy;
+  allowed_count: number;
+  queued_count: number;
+  rejected_count: number;
+  total_cost_allowed_usd: number;
+  total_cost_blocked_usd: number;
+  timeline_steps: ThrottlingStepLog[];
+  analysis: string;
+}
+
 
 
 

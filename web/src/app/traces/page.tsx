@@ -148,6 +148,17 @@ function TracesExplorerContent() {
                             🎙️/🛠️ Multi
                           </span>
                         )}
+                        {t.is_rate_limited && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 font-mono ${
+                            t.rate_limit_queued_ms && t.rate_limit_queued_ms > 0
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                              : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                          }`}>
+                            {t.rate_limit_queued_ms && t.rate_limit_queued_ms > 0 
+                              ? `⏳ Q:${t.rate_limit_queued_ms}ms` 
+                              : `🚦 429:${t.rate_limit_type || 'Limit'}`}
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs font-mono font-bold text-emerald-400">
                         ${t.total_cost.toFixed(4)}

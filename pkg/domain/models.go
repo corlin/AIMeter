@@ -168,6 +168,9 @@ type TraceTreeNode struct {
 	ToolCallsCount       int              `json:"tool_calls_count,omitempty"`
 	MultimodalCostUSD    float64          `json:"multimodal_cost_usd,omitempty"`
 	MultimodalDetails    *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
+	IsRateLimited        bool             `json:"is_rate_limited,omitempty"`
+	RateLimitType        string           `json:"rate_limit_type,omitempty"`
+	RateLimitQueuedMs    int              `json:"rate_limit_queued_ms,omitempty"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
@@ -211,6 +214,9 @@ type TraceDetail struct {
 	ToolCallsCount       int            `json:"tool_calls_count,omitempty"`
 	MultimodalCostUSD    float64        `json:"multimodal_cost_usd,omitempty"`
 	MultimodalDetails    *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
+	IsRateLimited        bool           `json:"is_rate_limited,omitempty"`
+	RateLimitType        string         `json:"rate_limit_type,omitempty"`
+	RateLimitQueuedMs    int            `json:"rate_limit_queued_ms,omitempty"`
 }
 
 // OverviewStats provides high level aggregate metrics for the dashboard
@@ -810,6 +816,90 @@ type MultimodalSimulateResponse struct {
 	TotalCostUSD       float64               `json:"total_cost_usd"`
 	FormulaExplanation string                `json:"formula_explanation"`
 }
+
+// ==========================================
+// Phase 17: Distributed Rate Limiting & Token-Bucket Cost Throttler
+// ==========================================
+
+// RateLimitPolicy defines multidimensional limits for a tenant or specific API key
+type RateLimitPolicy struct {
+	ID              string    `json:"id"`
+	TenantID        string    `json:"tenant_id"`           // "all", "default", or specific tenant
+	APIKeyID        string    `json:"api_key_id,omitempty"` // optional specific API Key override
+	Tier            string    `json:"tier"`                // "free", "standard", "enterprise", "custom"
+	Enabled         bool      `json:"enabled"`
+	LimitRPM        int       `json:"limit_rpm"`           // Requests Per Minute
+	LimitTPM        int       `json:"limit_tpm"`           // Tokens Per Minute
+	LimitCPM        float64   `json:"limit_cpm_usd"`       // Cost USD Per Minute
+	BurstMultiplier float64   `json:"burst_multiplier"`    // e.g. 1.2 to 1.5x burst capacity
+	MaxQueueDelayMs int       `json:"max_queue_delay_ms"`  // Max queue delay before 429 (0 = no wait, e.g. 1500ms)
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type ThrottlingAction string
+
+const (
+	ActionAllow  ThrottlingAction = "allow"
+	ActionQueue  ThrottlingAction = "queue"
+	ActionReject ThrottlingAction = "reject"
+)
+
+// ThrottlingDecision captures the outcome of a rate-limit check
+type ThrottlingDecision struct {
+	Action         ThrottlingAction `json:"action"`
+	LimitBreached  string           `json:"limit_breached,omitempty"` // "rpm", "tpm", "cpm"
+	CurrentUsage   float64          `json:"current_usage"`
+	LimitValue     float64          `json:"limit_value"`
+	RemainingRPM   int              `json:"remaining_rpm"`
+	RemainingTPM   int              `json:"remaining_tpm"`
+	RemainingCPM   float64          `json:"remaining_cpm_usd"`
+	QueueWaitMs    int              `json:"queue_wait_ms,omitempty"`
+	RetryAfterSec  int              `json:"retry_after_sec,omitempty"`
+	ResetTimestamp int64            `json:"reset_timestamp"`
+}
+
+// ThrottlingStatsSummary aggregates metrics for the rate limiting dashboard
+type ThrottlingStatsSummary struct {
+	TenantID             string  `json:"tenant_id"`
+	TotalRequestsChecked int64   `json:"total_requests_checked"`
+	TotalThrottledCount  int64   `json:"total_throttled_count"`
+	TotalQueuedCount     int64   `json:"total_queued_count"`
+	TotalCostProtected   float64 `json:"total_cost_protected_usd"` // avoided runaway spend via CPM reject
+	ActiveBucketsCount   int     `json:"active_buckets_count"`
+}
+
+// ThrottlingStepLog records a simulated request outcome
+type ThrottlingStepLog struct {
+	RequestIndex int              `json:"request_index"`
+	Action       ThrottlingAction `json:"action"`
+	BreachType   string           `json:"breach_type,omitempty"`
+	DelayMs      int              `json:"delay_ms,omitempty"`
+	RemainingRPM int              `json:"remaining_rpm"`
+	RemainingTPM int              `json:"remaining_tpm"`
+	RemainingCPM float64          `json:"remaining_cpm_usd"`
+}
+
+// ThrottlingSimulateRequest represents an interactive test request
+type ThrottlingSimulateRequest struct {
+	Tier             string           `json:"tier"` // "free", "standard", "enterprise", "custom"
+	CustomPolicy     *RateLimitPolicy `json:"custom_policy,omitempty"`
+	BurstRequests    int              `json:"burst_requests"`      // e.g. 10 requests at once
+	TokensPerRequest int              `json:"tokens_per_request"`  // e.g. 1500 tokens
+	CostPerRequest   float64          `json:"cost_per_request_usd"`// e.g. 0.02 USD
+}
+
+// ThrottlingSimulateResponse provides simulation breakdown and timeline
+type ThrottlingSimulateResponse struct {
+	Policy           RateLimitPolicy     `json:"policy"`
+	AllowedCount     int                 `json:"allowed_count"`
+	QueuedCount      int                 `json:"queued_count"`
+	RejectedCount    int                 `json:"rejected_count"`
+	TotalCostAllowed float64             `json:"total_cost_allowed_usd"`
+	TotalCostBlocked float64             `json:"total_cost_blocked_usd"`
+	TimelineSteps    []ThrottlingStepLog `json:"timeline_steps"`
+	Analysis         string              `json:"analysis"`
+}
+
 
 
 

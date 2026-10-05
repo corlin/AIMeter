@@ -16,7 +16,8 @@ import {
   Scissors,
   Shuffle,
   Zap,
-  Wrench
+  Wrench,
+  Gauge
 } from "lucide-react";
 
 export function Navbar() {
@@ -25,6 +26,7 @@ export function Navbar() {
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
     { label: "Traces & Economics", href: "/traces", icon: Network },
+    { label: "Rate Limits", href: "/throttling", icon: Gauge },
     { label: "Smart Router", href: "/router", icon: Shuffle },
     { label: "Semantic Cache", href: "/cache", icon: Zap },
     { label: "Multimodal & Tools", href: "/multimodal", icon: Wrench },

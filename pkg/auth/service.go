@@ -185,15 +185,13 @@ func (s *AuthService) ValidateKey(rawKey string, requiredScope string) (*APIKey,
 		}
 	}
 
-	// 6. Update LastUsedAt (safely throttle to at most once per second to avoid lock contention)
+	// 6. Update LastUsedAt (safely throttle to at most once per second under lock)
+	s.mu.Lock()
 	if apiKey.LastUsedAt == nil || time.Since(*apiKey.LastUsedAt) > time.Second {
-		s.mu.Lock()
-		if apiKey.LastUsedAt == nil || time.Since(*apiKey.LastUsedAt) > time.Second {
-			now := time.Now()
-			apiKey.LastUsedAt = &now
-		}
-		s.mu.Unlock()
+		now := time.Now()
+		apiKey.LastUsedAt = &now
 	}
+	s.mu.Unlock()
 
 	return apiKey, nil
 }

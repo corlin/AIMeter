@@ -23,6 +23,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
+	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,6 +42,7 @@ type APIHandler struct {
 	slaArbiter       *router.SLAArbiter
 	cacheMgr         *cache.SemanticCacheManager
 	multimodalEngine *multimodal.MultimodalEngine
+	throttlerEngine  *throttler.ThrottlerEngine
 }
 
 // SetSLAArbiter attaches a SLA arbiter to the API handler
@@ -56,6 +58,11 @@ func (h *APIHandler) SetCacheManager(cm *cache.SemanticCacheManager) {
 // SetMultimodalEngine attaches a multimodal engine to the API handler
 func (h *APIHandler) SetMultimodalEngine(me *multimodal.MultimodalEngine) {
 	h.multimodalEngine = me
+}
+
+// SetThrottlerEngine attaches a throttler engine to the API handler
+func (h *APIHandler) SetThrottlerEngine(te *throttler.ThrottlerEngine) {
+	h.throttlerEngine = te
 }
 
 // GetMultimodalEngine returns the attached multimodal engine
@@ -1107,6 +1114,81 @@ func (h *APIHandler) SimulateMultimodal(c *gin.Context) {
 	resp := h.multimodalEngine.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// GetThrottlingPolicies returns all configured rate limiting & cost quota policies
+func (h *APIHandler) GetThrottlingPolicies(c *gin.Context) {
+	if h.throttlerEngine == nil {
+		c.JSON(http.StatusOK, []domain.RateLimitPolicy{})
+		return
+	}
+	policies := h.throttlerEngine.ListPolicies()
+	c.JSON(http.StatusOK, policies)
+}
+
+// UpsertThrottlingPolicy creates or updates a rate limiting & cost quota policy
+func (h *APIHandler) UpsertThrottlingPolicy(c *gin.Context) {
+	if h.throttlerEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Throttler engine not initialized"})
+		return
+	}
+	var policy domain.RateLimitPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if policy.TenantID == "" && policy.APIKeyID == "" && policy.Tier == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one of tenant_id, api_key_id, or tier is required"})
+		return
+	}
+	h.throttlerEngine.SetPolicy(policy)
+	c.JSON(http.StatusOK, policy)
+}
+
+// DeleteThrottlingPolicy removes a rate limiting policy by ID
+func (h *APIHandler) DeleteThrottlingPolicy(c *gin.Context) {
+	if h.throttlerEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Throttler engine not initialized"})
+		return
+	}
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Policy ID is required"})
+		return
+	}
+	success := h.throttlerEngine.DeletePolicy(id)
+	if !success {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Policy not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "deleted_id": id})
+}
+
+// GetThrottlingStats returns aggregate rate limiting and cost protection metrics
+func (h *APIHandler) GetThrottlingStats(c *gin.Context) {
+	if h.throttlerEngine == nil {
+		c.JSON(http.StatusOK, domain.ThrottlingStatsSummary{})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "all")
+	stats := h.throttlerEngine.GetStats(tenantID)
+	c.JSON(http.StatusOK, stats)
+}
+
+// SimulateThrottling runs an interactive token bucket simulation
+func (h *APIHandler) SimulateThrottling(c *gin.Context) {
+	if h.throttlerEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Throttler engine not initialized"})
+		return
+	}
+	var req domain.ThrottlingSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.throttlerEngine.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

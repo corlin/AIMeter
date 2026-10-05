@@ -413,4 +413,84 @@ func TestMultimodalEndpoints(t *testing.T) {
 	}
 }
 
+func TestThrottlingEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/throttling/policies
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/throttling/policies", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/throttling/policies, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "tier:standard") || !strings.Contains(w.Body.String(), "limit_rpm") {
+		t.Errorf("Expected default tiers in policies response, got: %s", w.Body.String())
+	}
+
+	// 2. POST /api/v1/throttling/policies
+	policyJSON := `{
+		"id": "policy-custom-test",
+		"tenant_id": "tenant-custom-corp",
+		"tier": "custom",
+		"enabled": true,
+		"limit_rpm": 120,
+		"limit_tpm": 500000,
+		"limit_cpm_usd": 15.0,
+		"burst_multiplier": 1.4,
+		"max_queue_delay_ms": 2000
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/throttling/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/throttling/policies, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "tenant-custom-corp") {
+		t.Errorf("Expected tenant-custom-corp in response, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/throttling/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/throttling/stats?tenant_id=tenant-custom-corp", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/throttling/stats, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"total_requests_checked"`) {
+		t.Errorf("Expected total_requests_checked in stats response, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/throttling/simulate
+	simJSON := `{
+		"tier": "free",
+		"burst_requests": 25,
+		"tokens_per_request": 1000,
+		"cost_per_request_usd": 0.02
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/throttling/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/throttling/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"rejected_count"`) || !strings.Contains(w.Body.String(), `"timeline_steps"`) {
+		t.Errorf("Expected rejected_count and timeline_steps in simulation response, got: %s", w.Body.String())
+	}
+
+	// 5. DELETE /api/v1/throttling/policies/:id
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/api/v1/throttling/policies/policy-custom-test", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for DELETE /api/v1/throttling/policies/policy-custom-test, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"status":"ok"`) {
+		t.Errorf("Expected status ok in delete response, got: %s", w.Body.String())
+	}
+}
+
+
 

@@ -23,6 +23,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/router"
+	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -83,6 +84,7 @@ type ProxyHandler struct {
 	cacheMgr         *cache.SemanticCacheManager
 	raterEngine      *rater.RatingEngine
 	multimodalEngine *multimodal.MultimodalEngine
+	throttlerEngine  *throttler.ThrottlerEngine
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -118,6 +120,16 @@ func (h *ProxyHandler) SetMultimodalEngine(me *multimodal.MultimodalEngine) {
 // GetMultimodalEngine returns the attached multimodal engine
 func (h *ProxyHandler) GetMultimodalEngine() *multimodal.MultimodalEngine {
 	return h.multimodalEngine
+}
+
+// SetThrottlerEngine attaches a throttler engine
+func (h *ProxyHandler) SetThrottlerEngine(te *throttler.ThrottlerEngine) {
+	h.throttlerEngine = te
+}
+
+// GetThrottlerEngine returns the attached throttler engine
+func (h *ProxyHandler) GetThrottlerEngine() *throttler.ThrottlerEngine {
+	return h.throttlerEngine
 }
 
 func (h *ProxyHandler) resolveTargetURL(provider, headerTarget string) string {
@@ -170,6 +182,7 @@ func NewProxyHandler(
 		},
 		compressEngine:   compress.NewEngine(),
 		multimodalEngine: multimodal.NewMultimodalEngine(),
+		throttlerEngine:  throttler.NewThrottlerEngine(),
 	}
 }
 
@@ -612,8 +625,107 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 				routingStats,
 				cacheStats,
 				nil,
+				domain.ThrottlingDecision{},
 			)
 			return
+		}
+	}
+
+	// 6.8 Evaluate Multidimensional Rate Limiter & Token-Bucket Cost Throttler (Phase 17)
+	apiKeyID := c.GetHeader("X-API-Key")
+	if apiKeyID == "" {
+		apiKeyID = c.GetHeader("X-AIMeter-API-Key")
+	}
+	if apiKeyID == "" {
+		authHdr := c.GetHeader("Authorization")
+		if strings.HasPrefix(strings.ToLower(authHdr), "bearer ") {
+			apiKeyID = strings.TrimSpace(authHdr[7:])
+		}
+	}
+
+	estTokens := 1000
+	if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+		calcTokens := 0
+		for _, m := range rawMsgs {
+			if msgMap, ok := m.(map[string]interface{}); ok {
+				if str, ok := msgMap["content"].(string); ok {
+					calcTokens += compress.EstimateTokens(str)
+				}
+			}
+		}
+		if calcTokens > 0 {
+			estTokens = calcTokens
+		}
+	}
+	estTotalTokens := estTokens + 300
+	estCost := 0.002
+	if h.raterEngine != nil {
+		estCost = h.raterEngine.EstimateModelCost(tenantID, provider, actualModel, estTokens, 300)
+	}
+	if estCost <= 0 {
+		estCost = float64(estTotalTokens) * 0.000003
+	}
+
+	var throttlingDecision domain.ThrottlingDecision
+	if h.throttlerEngine != nil {
+		throttlingDecision = h.throttlerEngine.Evaluate(c.Request.Context(), tenantID, apiKeyID, estTotalTokens, estCost)
+
+		policy := h.throttlerEngine.GetPolicy(tenantID, apiKeyID)
+		c.Header("X-RateLimit-Limit-RPM", strconv.Itoa(policy.LimitRPM))
+		c.Header("X-RateLimit-Remaining-RPM", strconv.Itoa(throttlingDecision.RemainingRPM))
+		c.Header("X-RateLimit-Limit-TPM", strconv.Itoa(policy.LimitTPM))
+		c.Header("X-RateLimit-Remaining-TPM", strconv.Itoa(throttlingDecision.RemainingTPM))
+		c.Header("X-RateLimit-Limit-CPM", fmt.Sprintf("%.2f", policy.LimitCPM))
+		c.Header("X-RateLimit-Remaining-CPM", fmt.Sprintf("%.4f", throttlingDecision.RemainingCPM))
+		c.Header("X-RateLimit-Reset", strconv.FormatInt(throttlingDecision.ResetTimestamp, 10))
+
+		if throttlingDecision.Action == domain.ActionReject {
+			metrics.RecordProxyRequest(provider, actualModel, "429", fbResult.Fallbacked, time.Since(startTime))
+			c.Header("Retry-After", strconv.Itoa(throttlingDecision.RetryAfterSec))
+			c.Header("X-AIMeter-Rate-Limited", "true")
+			c.Header("X-AIMeter-Rate-Limit-Breach", throttlingDecision.LimitBreached)
+
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error": gin.H{
+					"message":        fmt.Sprintf("AI Meter: Rate limit exceeded for %s. Limit: %v, Current: %v. Please retry after %d seconds.", strings.ToUpper(throttlingDecision.LimitBreached), throttlingDecision.LimitValue, throttlingDecision.CurrentUsage, throttlingDecision.RetryAfterSec),
+					"type":           "rate_limit_error",
+					"code":           "rate_limit_exceeded",
+					"limit_breached": throttlingDecision.LimitBreached,
+					"retry_after_sec": throttlingDecision.RetryAfterSec,
+					"tenant_id":      tenantID,
+				},
+			})
+
+			go h.recordUsage(
+				provider,
+				actualModel,
+				model,
+				fbResult.Fallbacked,
+				"rate_limited:"+throttlingDecision.LimitBreached,
+				traceID,
+				baggage,
+				tenantID,
+				appID,
+				workflowID,
+				"", "", "",
+				false,
+				0,
+				OpenAIUsage{},
+				uint32(time.Since(startTime).Milliseconds()),
+				0,
+				429,
+				compStats,
+				routingStats,
+				cacheStats,
+				nil,
+				throttlingDecision,
+			)
+			return
+		}
+
+		if throttlingDecision.Action == domain.ActionQueue {
+			c.Header("X-AIMeter-Rate-Limited", "true")
+			c.Header("X-AIMeter-Throttled-Queue-Ms", strconv.Itoa(throttlingDecision.QueueWaitMs))
 		}
 	}
 
@@ -732,9 +844,9 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	isSSE := isStream && strings.Contains(strings.ToLower(contentType), "text/event-stream")
 
 	if isSSE {
-		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec)
+		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec, apiKeyID, estTotalTokens, estCost, throttlingDecision)
 	} else {
-		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec)
+		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride, reqLowRes, reqHighRes, reqTiles, reqAudioSec, apiKeyID, estTotalTokens, estCost, throttlingDecision)
 	}
 }
 
@@ -752,6 +864,10 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	cacheTTLOverride int,
 	reqLowRes, reqHighRes, reqTiles int,
 	reqAudioSec float64,
+	apiKeyID string,
+	estTotalTokens int,
+	estCost float64,
+	throttlingDecision domain.ThrottlingDecision,
 ) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -813,12 +929,21 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			Usage OpenAIUsage `json:"usage"`
 		}
 		if err := json.Unmarshal(respBody, &respData); err == nil && respData.Usage.TotalTokens > 0 {
+			costUSD := 0.0
+			if h.raterEngine != nil {
+				costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, respData.Usage.PromptTokens, respData.Usage.CompletionTokens)
+			}
+			if costUSD <= 0 {
+				costUSD = float64(respData.Usage.TotalTokens) * 0.000003
+			}
+
+			// TrueUp rate limit tokens and cost (Phase 17)
+			if h.throttlerEngine != nil {
+				h.throttlerEngine.TrueUp(tenantID, apiKeyID, respData.Usage.TotalTokens, estTotalTokens, costUSD, estCost)
+			}
+
 			// Populate cache on successful response
 			if h.cacheMgr != nil && len(promptText) > 0 && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
-				costUSD := 0.0
-				if h.raterEngine != nil {
-					costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, respData.Usage.PromptTokens, respData.Usage.CompletionTokens)
-				}
 				h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, respData.Choices[0].Message.Content, respBody, respData.Usage.PromptTokens, respData.Usage.CompletionTokens, costUSD, cacheTTLOverride)
 			}
 
@@ -847,6 +972,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				routingStats,
 				ProxyCacheStats{},
 				mmDetail,
+				throttlingDecision,
 			)
 		}
 	}
@@ -869,6 +995,10 @@ func (h *ProxyHandler) handleStreamingResponse(
 	cacheTTLOverride int,
 	reqLowRes, reqHighRes, reqTiles int,
 	reqAudioSec float64,
+	apiKeyID string,
+	estTotalTokens int,
+	estCost float64,
+	throttlingDecision domain.ThrottlingDecision,
 ) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -967,18 +1097,28 @@ func (h *ProxyHandler) handleStreamingResponse(
 		}
 	}
 
+	// Calculate cost and reconcile TrueUp
+	costUSD := 0.0
+	inTokens := 0
+	outTokens := accumulatedTokens
+	if extractedUsage != nil {
+		inTokens = extractedUsage.PromptTokens
+		outTokens = extractedUsage.CompletionTokens
+	}
+	if h.raterEngine != nil {
+		costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, inTokens, outTokens)
+	}
+	if costUSD <= 0 {
+		costUSD = float64(inTokens+outTokens) * 0.000003
+	}
+
+	// TrueUp rate limit tokens and cost (Phase 17)
+	if h.throttlerEngine != nil && (inTokens+outTokens) > 0 {
+		h.throttlerEngine.TrueUp(tenantID, apiKeyID, inTokens+outTokens, estTotalTokens, costUSD, estCost)
+	}
+
 	// Populate cache on successful, uncapped streaming completion
 	if !isCapped && resp.StatusCode == http.StatusOK && accumulatedContent.Len() > 0 && h.cacheMgr != nil && len(promptText) > 0 {
-		costUSD := 0.0
-		inTokens := 0
-		outTokens := accumulatedTokens
-		if extractedUsage != nil {
-			inTokens = extractedUsage.PromptTokens
-			outTokens = extractedUsage.CompletionTokens
-		}
-		if h.raterEngine != nil {
-			costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, inTokens, outTokens)
-		}
 		h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, accumulatedContent.String(), nil, inTokens, outTokens, costUSD, cacheTTLOverride)
 	}
 
@@ -1019,6 +1159,7 @@ func (h *ProxyHandler) handleStreamingResponse(
 			routingStats,
 			ProxyCacheStats{},
 			mmDetail,
+			throttlingDecision,
 		)
 	}
 }
@@ -1038,6 +1179,7 @@ func (h *ProxyHandler) recordUsage(
 	routingStats SmartRoutingStats,
 	cacheStats ProxyCacheStats,
 	mmDetail *domain.MultimodalUsageDetail,
+	throttlingDecision domain.ThrottlingDecision,
 ) {
 	if h.collectorSvc == nil {
 		return
@@ -1050,6 +1192,15 @@ func (h *ProxyHandler) recordUsage(
 		"prompt_tokens_details.cached_tokens": strconv.Itoa(usage.PromptTokensDetails.CachedTokens),
 		"completion_tokens_details.reasoning": strconv.Itoa(usage.CompletionTokensDetails.ReasoningTokens),
 		"aimeter.proxy":                       "true",
+	}
+
+	if throttlingDecision.Action == domain.ActionQueue || throttlingDecision.QueueWaitMs > 0 {
+		attrs["aimeter.rate_limited"] = "true"
+		attrs["aimeter.rate_limit_type"] = "queue"
+		attrs["aimeter.rate_limit_queued_ms"] = strconv.Itoa(throttlingDecision.QueueWaitMs)
+	} else if throttlingDecision.Action == domain.ActionReject {
+		attrs["aimeter.rate_limited"] = "true"
+		attrs["aimeter.rate_limit_type"] = throttlingDecision.LimitBreached
 	}
 
 	if routingStats.IsRouted {

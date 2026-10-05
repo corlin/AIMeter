@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TraceTreeNode, TraceDetail, CostItem, ToolExecutionDetail } from "@/types";
-import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors, Shuffle, Wrench } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, DollarSign, Clock, Sparkles, Search, Layers, Server, Zap, AlertOctagon, Scissors, Shuffle, Wrench, Gauge } from "lucide-react";
 
 interface TraceTreeViewerProps {
   trace: TraceDetail;
@@ -34,6 +34,20 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
                 {trace.audio_duration_seconds ? <span>🎙️ {trace.audio_duration_seconds.toFixed(1)}s</span> : null}
                 {trace.image_tiles_count ? <span>🖼️ {trace.image_tiles_count} tiles</span> : null}
                 {trace.tool_calls_count ? <span>🛠️ {trace.tool_calls_count} tools</span> : null}
+              </span>
+            )}
+            {trace.is_rate_limited && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded border flex items-center gap-1.5 font-mono ${
+                trace.rate_limit_queued_ms && trace.rate_limit_queued_ms > 0
+                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                  : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+              }`}>
+                <Gauge className="h-3.5 w-3.5" />
+                <span>
+                  {trace.rate_limit_queued_ms && trace.rate_limit_queued_ms > 0
+                    ? `⏳ Throttled (Queued ${trace.rate_limit_queued_ms}ms)`
+                    : `🚦 429 Rate-Limited (${(trace.rate_limit_type || "Limit").toUpperCase()})`}
+                </span>
               </span>
             )}
             {trace.is_fallback && (
@@ -265,6 +279,20 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                         {node.audio_duration_seconds ? `🎙️ ${node.audio_duration_seconds.toFixed(1)}s ` : ""}
                         {node.image_tiles_count ? `🖼️ ${node.image_tiles_count} tiles ` : ""}
                         {node.tool_calls_count ? `🛠️ ${node.tool_calls_count} tools` : ""}
+                      </span>
+                    </span>
+                  )}
+                  {node.is_rate_limited && (
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 font-mono ${
+                      node.rate_limit_queued_ms && node.rate_limit_queued_ms > 0
+                        ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                        : "bg-rose-500/10 text-rose-300 border border-rose-500/30"
+                    }`}>
+                      <Gauge className="h-3 w-3" />
+                      <span>
+                        {node.rate_limit_queued_ms && node.rate_limit_queued_ms > 0
+                          ? `⏳ Throttled (Queued ${node.rate_limit_queued_ms}ms)`
+                          : `🚦 429 Rate-Limited (${(node.rate_limit_type || "Limit").toUpperCase()})`}
                       </span>
                     </span>
                   )}

@@ -187,6 +187,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **响应头透明审计透传**：`X-AIMeter-Tool-Calls`, `X-AIMeter-Audio-Tokens`, `X-AIMeter-Vision-Tiles`, `X-AIMeter-Multimodal-Cost`。
 * **全生命周期大盘与在线沙箱**：全新一级看板 `/multimodal`（4 维核心宏观 KPI、Top 5 热门工具排行、Tool 费率管理表格与编辑 Modal、多模态与 Tool 在线仿真沙箱）；`/traces` 树状层级图实时点亮 `🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 彩色徽标与分项卡片。
 
+### 20. 多级分布式速率限制与令牌桶成本配额防护引擎 (Distributed Rate Limiting & Token-Bucket Cost Throttler - Phase 17)
+* **三维双轨令牌桶算法 (RPM + TPM + CPM 成本速率)**：纯 Go 内存高并发原子无锁架构，同时约束 RPM（请求频次/分）、TPM（Token 吞吐/分）与 CPM（美元成本速率/分），内建平滑补充（Refill）与突发系数（Burst Multiplier 1.2x~1.5x）。
+* **双模混合超限响应与微排队缓冲**：支持 `max_queue_delay_ms` 毫秒级延迟平滑挂起放行（微排队削峰填谷）；硬超限秒级阻断并返回标准 HTTP 429 与 `rate_limit_error` 结构化诊断体。
+* **标准 RFC 与业界扩展响应头透明透传**：`X-RateLimit-Limit-RPM`, `X-RateLimit-Remaining-RPM`, `X-RateLimit-Limit-TPM`, `X-RateLimit-Remaining-TPM`, `X-RateLimit-Limit-CPM`, `X-RateLimit-Remaining-CPM`, `X-RateLimit-Reset`, `Retry-After`, `X-AIMeter-Rate-Limited`, `X-AIMeter-Rate-Limit-Breach`, `X-AIMeter-Throttled-Queue-Ms`。
+* **网关透明代理与 TrueUp 动态纠偏**：在请求执行前评估预估 Token/成本并执行决策，请求完成后根据真实上游消费执行 `TrueUp` 动态差额补偿纠偏，保证账本与额度精准一致。
+* **全生命周期限流大盘与仿真沙箱**：全新一级看板 `/throttling`（4 维核心宏观 KPI、多级配额策略管理表与新建/编辑模态窗、在线突发压力仿真沙箱与逐步执行时间线）；`/traces` 实时点亮 `🚦 429 Rate-Limited` 与 `⏳ Throttled (Queue: Xms)` 彩色徽标。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -194,10 +201,11 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/throttling` | **分布式速率限制与配额大盘** | 4 维宏观 KPI（评估请求数、429 拦截数、微排队缓冲数、避免 runaway 保护金额）、配额策略管理表、在线令牌桶突发压力仿真沙箱 |
 | `/multimodal` | **多模态与工具调用计费大盘** | 4 维宏观 KPI（音频、视觉、工具与全口径支出）、Top 5 热门工具执行排行、Tool 费率管理表格、多模态与 Tool 在线仿真试算沙箱 |
 | `/cache` | **语义级响应缓存大盘** | 4 维核心 KPI 概览（命中率、规避支出、节约时延、活跃条目）、租户策略配置、双 Prompt 相似度在线测试 Playground 与活跃条目失效控制 |
 | `/router` | **智能路由与 SLA 调度大盘** | 虚拟模型池管理、供应商实时 EWMA 时延与可用性监控矩阵、交互式 Prompt 路由决策仿真沙箱 |
-| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 多模态徽标、`⚡ Cached` 缓存徽标、`🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
+| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `🚦 Rate-Limited` 限流徽标、`🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 多模态徽标、`⚡ Cached` 缓存徽标、`🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
 | `/compress` | **Prompt 瘦身策略与实验室** | 租户级压缩模式配置、阈值设定、交互式在线 Prompt 瘦身与多模型节省金额实时比对矩阵 |
 | `/rates` | **费率目录知识库** | 39+ 预置模型基准价格表、租户阶梯折扣配置、自建 GPU 目录与在线试算 Playground |
 | `/reconcile` | **发票对账与方差拆解** | 账单 PDF/CSV 拖拽上传、实付 vs 观测对比、5 维瀑布图拆解 |

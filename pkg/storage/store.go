@@ -384,6 +384,11 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 		mmCost     float64
 		detail     *domain.MultimodalUsageDetail
 	})
+	rateLimitedMap := make(map[string]struct {
+		isLimited bool
+		limitType string
+		queuedMs  int
+	})
 
 	for _, u := range s.usages {
 		if u.RawAttributes != nil {
@@ -480,6 +485,18 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 					detail:     mmDetail,
 				}
 			}
+			if u.RawAttributes["aimeter.rate_limited"] == "true" {
+				qMs, _ := strconv.Atoi(u.RawAttributes["aimeter.rate_limit_queued_ms"])
+				rateLimitedMap[u.TraceID] = struct {
+					isLimited bool
+					limitType string
+					queuedMs  int
+				}{
+					isLimited: true,
+					limitType: u.RawAttributes["aimeter.rate_limit_type"],
+					queuedMs:  qMs,
+				}
+			}
 		}
 	}
 
@@ -525,6 +542,11 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 			td.ToolCallsCount = mm.toolCalls
 			td.MultimodalCostUSD = mm.mmCost
 			td.MultimodalDetails = mm.detail
+		}
+		if rl, ok := rateLimitedMap[td.TraceID]; ok {
+			td.IsRateLimited = rl.isLimited
+			td.RateLimitType = rl.limitType
+			td.RateLimitQueuedMs = rl.queuedMs
 		}
 		result = append(result, *td)
 	}
@@ -579,6 +601,9 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	var toolCallsCount int
 	var multimodalCostUSD float64
 	var multimodalDetail *domain.MultimodalUsageDetail
+	var isRateLimited bool
+	var rateLimitType string
+	var rateLimitQueuedMs int
 
 	for _, u := range s.usages {
 		if u.TraceID == traceID {
@@ -627,6 +652,11 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 							multimodalDetail = &d
 						}
 					}
+				}
+				if u.RawAttributes["aimeter.rate_limited"] == "true" {
+					isRateLimited = true
+					rateLimitType = u.RawAttributes["aimeter.rate_limit_type"]
+					rateLimitQueuedMs, _ = strconv.Atoi(u.RawAttributes["aimeter.rate_limit_queued_ms"])
 				}
 			}
 		}
@@ -683,6 +713,9 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 				ToolCallsCount:       toolCallsCount,
 				MultimodalCostUSD:    multimodalCostUSD,
 				MultimodalDetails:    multimodalDetail,
+				IsRateLimited:        isRateLimited,
+				RateLimitType:        rateLimitType,
+				RateLimitQueuedMs:    rateLimitQueuedMs,
 			}
 			if node.SpanName == "" {
 				node.SpanName = item.Model
@@ -779,5 +812,8 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 		ToolCallsCount:       toolCallsCount,
 		MultimodalCostUSD:    multimodalCostUSD,
 		MultimodalDetails:    multimodalDetail,
+		IsRateLimited:        isRateLimited,
+		RateLimitType:        rateLimitType,
+		RateLimitQueuedMs:    rateLimitQueuedMs,
 	}, nil
 }

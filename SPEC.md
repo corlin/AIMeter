@@ -651,6 +651,16 @@ AIMeter/
 * [x] 交付 Web 控制台全新一级看板 `/multimodal`：4 维宏观 KPI（音频、视觉、工具与全口径支出）、Top 5 热门工具执行排行榜、Tool 费率管理表格与新增/编辑 Modal、以及多模态与 Tool 在线仿真沙箱。
 * [x] 升级 `/traces` 列表与 `TraceTreeViewer` 树状层级图：点亮 `🎙️ Audio`, `🖼️ Vision`, `🛠️ Tool` 彩色徽标，并在树状节点中渲染多模态分项开销卡片与外部工具调用执行明细。
 
+### Phase 17: 多级分布式速率限制与令牌桶成本配额防护引擎 (Distributed Rate Limiting & Token-Bucket Cost Throttler)
+* [x] 核心引擎与计量算法实现（`pkg/throttler/`）：三维双轨令牌桶算法，同时约束 RPM（请求频次/分）、TPM（Token 吞吐/分）与 CPM（美元成本速率/分），内建毫秒级平滑平补（Refill）与突发系数（Burst Multiplier 1.2x~1.5x）。
+* [x] 双模混合超限响应与微排队缓冲：支持 `max_queue_delay_ms` 毫秒级延迟平滑挂起放行（微排队削峰填谷）；硬超限秒级阻断并返回标准 HTTP 429 与 `rate_limit_error` 结构化诊断体。
+* [x] 标准 RFC 与业界扩展响应头透明透传：`X-RateLimit-Limit-RPM`, `X-RateLimit-Remaining-RPM`, `X-RateLimit-Limit-TPM`, `X-RateLimit-Remaining-TPM`, `X-RateLimit-Limit-CPM`, `X-RateLimit-Remaining-CPM`, `X-RateLimit-Reset`, `Retry-After`, `X-AIMeter-Rate-Limited`, `X-AIMeter-Rate-Limit-Breach`, `X-AIMeter-Throttled-Queue-Ms`。
+* [x] 网关代理反向透明接入与 TrueUp 差额纠偏：在网关请求执行前评估预估 Token/成本并执行决策，请求完成后根据真实上游消费执行 `TrueUp` 动态差额补偿纠偏，保证账本与额度高度精准。
+* [x] 存储层与遥测字段回填：将 `aimeter.rate_limited`, `aimeter.rate_limit_type`, `aimeter.rate_limit_queued_ms` 回填至 `TraceDetail` 与 `TraceTreeNode`，阻断或排队请求在链路追踪中实时可审计。
+* [x] 控制面 REST API 交付（`pkg/api/`）：暴露 `GET /api/v1/throttling/policies`（策略列表）、`POST /api/v1/throttling/policies`（创建/更新策略）、`DELETE /api/v1/throttling/policies/:id`（删除策略）、`GET /api/v1/throttling/stats`（宏观防护总览）、`POST /api/v1/throttling/simulate`（在线突发压力仿真沙箱）。
+* [x] 交付 Web 控制台全新一级看板 `/throttling`：4 维宏观 KPI（总评估请求数、429 拦截数、微排队缓冲数、避免 runaway 破产保护金额）、多级配额策略管理表与新建/编辑模态窗、在线突发压力仿真沙箱与逐步执行时间线。
+* [x] 升级 `/traces` 列表及 `TraceTreeViewer` 节点：点亮 `🚦 429 Rate-Limited` 与 `⏳ Throttled (Queue: Xms)` 彩色徽标。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

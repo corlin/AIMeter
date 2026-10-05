@@ -37,7 +37,11 @@ import {
   ToolRateConfig,
   MultimodalStatsSummary,
   MultimodalSimulateRequest,
-  MultimodalSimulateResponse
+  MultimodalSimulateResponse,
+  RateLimitPolicy,
+  ThrottlingStatsSummary,
+  ThrottlingSimulateRequest,
+  ThrottlingSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -713,6 +717,71 @@ export async function simulateMultimodal(req: MultimodalSimulateRequest): Promis
   }
   return await res.json();
 }
+
+// Phase 17: Distributed Rate Limiting & Token-Bucket Cost Throttler
+export async function fetchThrottlingPolicies(): Promise<RateLimitPolicy[]> {
+  try {
+    const res = await fetch(`${API_BASE}/throttling/policies`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("fetchThrottlingPolicies failed:", err);
+    return [];
+  }
+}
+
+export async function upsertThrottlingPolicy(policy: RateLimitPolicy): Promise<RateLimitPolicy> {
+  const res = await fetch(`${API_BASE}/throttling/policies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save rate limit policy" }));
+    throw new Error(err.error || "Failed to save rate limit policy");
+  }
+  return await res.json();
+}
+
+export async function deleteThrottlingPolicy(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/throttling/policies/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  return res.ok;
+}
+
+export async function fetchThrottlingStats(tenantId = "all"): Promise<ThrottlingStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/throttling/stats?tenant_id=${encodeURIComponent(tenantId)}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch throttling stats");
+    return await res.json();
+  } catch (err) {
+    console.error("fetchThrottlingStats failed:", err);
+    return {
+      tenant_id: tenantId,
+      total_requests_checked: 0,
+      total_throttled_count: 0,
+      total_queued_count: 0,
+      total_cost_protected_usd: 0,
+      active_buckets_count: 0,
+    };
+  }
+}
+
+export async function simulateThrottling(req: ThrottlingSimulateRequest): Promise<ThrottlingSimulateResponse> {
+  const res = await fetch(`${API_BASE}/throttling/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate throttling scenario" }));
+    throw new Error(err.error || "Failed to simulate throttling scenario");
+  }
+  return await res.json();
+}
+
 
 
 
