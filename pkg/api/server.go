@@ -12,6 +12,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/cache"
+	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/forecast"
@@ -175,6 +176,8 @@ func NewServer(
 	forecastEngine := forecast.NewForecastEngine(store, budgetMgr, compressEngine, slaArbiter, throttlerEngine, handler.alertDispatcher)
 	proxyHandler.SetForecastEngine(forecastEngine)
 	handler.SetForecastEngine(forecastEngine)
+	clusterCoordinator := cluster.NewClusterCoordinator("hub-primary", "us-east-1", true, throttlerEngine, budgetMgr, handler.alertDispatcher)
+	handler.SetClusterCoordinator(clusterCoordinator)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
@@ -266,6 +269,15 @@ func NewServer(
 		apiV1.GET("/forecast/policies", handler.GetForecastPolicies)
 		apiV1.POST("/forecast/policies", handler.UpsertForecastPolicy)
 		apiV1.PUT("/forecast/policies", handler.UpsertForecastPolicy)
+
+		// Phase 19: Multi-Region Edge Coordination & Distributed Quota Sync
+		apiV1.GET("/cluster/nodes", handler.GetClusterNodes)
+		apiV1.POST("/cluster/nodes/register", handler.RegisterClusterNode)
+		apiV1.POST("/cluster/nodes/heartbeat", handler.HeartbeatClusterNode)
+		apiV1.GET("/cluster/leases", handler.GetClusterLeases)
+		apiV1.POST("/cluster/leases/rebalance", handler.RebalanceClusterLeases)
+		apiV1.GET("/cluster/stats", handler.GetClusterStats)
+		apiV1.POST("/cluster/simulate", handler.SimulateCluster)
 	}
 
 	return &Server{

@@ -13,6 +13,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/cache"
+	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/focus"
@@ -29,22 +30,23 @@ import (
 )
 
 type APIHandler struct {
-	store            storage.Store
-	postgres         *storage.PostgresClient
-	rater            *rater.RatingEngine
-	budgetMgr        *budget.BudgetManager
-	reconciler       *reconcile.ReconciliationEngine
-	focusExport      *focus.FocusExporter
-	detector         *anomaly.AnomalyDetector
-	advisor          *advisor.CostAdvisor
-	guardSvc         *guard.GuardService
-	alertDispatcher  *alert.AlertDispatcher
-	authSvc          *auth.AuthService
-	slaArbiter       *router.SLAArbiter
-	cacheMgr         *cache.SemanticCacheManager
-	multimodalEngine *multimodal.MultimodalEngine
-	throttlerEngine  *throttler.ThrottlerEngine
-	forecastEngine   *forecast.ForecastEngine
+	store              storage.Store
+	postgres           *storage.PostgresClient
+	rater              *rater.RatingEngine
+	budgetMgr          *budget.BudgetManager
+	reconciler         *reconcile.ReconciliationEngine
+	focusExport        *focus.FocusExporter
+	detector           *anomaly.AnomalyDetector
+	advisor            *advisor.CostAdvisor
+	guardSvc           *guard.GuardService
+	alertDispatcher    *alert.AlertDispatcher
+	authSvc            *auth.AuthService
+	slaArbiter         *router.SLAArbiter
+	cacheMgr           *cache.SemanticCacheManager
+	multimodalEngine   *multimodal.MultimodalEngine
+	throttlerEngine    *throttler.ThrottlerEngine
+	forecastEngine     *forecast.ForecastEngine
+	clusterCoordinator *cluster.ClusterCoordinator
 }
 
 // SetSLAArbiter attaches a SLA arbiter to the API handler
@@ -75,6 +77,16 @@ func (h *APIHandler) SetForecastEngine(fe *forecast.ForecastEngine) {
 // GetForecastEngine returns the attached forecast engine
 func (h *APIHandler) GetForecastEngine() *forecast.ForecastEngine {
 	return h.forecastEngine
+}
+
+// SetClusterCoordinator attaches a cluster coordinator to the API handler
+func (h *APIHandler) SetClusterCoordinator(cc *cluster.ClusterCoordinator) {
+	h.clusterCoordinator = cc
+}
+
+// GetClusterCoordinator returns the attached cluster coordinator
+func (h *APIHandler) GetClusterCoordinator() *cluster.ClusterCoordinator {
+	return h.clusterCoordinator
 }
 
 // GetMultimodalEngine returns the attached multimodal engine
@@ -1326,6 +1338,100 @@ func (h *APIHandler) UpsertForecastPolicy(c *gin.Context) {
 	}
 	h.forecastEngine.SetPolicy(policy)
 	c.JSON(http.StatusOK, policy)
+}
+
+// ==========================================
+// Phase 19: Multi-Region Edge Coordination & Distributed Quota Handlers
+// ==========================================
+
+// GetClusterNodes returns all registered regional/edge nodes
+func (h *APIHandler) GetClusterNodes(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusOK, []domain.ClusterNode{})
+		return
+	}
+	nodes := h.clusterCoordinator.GetNodes()
+	c.JSON(http.StatusOK, nodes)
+}
+
+// RegisterClusterNode handles node self-registration
+func (h *APIHandler) RegisterClusterNode(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
+		return
+	}
+	var node domain.ClusterNode
+	if err := c.ShouldBindJSON(&node); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	registered := h.clusterCoordinator.RegisterNode(node)
+	c.JSON(http.StatusOK, registered)
+}
+
+// HeartbeatClusterNode processes bi-directional heartbeats, true-ups and lease grants
+func (h *APIHandler) HeartbeatClusterNode(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
+		return
+	}
+	var req domain.NodeHeartbeatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.NodeID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "node_id is required"})
+		return
+	}
+	resp := h.clusterCoordinator.Heartbeat(req)
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetClusterLeases returns active distributed quota slices
+func (h *APIHandler) GetClusterLeases(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusOK, []domain.QuotaLease{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	leases := h.clusterCoordinator.GetLeases(tenantID)
+	c.JSON(http.StatusOK, leases)
+}
+
+// RebalanceClusterLeases triggers a global quota rebalancing across healthy nodes
+func (h *APIHandler) RebalanceClusterLeases(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
+		return
+	}
+	h.clusterCoordinator.RebalanceLeases()
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Cluster quota leases rebalanced successfully"})
+}
+
+// GetClusterStats returns aggregate metrics for multi-region coordination
+func (h *APIHandler) GetClusterStats(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusOK, domain.ClusterStatsSummary{})
+		return
+	}
+	stats := h.clusterCoordinator.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// SimulateCluster executes a network partition and surge traffic scenario
+func (h *APIHandler) SimulateCluster(c *gin.Context) {
+	if h.clusterCoordinator == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
+		return
+	}
+	var req domain.ClusterSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.clusterCoordinator.Simulate(req)
+	c.JSON(http.StatusOK, resp)
 }
 
 

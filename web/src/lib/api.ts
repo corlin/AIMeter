@@ -47,7 +47,12 @@ import {
   RemediationStatus,
   RemediationPolicy,
   ForecastSimulateRequest,
-  ForecastSimulateResponse
+  ForecastSimulateResponse,
+  ClusterNode,
+  QuotaLease,
+  ClusterStatsSummary,
+  ClusterSimulateRequest,
+  ClusterSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -882,6 +887,128 @@ export async function upsertForecastPolicy(policy: RemediationPolicy): Promise<R
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Failed to save remediation policy" }));
     throw new Error(err.error || "Failed to save remediation policy");
+  }
+  return await res.json();
+}
+
+// Phase 19: Multi-Region Edge Coordination & Quota Sync
+export async function fetchClusterNodes(): Promise<ClusterNode[]> {
+  try {
+    const res = await fetch(`${API_BASE}/cluster/nodes`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("fetchClusterNodes failed:", err);
+    return [];
+  }
+}
+
+export async function registerClusterNode(node: Partial<ClusterNode>): Promise<ClusterNode> {
+  const res = await fetch(`${API_BASE}/cluster/nodes/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(node),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to register cluster node" }));
+    throw new Error(err.error || "Failed to register cluster node");
+  }
+  return await res.json();
+}
+
+export async function heartbeatClusterNode(req: {
+  node_id: string;
+  wan_latency_ms?: number;
+  consumed_delta_usd?: number;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/cluster/nodes/heartbeat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      node_id: req.node_id,
+      wan_latency_ms: req.wan_latency_ms ?? 25,
+      consumed_delta_usd: req.consumed_delta_usd ?? 0,
+      timestamp: new Date().toISOString(),
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to send cluster heartbeat" }));
+    throw new Error(err.error || "Failed to send cluster heartbeat");
+  }
+  return await res.json();
+}
+
+export async function fetchClusterLeases(nodeId = ""): Promise<QuotaLease[]> {
+  try {
+    const url = nodeId
+      ? `${API_BASE}/cluster/leases?node_id=${encodeURIComponent(nodeId)}`
+      : `${API_BASE}/cluster/leases`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("fetchClusterLeases failed:", err);
+    return [];
+  }
+}
+
+export async function rebalanceClusterLeases(nodeId = ""): Promise<{ count: number; rebalanced: QuotaLease[] }> {
+  const res = await fetch(`${API_BASE}/cluster/leases/rebalance`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_id: nodeId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to rebalance quota leases" }));
+    throw new Error(err.error || "Failed to rebalance quota leases");
+  }
+  return await res.json();
+}
+
+export async function fetchClusterStats(): Promise<ClusterStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/cluster/stats`, { cache: "no-store" });
+    if (!res.ok) {
+      return {
+        total_nodes: 0,
+        online_nodes: 0,
+        degraded_nodes: 0,
+        partitioned_nodes: 0,
+        global_allocated_usd: 0,
+        global_consumed_usd: 0,
+        avg_wan_latency_ms: 0,
+        sync_ops_total: 0,
+        prevented_overdraft_usd: 0,
+      };
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("fetchClusterStats failed:", err);
+    return {
+      total_nodes: 0,
+      online_nodes: 0,
+      degraded_nodes: 0,
+      partitioned_nodes: 0,
+      global_allocated_usd: 0,
+      global_consumed_usd: 0,
+      avg_wan_latency_ms: 0,
+      sync_ops_total: 0,
+      prevented_overdraft_usd: 0,
+    };
+  }
+}
+
+export async function simulateCluster(req: ClusterSimulateRequest): Promise<ClusterSimulateResponse> {
+  const res = await fetch(`${API_BASE}/cluster/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate cluster partition scenario" }));
+    throw new Error(err.error || "Failed to simulate cluster partition scenario");
   }
   return await res.json();
 }

@@ -594,5 +594,124 @@ func TestForecastEndpoints(t *testing.T) {
 	}
 }
 
+func TestClusterEndpoints(t *testing.T) {
+	store := storage.NewMemoryStore()
+	server := api.NewServer(
+		8080,
+		store,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+	)
+
+	// 1. GET /api/v1/cluster/nodes
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/cluster/nodes", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/cluster/nodes, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"node_id"`) {
+		t.Errorf("Expected node list in response, got: %s", w.Body.String())
+	}
+
+	// 2. POST /api/v1/cluster/nodes/register
+	regJSON := `{
+		"region_id": "eu-west-1",
+		"role": "spoke",
+		"cluster_type": "k8s-pod",
+		"weight": 0.9,
+		"latency_ms": 78.4
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cluster/nodes/register", strings.NewReader(regJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/cluster/nodes/register, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"eu-west-1"`) {
+		t.Errorf("Expected registered node in response, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/cluster/nodes/heartbeat
+	hbJSON := `{
+		"node_id": "spoke-eu-central",
+		"region_id": "eu-central-1",
+		"reported_usage": {
+			"default": {
+				"requests": 5,
+				"tokens": 1200,
+				"cost_usd": 0.03
+			}
+		},
+		"latency_ms": 84.1
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cluster/nodes/heartbeat", strings.NewReader(hbJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/cluster/nodes/heartbeat, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"status":"ack"`) {
+		t.Errorf("Expected ack status in heartbeat response, got: %s", w.Body.String())
+	}
+
+	// 4. GET /api/v1/cluster/leases
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/cluster/leases", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/cluster/leases, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/cluster/leases/rebalance
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cluster/leases/rebalance", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/cluster/leases/rebalance, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"status":"ok"`) {
+		t.Errorf("Expected status ok in rebalance response, got: %s", w.Body.String())
+	}
+
+	// 6. GET /api/v1/cluster/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/cluster/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/cluster/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_nodes"`) {
+		t.Errorf("Expected total_nodes in stats response, got: %s", w.Body.String())
+	}
+
+	// 7. POST /api/v1/cluster/simulate
+	simJSON := `{
+		"partitioned_region_id": "eu-central-1",
+		"traffic_surge_multiplier": 2.0,
+		"simulate_duration_sec": 30,
+		"enable_fail_safe_degradation": true
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cluster/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/cluster/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"autonomous_spend_allowed_usd"`) {
+		t.Errorf("Expected simulation results, got: %s", w.Body.String())
+	}
+}
+
 
 

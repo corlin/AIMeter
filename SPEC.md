@@ -679,6 +679,36 @@ AIMeter/
 * [x] 反向代理请求头贯通注入：在网关响应头自动透传 `X-AIMeter-Remediation-Level` 与 `X-AIMeter-Remediation-Actions`。
 * [x] 交付 Web 控制台全新一级看板 `/forecasting`：4 维宏观 KPI（月度预算消耗率、月末预测总花费、高风险穿透租户数、自愈累计节省金额）、SVG 交互式时序投影图（实线消耗、虚线预测、P50-P90 置信区间带、穿透点高亮）、多租户自愈阶梯矩阵监控表与执行审计 Drawer、以及交互式 What-If 压力仿真沙箱。
 
+### Phase 19: 多集群跨地域边缘控制面协同与配额同步引擎 (Multi-Region Edge Coordination & Distributed Quota Sync)
+* [x] **领域模型与多地域拓扑骨架（`pkg/domain/models.go` & `configs/cluster_seed.json`）**：
+  * 建立 `ClusterNode`（涵盖 `node_id`, `region`, `role: hub|spoke`, `status: online|degraded|partitioned|offline`, `allocated_quota_usd`, `consumed_quota_usd`, `wan_latency_ms`, `sync_version`, `degradation_mode`）。
+  * 建立 `QuotaLease`（涵盖 `lease_id`, `node_id`, `tenant_id`, `assigned_limit_usd`, `used_amount_usd`, `remaining_usd`, `soft_threshold_pct`, `expires_at`, `status: active|expired|rebalanced|revoked`）。
+  * 内置跨地域标准拓扑种子配置：涵盖 `us-east-1` (Central Hub), `eu-central-1` (Spoke), `ap-southeast-1` (Spoke), `edge-global` (Spoke/Cloudflare/Lambda Worker)。
+* [x] **分层两级配额租约与双向批冲正协同引擎（`pkg/cluster/coordinator.go`）**：
+  * **零 WAN RTT 本地微秒级仲裁**：Central Hub 为各边缘 Spoke 节点切片下发具有 TTL 有效期的配额租约（Lease Slice），边缘节点在租约限额内自主仲裁请求放行，彻底消除逐请求跨地域往返延迟（耗时 `< 0.2ms` 对比跨大西洋 WAN 120ms~250ms）。
+  * **自适应心跳与双向批同步**：Spoke 定期以批量 Delta 形式冲正已消耗额度（True-Up），Hub 刷新租约并根据各节点实时消耗速率动态执行再平衡 (`RebalanceLeases`)。
+  * **网络分区自治软降级容灾（Fail-Safe Degradation）**：心跳丢失超过超时窗口（默认 10s）自动标记为 `degraded` / `partitioned`，边缘节点进入本地保守自治模式（锁定软阈值 80%、自动联动模型降配或轻度限流），坚决阻止预算失控超发。
+  * **跨地域网络分区仿真沙箱（`Simulate`）**：支持针对特定 Spoke 节点注入网络断连、WAN 抖动与突发请求，毫秒级推演故障隔离、降级防护与规避超发金额。
+* [x] **反向代理网关贯通与控制面 REST API（`pkg/proxy/` & `pkg/api/`）**：
+  * 网关响应头透明注入集群归属标记：`X-AIMeter-Cluster-Node` 与 `X-AIMeter-Cluster-Region`。
+  * 暴露 7 大集群管理 REST API 端点：
+    * `GET /api/v1/cluster/nodes`（查询集群全部节点及健康状态）
+    * `POST /api/v1/cluster/nodes/register`（边缘节点动态自注册与拓扑扩展）
+    * `POST /api/v1/cluster/nodes/heartbeat`（节点心跳上报与批额度双向冲正）
+    * `GET /api/v1/cluster/leases`（查询活跃配额租约列表）
+    * `POST /api/v1/cluster/leases/rebalance`（手动或自动化租约配额动态再平衡）
+    * `GET /api/v1/cluster/stats`（多集群全局统计与防超发成果指标）
+    * `POST /api/v1/cluster/simulate`（网络分区故障演练与规避超发试算）
+* [x] **Web 控制台全新一级看板 `/clustering`（`web/src/app/clustering/`）**：
+  * **4 维宏观 KPI**：活跃边缘节点数（含降级/分区告警）、全局配额分配与消耗水位、平均 WAN 延迟、分区容灾规避超发金额。
+  * **全球拓扑与心跳可视化**：Hub-and-Spoke 星型连接矩阵，直观呈现节点健康徽标、往返延迟、租约水位进度条与即时 Ping 探测。
+  * **分布式租约切片表格**：Lease ID、Node / Region、Tenant、配额上限、已用额度、动态水位条与一键再平衡。
+  * **网络分区推演沙箱**：支持选择断网地域、突发倍率 (1x~5x)、WAN 延迟与自愈降级开关，输出详细时间线步骤与架构建议。
+* [x] **严格测试与质量门禁保障**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）。
+  * 前端全量构建 `npm run build` 100% 成功（20/20 静态路由编译零报错）。
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

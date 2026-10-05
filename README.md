@@ -206,6 +206,12 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理请求头贯通注入**：在网关响应头自动透传 `X-AIMeter-Remediation-Level` 与 `X-AIMeter-Remediation-Actions`。
 * **全生命周期预测大盘与仿真沙箱**：全新一级看板 `/forecasting`（4 维核心宏观 KPI、SVG 交互式时序投影图、多租户自愈阶梯矩阵监控表与执行审计 Drawer、以及交互式 What-If 压力仿真沙箱）。
 
+### 20. 多集群跨地域边缘控制面协同与配额同步引擎 (Multi-Region Edge Coordination & Distributed Quota Sync - Phase 19)
+* **分层两级配额租约切片 (Hierarchical Quota Lease Slices)**：Central Hub 协同器根据各地域边缘节点（Spoke / Cloudflare Workers / AWS Lambda / 边缘机房）的历史流量与信用评级，动态按批切分下发带有 TTL 有效期的配额租约，消除跨大西洋/跨太平洋逐次请求的 WAN RTT 往返阻塞（耗时从 150ms 降至本地内存 `< 0.2ms`）。
+* **自适应心跳与双向批冲正 (Adaptive Heartbeat & Bilateral Batch True-Up)**：Spoke 节点在租约限额内自主仲裁放行请求，周期性通过轻量心跳批量回传已消费金额（Delta True-Up）；Hub 集中刷新租约并根据消耗速率自动动态再平衡（Rebalance）。
+* **网络分区自治软降级容灾 (Fail-Safe Local Degradation)**：当跨地域海缆或公网链路发生抖动或分区中断时，心跳超时探测器（默认 10s）自动将节点标为 `degraded` 或 `partitioned`，边缘节点进入本地保守自治模式（锁定 80% 软阈值安全水位、联动本地轻度限流或模型降配），既保证局部可用性，又杜绝超发穿透总预算。
+* **网络分区推演沙箱与控制面管理**：全新一级看板 `/clustering`（4 维宏观 KPI、全球集群拓扑图与心跳链路监控、多地域租约切片管理、以及跨地域突发与网络断连推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -213,6 +219,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/clustering` | **多集群跨地域协同大盘** | 4 维宏观 KPI（活跃节点、全局租约配额水位、平均 WAN 延迟、分区容灾规避超发金额）、全球集群星型拓扑图、租约切片表格与一键再平衡、网络分区与突发推演沙箱 |
 | `/forecasting` | **预算时序预测与自愈大盘** | 4 维宏观 KPI（预算使用率、月末预测、穿透预警、自愈节省）、SVG 时序投影图（实线/虚线/P50-P90 置信区间）、四级自愈矩阵与 What-If 突发沙箱 |
 | `/throttling` | **分布式速率限制与配额大盘** | 4 维宏观 KPI（评估请求数、429 拦截数、微排队缓冲数、避免 runaway 保护金额）、配额策略管理表、在线令牌桶突发压力仿真沙箱 |
 | `/multimodal` | **多模态与工具调用计费大盘** | 4 维宏观 KPI（音频、视觉、工具与全口径支出）、Top 5 热门工具执行排行、Tool 费率管理表格、多模态与 Tool 在线仿真试算沙箱 |

@@ -15,6 +15,7 @@ import (
 
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/cache"
+	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
@@ -85,8 +86,9 @@ type ProxyHandler struct {
 	cacheMgr         *cache.SemanticCacheManager
 	raterEngine      *rater.RatingEngine
 	multimodalEngine *multimodal.MultimodalEngine
-	throttlerEngine  *throttler.ThrottlerEngine
-	forecastEngine   *forecast.ForecastEngine
+	throttlerEngine    *throttler.ThrottlerEngine
+	forecastEngine     *forecast.ForecastEngine
+	clusterCoordinator *cluster.ClusterCoordinator
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -142,6 +144,16 @@ func (h *ProxyHandler) SetForecastEngine(fe *forecast.ForecastEngine) {
 // GetForecastEngine returns the attached forecast engine
 func (h *ProxyHandler) GetForecastEngine() *forecast.ForecastEngine {
 	return h.forecastEngine
+}
+
+// SetClusterCoordinator attaches a cluster coordinator
+func (h *ProxyHandler) SetClusterCoordinator(cc *cluster.ClusterCoordinator) {
+	h.clusterCoordinator = cc
+}
+
+// GetClusterCoordinator returns the attached cluster coordinator
+func (h *ProxyHandler) GetClusterCoordinator() *cluster.ClusterCoordinator {
+	return h.clusterCoordinator
 }
 
 func (h *ProxyHandler) resolveTargetURL(provider, headerTarget string) string {
@@ -699,6 +711,11 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 					c.Header("X-AIMeter-Remediation-Actions", strings.Join(status.ActiveActions, ","))
 				}
 			}
+		}
+
+		if h.clusterCoordinator != nil {
+			c.Header("X-AIMeter-Cluster-Node", "hub-primary")
+			c.Header("X-AIMeter-Cluster-Region", "us-east-1")
 		}
 
 		if throttlingDecision.Action == domain.ActionReject {

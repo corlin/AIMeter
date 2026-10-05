@@ -1002,3 +1002,116 @@ type ForecastSimulateResponse struct {
 	ProjectedPoints             []ForecastDataPoint `json:"projected_points"`
 	Analysis                    string              `json:"analysis"`
 }
+
+// ==========================================
+// Phase 19: Multi-Region Edge Coordination & Distributed Quota Sync
+// ==========================================
+
+// ClusterNodeStatus represents the health/connectivity state of a cluster node
+type ClusterNodeStatus string
+
+const (
+	NodeStatusHealthy     ClusterNodeStatus = "healthy"
+	NodeStatusDegraded    ClusterNodeStatus = "degraded"
+	NodeStatusOffline     ClusterNodeStatus = "offline"
+	NodeStatusPartitioned ClusterNodeStatus = "partitioned"
+)
+
+// ClusterNode represents a regional gateway or edge worker node
+type ClusterNode struct {
+	NodeID           string            `json:"node_id"`
+	RegionID         string            `json:"region_id"` // e.g. "us-east-1", "eu-central-1", "ap-southeast-1", "edge-global"
+	Role             string            `json:"role"`      // "hub" or "spoke"
+	ClusterType      string            `json:"cluster_type"` // "k8s-pod", "vm", "edge-worker"
+	Status           ClusterNodeStatus `json:"status"`
+	EndpointURL      string            `json:"endpoint_url,omitempty"`
+	Weight           float64           `json:"weight"`
+	LatencyMs        float64           `json:"latency_ms"`
+	LastHeartbeatAt  time.Time         `json:"last_heartbeat_at"`
+	RegisteredAt     time.Time         `json:"registered_at"`
+	ActiveLeaseCount int               `json:"active_lease_count"`
+}
+
+// QuotaLease represents a distributed quota slice leased to a specific region/node
+type QuotaLease struct {
+	LeaseID        string    `json:"lease_id"`
+	NodeID         string    `json:"node_id"`
+	RegionID       string    `json:"region_id"`
+	TenantID       string    `json:"tenant_id"`
+	Tier           string    `json:"tier"`
+	AllocatedRPM   int       `json:"allocated_rpm"`
+	AllocatedTPM   int       `json:"allocated_tpm"`
+	AllocatedCPM   float64   `json:"allocated_cpm_usd"`
+	UsedRPM        int       `json:"used_rpm"`
+	UsedTPM        int       `json:"used_tpm"`
+	UsedCPM        float64   `json:"used_cpm_usd"`
+	LeaseExpiresAt time.Time `json:"lease_expires_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// LeaseUsageDelta captures local consumption to report during heartbeat true-up
+type LeaseUsageDelta struct {
+	Requests int     `json:"requests"`
+	Tokens   int     `json:"tokens"`
+	CostUSD  float64 `json:"cost_usd"`
+}
+
+// NodeHeartbeatRequest sent from regional/edge nodes to the coordinator hub
+type NodeHeartbeatRequest struct {
+	NodeID          string                     `json:"node_id"`
+	RegionID        string                     `json:"region_id"`
+	ReportedUsage   map[string]LeaseUsageDelta `json:"reported_usage"`   // tenantID -> usage delta
+	RequestedLeases []string                   `json:"requested_leases"` // tenantIDs needing top-up
+	LatencyMs       float64                    `json:"latency_ms"`
+}
+
+// NodeHeartbeatResponse returned by the coordinator hub
+type NodeHeartbeatResponse struct {
+	NodeID                  string            `json:"node_id"`
+	Status                  string            `json:"status"` // "ack"
+	GrantedLeases           []QuotaLease      `json:"granted_leases"`
+	PolicyDeltas            []RateLimitPolicy `json:"policy_deltas"`
+	NextHeartbeatIntervalMs int               `json:"next_heartbeat_interval_ms"`
+	ServerTime              time.Time         `json:"server_time"`
+}
+
+// ClusterStatsSummary aggregates multi-region coordination metrics
+type ClusterStatsSummary struct {
+	TotalNodes                   int     `json:"total_nodes"`
+	HealthyNodes                 int     `json:"healthy_nodes"`
+	TotalRegions                 int     `json:"total_regions"`
+	GlobalSyncRPM                int     `json:"global_sync_rpm"`
+	GlobalSyncTPM                int     `json:"global_sync_tpm"`
+	GlobalSyncCPM                float64 `json:"global_sync_cpm_usd"`
+	AverageWANLatencyMs          float64 `json:"average_wan_latency_ms"`
+	PartitionProtectedSavingsUSD float64 `json:"partition_protected_savings_usd"`
+}
+
+// ClusterSimulateRequest simulates regional WAN network partition and surge
+type ClusterSimulateRequest struct {
+	PartitionedRegionID       string  `json:"partitioned_region_id"`
+	TrafficSurgeMultiplier    float64 `json:"traffic_surge_multiplier"`
+	SimulateDurationSec       int     `json:"simulate_duration_sec"`
+	EnableFailSafeDegradation bool    `json:"enable_fail_safe_degradation"`
+}
+
+// ClusterSimulateStep represents a timeline step in partition simulation
+type ClusterSimulateStep struct {
+	TimestampSec      int     `json:"timestamp_sec"`
+	Event             string  `json:"event"`
+	NodeStatus        string  `json:"node_status"`
+	AvailableQuotaPct float64 `json:"available_quota_pct"`
+	RequestsHandled   int     `json:"requests_handled"`
+	RequestsThrottled int     `json:"requests_throttled"`
+}
+
+// ClusterSimulateResponse returns the simulated partition resilience metrics
+type ClusterSimulateResponse struct {
+	TargetRegion               string                `json:"target_region"`
+	OriginalRejectionRate      float64               `json:"original_rejection_rate"`
+	SimulatedRejectionRate     float64               `json:"simulated_rejection_rate"`
+	AutonomousSpendAllowedUSD  float64               `json:"autonomous_spend_allowed_usd"`
+	RunawayOverSpendBlockedUSD float64               `json:"runaway_overspend_blocked_usd"`
+	Timeline                   []ClusterSimulateStep `json:"timeline"`
+	Analysis                   string                `json:"analysis"`
+}

@@ -807,3 +807,76 @@ export interface ForecastSimulateResponse {
   projected_points: ForecastDataPoint[];
   analysis: string;
 }
+
+// Phase 19: Multi-Region Edge Coordination & Distributed Quota Sync
+export type ClusterNodeRole = "hub" | "spoke";
+export type ClusterNodeStatus = "online" | "degraded" | "partitioned" | "offline";
+
+export interface ClusterNode {
+  node_id: string;
+  region: string;
+  role: ClusterNodeRole;
+  endpoint: string;
+  status: ClusterNodeStatus;
+  last_heartbeat_at: string;
+  allocated_quota_usd: number;
+  consumed_quota_usd: number;
+  wan_latency_ms: number;
+  sync_version: number;
+  registered_at: string;
+  degradation_mode: string;
+}
+
+export type LeaseStatus = "active" | "expired" | "rebalanced" | "revoked";
+
+export interface QuotaLease {
+  lease_id: string;
+  node_id: string;
+  tenant_id: string;
+  assigned_limit_usd: number;
+  used_amount_usd: number;
+  remaining_usd: number;
+  soft_threshold_pct: number;
+  expires_at: string;
+  status: LeaseStatus;
+  issued_at: string;
+  version: number;
+}
+
+export interface ClusterStatsSummary {
+  total_nodes: number;
+  online_nodes: number;
+  degraded_nodes: number;
+  partitioned_nodes: number;
+  global_allocated_usd: number;
+  global_consumed_usd: number;
+  avg_wan_latency_ms: number;
+  sync_ops_total: number;
+  prevented_overdraft_usd: number;
+}
+
+export interface ClusterSimulateRequest {
+  partition_region: string;
+  surge_multiplier: number;
+  wan_delay_ms: number;
+  enable_fail_safe: boolean;
+}
+
+export interface ClusterSimulateStep {
+  time_offset_sec: number;
+  phase: string;
+  description: string;
+  node_status: string;
+  local_spend_usd: number;
+  hub_spend_usd: number;
+  action_triggered: string;
+}
+
+export interface ClusterSimulateResponse {
+  target_region: string;
+  partition_detected: boolean;
+  fail_safe_activated: boolean;
+  prevented_overdraft_usd: number;
+  steps: ClusterSimulateStep[];
+  recommendations: string[];
+}

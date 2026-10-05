@@ -18,7 +18,8 @@ import {
   Zap,
   Wrench,
   Gauge,
-  TrendingUp
+  TrendingUp,
+  Globe
 } from "lucide-react";
 
 export function Navbar() {
@@ -26,6 +27,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Clustering", href: "/clustering", icon: Globe },
     { label: "Traces & Economics", href: "/traces", icon: Network },
     { label: "Forecasting", href: "/forecasting", icon: TrendingUp },
     { label: "Rate Limits", href: "/throttling", icon: Gauge },
