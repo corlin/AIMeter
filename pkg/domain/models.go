@@ -1115,3 +1115,109 @@ type ClusterSimulateResponse struct {
 	Timeline                   []ClusterSimulateStep `json:"timeline"`
 	Analysis                   string                `json:"analysis"`
 }
+
+// ==========================================
+// Phase 20: Prompt A/B Testing, Evaluation & Unit Economics ROI Engine
+// ==========================================
+
+// ExperimentStatus tracks lifecycle state of an A/B evaluation
+type ExperimentStatus string
+
+const (
+	ExperimentStatusDraft     ExperimentStatus = "draft"
+	ExperimentStatusRunning   ExperimentStatus = "running"
+	ExperimentStatusPaused    ExperimentStatus = "paused"
+	ExperimentStatusConcluded ExperimentStatus = "concluded"
+)
+
+// HeuristicRule defines programmatic deterministic validation (0 external cost)
+type HeuristicRule struct {
+	Type   string  `json:"type"`   // json_valid, min_length, regex_match, prohibited_phrases
+	Value  string  `json:"value"`  // e.g., regex pattern, phrase, or integer string
+	Weight float64 `json:"weight"` // weight contribution to total heuristic score (0.0 - 1.0)
+}
+
+// ExperimentEvalConfig defines evaluation methodology (Judge LLM + Rules + Feedback)
+type ExperimentEvalConfig struct {
+	EnableLLMJudge        bool            `json:"enable_llm_judge"`
+	JudgeModel            string          `json:"judge_model"`       // e.g. gpt-4o-mini, deepseek-v3
+	JudgeSampleRate       float64         `json:"judge_sample_rate"` // 0.0 - 1.0 (e.g. 0.20 = 20% sample)
+	JudgeCriteria         string          `json:"judge_criteria"`    // standard rubrics: accuracy, conciseness, instruction_following
+	EnableHeuristicRules  bool            `json:"enable_heuristic_rules"`
+	Rules                 []HeuristicRule `json:"rules"`
+	ClientFeedbackWeight  float64         `json:"client_feedback_weight"` // 0.0 - 1.0
+}
+
+// ExperimentVariant represents a branch (A or B) in an A/B experiment
+type ExperimentVariant struct {
+	ID                     string  `json:"id"`                       // "A" or "B"
+	Name                   string  `json:"name"`                     // e.g., "Baseline GPT-4o", "Compressed DeepSeek-R1"
+	Description            string  `json:"description"`
+	Model                  string  `json:"model"`                    // Target model name
+	SystemPromptOverride   string  `json:"system_prompt_override"`   // Injected or replaced system prompt
+	PromptTemplateOverride string  `json:"prompt_template_override"` // Optional prefix/suffix template
+	TotalRequests          int64   `json:"total_requests"`
+	TotalTokens            int64   `json:"total_tokens"`
+	TotalCostUSD           float64 `json:"total_cost_usd"`
+	AvgLatencyMs           float64 `json:"avg_latency_ms"`
+	AvgQualityScore        float64 `json:"avg_quality_score"`        // Normalized 1.0 - 5.0
+	SuccessCount           int64   `json:"success_count"`            // Positive user ratings or resolved tickets
+	CostPerQualityPoint    float64 `json:"cost_per_quality_point"`   // Unit economics: Cost / AvgQualityScore
+	CostPerResolution      float64 `json:"cost_per_resolution"`      // Unit economics: Cost / SuccessCount
+}
+
+// Experiment represents a managed A/B evaluation suite
+type Experiment struct {
+	ID              string               `json:"id"`
+	Name            string               `json:"name"`
+	TenantID        string               `json:"tenant_id"`
+	Status          ExperimentStatus     `json:"status"`
+	SplitRatio      float64              `json:"split_ratio"` // Weight for Variant A (e.g., 0.5 = 50% A, 50% B)
+	HashKey         string               `json:"hash_key"`    // "session_id", "user_id", "api_key", "trace_id"
+	Variants        []ExperimentVariant  `json:"variants"`
+	EvalConfig      ExperimentEvalConfig `json:"eval_config"`
+	WinnerVariantID string               `json:"winner_variant_id,omitempty"` // Promoted winner variant ("A" or "B")
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
+}
+
+// ExperimentFeedback captures business/user feedback for a specific trace & variant
+type ExperimentFeedback struct {
+	ExperimentID string    `json:"experiment_id"`
+	VariantID    string    `json:"variant_id"`
+	TraceID      string    `json:"trace_id"`
+	Score        float64   `json:"score"` // 1.0 - 5.0 or 0/1
+	Label        string    `json:"label"` // "positive", "negative", "resolved", "unresolved"
+	FeedbackText string    `json:"feedback_text,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+// ExperimentStatsSummary provides high-level metrics across all active experiments
+type ExperimentStatsSummary struct {
+	TotalExperiments       int     `json:"total_experiments"`
+	ActiveExperiments      int     `json:"active_experiments"`
+	TotalEvaluatedRequests int64   `json:"total_evaluated_requests"`
+	AvgCostReductionPct    float64 `json:"avg_cost_reduction_pct"`
+	AvgQualityScore        float64 `json:"avg_quality_score"`
+	ParetoWinnersCount     int     `json:"pareto_winners_count"`
+}
+
+// ExperimentSimulateRequest triggers Monte Carlo traffic simulation and Pareto analysis
+type ExperimentSimulateRequest struct {
+	ExperimentID       string  `json:"experiment_id"`
+	SimulatedRequests  int     `json:"simulated_requests"`
+	OverrideSplitRatio float64 `json:"override_split_ratio"`
+	SampleUserPrompt   string  `json:"sample_user_prompt,omitempty"`
+}
+
+// ExperimentSimulateResponse returns the simulated Pareto trade-offs and win rates
+type ExperimentSimulateResponse struct {
+	ExperimentID                string            `json:"experiment_id"`
+	TotalSimulated              int               `json:"total_simulated"`
+	VariantAStats               ExperimentVariant `json:"variant_a_stats"`
+	VariantBStats               ExperimentVariant `json:"variant_b_stats"`
+	ParetoWinner                string            `json:"pareto_winner"` // "A", "B", or "tie"
+	EstimatedMonthlySavingsUSD  float64           `json:"estimated_monthly_savings_usd"`
+	ROIMultiplier               float64           `json:"roi_multiplier"`
+	Insights                    []string          `json:"insights"`
+}

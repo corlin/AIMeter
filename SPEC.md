@@ -709,6 +709,38 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（20/20 静态路由编译零报错）。
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 20: 企业级 Prompt A/B 灰度实验、LLM 评测打分与单位业务经济效益 ROI 评估引擎 (Prompt A/B Testing, Evaluation & Unit Economics ROI Engine)
+* [x] **领域模型与生产级种子数据（`pkg/domain/models.go` & `configs/experiments_seed.json`）**：
+  * 定义完整数据结构：`Experiment`（状态机 `draft`, `running`, `paused`, `concluded`、一致性哈希 key、分流比例、优胜变体）、`ExperimentVariant`（变体 A/B 模型名、System Prompt / 模板覆写、累计请求/Token/花费、延迟 P95、平均质量分、单位质量成本 `CostPerQualityPoint`、单次成功解决成本 `CostPerResolution`）、`HeuristicRule`、`ExperimentEvalConfig`、`ExperimentFeedback` 与 `ExperimentStatsSummary`。
+  * 预置两个开箱即用标杆对比实验：`exp-reasoning-vs-speed`（DeepSeek-R1 思考流 vs GPT-4o 旗舰流法律审核 ROI）与 `exp-prompt-slimming`（冗长 CoT vs 结构化 JSON 提示词极速瘦身对比）。
+* [x] **核心实验分流与评测打分引擎（`pkg/experiment/engine.go`）**：
+  * **一致性哈希粘滞分流**：基于会话标识（`session_id` / `user_id`）做 FNV-1a 一致性哈希，确保同一终端用户在多轮会话中体验稳定不跳变；并支持 `X-AIMeter-Variant` 请求头强制显式覆盖；
+  * **动态 Prompt / 模型改写**：网关层根据命中的变体动态注入 System Prompt 或模板后缀，无侵入重写转发模型；
+  * **三轨混合打分体系**：支持轻量 LLM 裁判异步抽样、确定性启发式规则质检（JSON 校验、最小长度、禁用语扣分）与客户端业务反馈（点赞/点踩、工单解决信号回填）；
+  * **帕累托最优边界与推全（Pareto Frontier & Promotion）**：自动分析成本降幅与质量偏离，高亮性价比最优变体，支持 `PromoteWinner` 一键将胜出变体推全至 100% 生产流量；
+  * **蒙特卡洛 A/B 仿真推演沙箱（`Simulate`）**：模拟大规模请求切流，即时推算月度节省金额与 ROI 效能倍率。
+* [x] **控制面 REST API 与反向代理网关贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 8 大 REST 控制端点：
+    * `GET /api/v1/experiments`（租户实验列表）
+    * `POST /api/v1/experiments`（创建实验）
+    * `GET /api/v1/experiments/:id`（实验详情与实时 ROI）
+    * `PUT /api/v1/experiments/:id`（更新实验配置）
+    * `POST /api/v1/experiments/:id/promote`（一键推全胜出变体）
+    * `POST /api/v1/experiments/feedback`（业务端反馈回传）
+    * `GET /api/v1/experiments/stats`（宏观实验大盘指标）
+    * `POST /api/v1/experiments/simulate`（在线蒙特卡洛仿真沙箱）
+  * 反向代理网关自动注入响应头：`X-AIMeter-Experiment-Id`, `X-AIMeter-Variant`, `X-AIMeter-Variant-Model`，并在非流式/流式响应结束异步记录评测数据。
+* [x] **Web 控制台全新一级看板 `/experiments`（`web/src/app/experiments/`）**：
+  * **4 维宏观 KPI**：活跃实验数、已评估请求量、胜出变体平均降本率、平均质量评分；
+  * **实验管理与创建模态窗**：可视化配置变体 A/B 模型、System Prompt 模板、分流比例滑块与评测规则；
+  * **Variant A vs Variant B 深度指标看板**：请求量、花费、延迟、质量评分、单位质量成本与单次解决成本六维矩阵对比；
+  * **交互式帕累托最优散点图谱 (Pareto Frontier)**：直观标定性价比最优变体，提供一键推全安全确认动作；
+  * **在线 A/B 蒙特卡洛仿真沙箱**：即时模拟大规模流量切流与月度节省美元。
+* [x] **全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（21/21 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

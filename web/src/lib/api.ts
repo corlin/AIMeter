@@ -52,7 +52,13 @@ import {
   QuotaLease,
   ClusterStatsSummary,
   ClusterSimulateRequest,
-  ClusterSimulateResponse
+  ClusterSimulateResponse,
+  Experiment,
+  ExperimentVariant,
+  ExperimentFeedback,
+  ExperimentStatsSummary,
+  ExperimentSimulateRequest,
+  ExperimentSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1009,6 +1015,118 @@ export async function simulateCluster(req: ClusterSimulateRequest): Promise<Clus
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Failed to simulate cluster partition scenario" }));
     throw new Error(err.error || "Failed to simulate cluster partition scenario");
+  }
+  return await res.json();
+}
+
+// Phase 20: Prompt A/B Testing & Unit Economics Engine
+export async function fetchExperiments(tenantId = "default"): Promise<Experiment[]> {
+  try {
+    const res = await fetch(`${API_BASE}/experiments?tenant_id=${encodeURIComponent(tenantId)}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("fetchExperiments failed:", err);
+    return [];
+  }
+}
+
+export async function createExperiment(exp: Partial<Experiment>): Promise<Experiment> {
+  const res = await fetch(`${API_BASE}/experiments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(exp),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create experiment" }));
+    throw new Error(err.error || "Failed to create experiment");
+  }
+  return await res.json();
+}
+
+export async function fetchExperimentDetail(id: string): Promise<Experiment> {
+  const res = await fetch(`${API_BASE}/experiments/${encodeURIComponent(id)}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch experiment detail: ${id}`);
+  }
+  return await res.json();
+}
+
+export async function updateExperiment(id: string, exp: Partial<Experiment>): Promise<Experiment> {
+  const res = await fetch(`${API_BASE}/experiments/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(exp),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to update experiment" }));
+    throw new Error(err.error || "Failed to update experiment");
+  }
+  return await res.json();
+}
+
+export async function promoteExperimentWinner(id: string, winnerVariantId: string): Promise<Experiment> {
+  const res = await fetch(`${API_BASE}/experiments/${encodeURIComponent(id)}/promote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ winner_variant_id: winnerVariantId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to promote experiment winner" }));
+    throw new Error(err.error || "Failed to promote experiment winner");
+  }
+  return await res.json();
+}
+
+export async function submitExperimentFeedback(fb: ExperimentFeedback): Promise<void> {
+  const res = await fetch(`${API_BASE}/experiments/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fb),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to submit experiment feedback" }));
+    throw new Error(err.error || "Failed to submit experiment feedback");
+  }
+}
+
+export async function fetchExperimentStats(): Promise<ExperimentStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/experiments/stats`, { cache: "no-store" });
+    if (!res.ok) {
+      return {
+        total_experiments: 0,
+        active_experiments: 0,
+        total_evaluated_requests: 0,
+        avg_cost_reduction_pct: 0,
+        avg_quality_score: 4.5,
+        pareto_winners_count: 0,
+      };
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("fetchExperimentStats failed:", err);
+    return {
+      total_experiments: 0,
+      active_experiments: 0,
+      total_evaluated_requests: 0,
+      avg_cost_reduction_pct: 0,
+      avg_quality_score: 4.5,
+      pareto_winners_count: 0,
+    };
+  }
+}
+
+export async function simulateExperiment(req: ExperimentSimulateRequest): Promise<ExperimentSimulateResponse> {
+  const res = await fetch(`${API_BASE}/experiments/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate experiment" }));
+    throw new Error(err.error || "Failed to simulate experiment");
   }
   return await res.json();
 }

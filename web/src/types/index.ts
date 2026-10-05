@@ -880,3 +880,90 @@ export interface ClusterSimulateResponse {
   steps: ClusterSimulateStep[];
   recommendations: string[];
 }
+
+// Phase 20: Prompt A/B Testing, Evaluation & Unit Economics ROI Engine
+export type ExperimentStatus = "draft" | "running" | "paused" | "concluded";
+
+export interface HeuristicRule {
+  type: string;
+  value: string;
+  weight: number;
+}
+
+export interface ExperimentEvalConfig {
+  enable_llm_judge: boolean;
+  judge_model: string;
+  judge_sample_rate: number;
+  judge_criteria: string;
+  enable_heuristic_rules: boolean;
+  rules: HeuristicRule[];
+  client_feedback_weight: number;
+}
+
+export interface ExperimentVariant {
+  id: string; // "A" | "B"
+  name: string;
+  description?: string;
+  model: string;
+  system_prompt_override?: string;
+  prompt_template_override?: string;
+  total_requests: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  avg_latency_ms: number;
+  avg_quality_score: number;
+  success_count: number;
+  cost_per_quality_point: number;
+  cost_per_resolution: number;
+}
+
+export interface Experiment {
+  id: string;
+  name: string;
+  tenant_id: string;
+  status: ExperimentStatus;
+  split_ratio: number;
+  hash_key: string;
+  variants: ExperimentVariant[];
+  eval_config: ExperimentEvalConfig;
+  winner_variant_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExperimentFeedback {
+  experiment_id: string;
+  variant_id: string;
+  trace_id?: string;
+  score: number;
+  label: string;
+  feedback_text?: string;
+  timestamp?: string;
+}
+
+export interface ExperimentStatsSummary {
+  total_experiments: number;
+  active_experiments: number;
+  total_evaluated_requests: number;
+  avg_cost_reduction_pct: number;
+  avg_quality_score: number;
+  pareto_winners_count: number;
+}
+
+export interface ExperimentSimulateRequest {
+  experiment_id: string;
+  simulated_requests: number;
+  override_split_ratio?: number;
+  sample_user_prompt?: string;
+}
+
+export interface ExperimentSimulateResponse {
+  experiment_id: string;
+  total_simulated: number;
+  variant_a_stats: ExperimentVariant;
+  variant_b_stats: ExperimentVariant;
+  pareto_winner: string;
+  estimated_monthly_savings_usd: number;
+  roi_multiplier: number;
+  insights: string[];
+}

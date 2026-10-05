@@ -19,6 +19,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
@@ -89,6 +90,17 @@ type ProxyHandler struct {
 	throttlerEngine    *throttler.ThrottlerEngine
 	forecastEngine     *forecast.ForecastEngine
 	clusterCoordinator *cluster.ClusterCoordinator
+	experimentEngine   *experiment.Engine
+}
+
+// SetExperimentEngine attaches an experiment engine
+func (h *ProxyHandler) SetExperimentEngine(ee *experiment.Engine) {
+	h.experimentEngine = ee
+}
+
+// GetExperimentEngine returns the attached experiment engine
+func (h *ProxyHandler) GetExperimentEngine() *experiment.Engine {
+	return h.experimentEngine
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -418,6 +430,33 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	actualModel := fbResult.ActualModel
 	if fbResult.Fallbacked {
 		payload["model"] = actualModel
+	}
+
+	// 4.2 Evaluate Prompt A/B Experiment & Transform (Phase 20)
+	if h.experimentEngine != nil {
+		activeExp, activeVariant, matched := h.experimentEngine.EvaluateRequest(tenantID, c.Request, actualModel)
+		if matched && activeExp != nil && activeVariant != nil {
+			c.Header("X-AIMeter-Experiment-Id", activeExp.ID)
+			c.Header("X-AIMeter-Variant", activeVariant.ID)
+			c.Header("X-AIMeter-Variant-Model", activeVariant.Model)
+
+			// Transform messages if variant defines overrides
+			if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+				var chatMsgs []domain.ChatMessage
+				msgBytes, err := json.Marshal(rawMsgs)
+				if err == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
+					targetModel, rewrittenMsgs := h.experimentEngine.ApplyVariantTransform(activeVariant, actualModel, chatMsgs)
+					actualModel = targetModel
+					model = targetModel
+					payload["model"] = actualModel
+					payload["messages"] = rewrittenMsgs
+				}
+			} else if activeVariant.Model != "" {
+				actualModel = activeVariant.Model
+				model = activeVariant.Model
+				payload["model"] = actualModel
+			}
+		}
 	}
 
 	// 4.5 Evaluate Smart Multi-Provider Router & SLA Arbiter (Phase 14)
@@ -986,6 +1025,20 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, respData.Choices[0].Message.Content, respBody, respData.Usage.PromptTokens, respData.Usage.CompletionTokens, costUSD, cacheTTLOverride)
 			}
 
+			// Record experiment results (Phase 20)
+			if expID := c.Writer.Header().Get("X-AIMeter-Experiment-Id"); expID != "" && h.experimentEngine != nil {
+				variantID := c.Writer.Header().Get("X-AIMeter-Variant")
+				content := ""
+				if len(respData.Choices) > 0 {
+					content = respData.Choices[0].Message.Content
+				}
+				heuristicScore := 4.5
+				if exp, err := h.experimentEngine.GetExperiment(expID); err == nil && exp != nil && len(exp.EvalConfig.Rules) > 0 {
+					heuristicScore = h.experimentEngine.EvaluateHeuristic(content, exp.EvalConfig.Rules)
+				}
+				h.experimentEngine.RecordResult(expID, variantID, int64(respData.Usage.TotalTokens), costUSD, float64(duration.Milliseconds()), heuristicScore, true)
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1174,6 +1227,12 @@ func (h *ProxyHandler) handleStreamingResponse(
 	}
 
 	if extractedUsage != nil && extractedUsage.TotalTokens > 0 {
+		if expID := c.Writer.Header().Get("X-AIMeter-Experiment-Id"); expID != "" && h.experimentEngine != nil {
+			variantID := c.Writer.Header().Get("X-AIMeter-Variant")
+			streamCost := float64(extractedUsage.TotalTokens) * 0.000003
+			h.experimentEngine.RecordResult(expID, variantID, int64(extractedUsage.TotalTokens), streamCost, float64(totalDuration.Milliseconds()), 4.6, true)
+		}
+
 		go h.recordUsage(
 			provider,
 			fbResult.ActualModel,

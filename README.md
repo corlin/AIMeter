@@ -212,6 +212,12 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **网络分区自治软降级容灾 (Fail-Safe Local Degradation)**：当跨地域海缆或公网链路发生抖动或分区中断时，心跳超时探测器（默认 10s）自动将节点标为 `degraded` 或 `partitioned`，边缘节点进入本地保守自治模式（锁定 80% 软阈值安全水位、联动本地轻度限流或模型降配），既保证局部可用性，又杜绝超发穿透总预算。
 * **网络分区推演沙箱与控制面管理**：全新一级看板 `/clustering`（4 维宏观 KPI、全球集群拓扑图与心跳链路监控、多地域租约切片管理、以及跨地域突发与网络断连推演沙箱）。
 
+### 21. Prompt A/B 灰度实验、LLM 评测打分与单位业务经济效益 ROI 评估引擎 (Prompt A/B Testing, Evaluation & Unit Economics ROI Engine - Phase 20)
+* **一致性哈希会话粘滞分流 (Consistent Hash Sticky Splitting)**：基于 `session_id` / `user_id` FNV-1a 一致性切流，保证同一终端用户的多轮会话体验连贯稳定；支持 `X-AIMeter-Variant` 请求头强制显式覆盖测试。
+* **三轨混合质量评测 (Hybrid 3-Source Evaluation)**：融合 LLM-as-a-Judge 裁判抽样、零外部开销确定性规则（JSON 结构有效性、长度阈值、禁用语扣分）以及客户端业务反馈（点赞/点踩、任务是否成功解决）。
+* **单位业务经济价值与帕累托最优边界 (Unit Economics ROI & Pareto Frontier)**：精确测算“每分质量成本（Cost-per-Quality-Point）”与“单次成功解决成本（Cost-per-Resolution）”，自动在控制台绘制散点坐标系，圈定帕累托最优变体并支持一键推全至 100% 生产流量。
+* **在线蒙特卡洛 A/B 仿真沙箱**：全新一级看板 `/experiments`（4 维宏观 KPI、Variant A vs Variant B 深度指标看板、帕累托前沿分析图谱、以及在线推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -219,6 +225,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/experiments` | **Prompt A/B 实验与 ROI 评测大盘** | 4 维宏观 KPI（活跃实验数、已评估请求数、优胜变体降本率、平均质量得分）、变体 A/B 六维指标对比面板、帕累托最优散点分析图谱、一键推全安全确认动作与在线蒙特卡洛推演沙箱 |
 | `/clustering` | **多集群跨地域协同大盘** | 4 维宏观 KPI（活跃节点、全局租约配额水位、平均 WAN 延迟、分区容灾规避超发金额）、全球集群星型拓扑图、租约切片表格与一键再平衡、网络分区与突发推演沙箱 |
 | `/forecasting` | **预算时序预测与自愈大盘** | 4 维宏观 KPI（预算使用率、月末预测、穿透预警、自愈节省）、SVG 时序投影图（实线/虚线/P50-P90 置信区间）、四级自愈矩阵与 What-If 突发沙箱 |
 | `/throttling` | **分布式速率限制与配额大盘** | 4 维宏观 KPI（评估请求数、429 拦截数、微排队缓冲数、避免 runaway 保护金额）、配额策略管理表、在线令牌桶突发压力仿真沙箱 |

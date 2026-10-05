@@ -19,7 +19,8 @@ import {
   Wrench,
   Gauge,
   TrendingUp,
-  Globe
+  Globe,
+  FlaskConical
 } from "lucide-react";
 
 export function Navbar() {
@@ -27,6 +28,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Experiments", href: "/experiments", icon: FlaskConical },
     { label: "Clustering", href: "/clustering", icon: Globe },
     { label: "Traces & Economics", href: "/traces", icon: Network },
     { label: "Forecasting", href: "/forecasting", icon: TrendingUp },

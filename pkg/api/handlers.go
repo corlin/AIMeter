@@ -16,6 +16,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/focus"
 	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
@@ -47,6 +48,17 @@ type APIHandler struct {
 	throttlerEngine    *throttler.ThrottlerEngine
 	forecastEngine     *forecast.ForecastEngine
 	clusterCoordinator *cluster.ClusterCoordinator
+	experimentEngine   *experiment.Engine
+}
+
+// SetExperimentEngine attaches an experiment engine to the API handler
+func (h *APIHandler) SetExperimentEngine(ee *experiment.Engine) {
+	h.experimentEngine = ee
+}
+
+// GetExperimentEngine returns the attached experiment engine
+func (h *APIHandler) GetExperimentEngine() *experiment.Engine {
+	return h.experimentEngine
 }
 
 // SetSLAArbiter attaches a SLA arbiter to the API handler
@@ -1431,6 +1443,145 @@ func (h *APIHandler) SimulateCluster(c *gin.Context) {
 		return
 	}
 	resp := h.clusterCoordinator.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
+// ==========================================
+// Phase 20: Prompt A/B Testing & Unit Economics Handlers
+// ==========================================
+
+// ListExperiments returns all experiments for a tenant
+func (h *APIHandler) ListExperiments(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusOK, []domain.Experiment{})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "default")
+	exps := h.experimentEngine.ListExperiments(tenantID)
+	c.JSON(http.StatusOK, exps)
+}
+
+// CreateExperiment creates a new A/B experiment
+func (h *APIHandler) CreateExperiment(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
+		return
+	}
+	var exp domain.Experiment
+	if err := c.ShouldBindJSON(&exp); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	saved, err := h.experimentEngine.UpsertExperiment(&exp)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, saved)
+}
+
+// GetExperiment retrieves a single experiment by ID
+func (h *APIHandler) GetExperiment(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
+		return
+	}
+	id := c.Param("id")
+	exp, err := h.experimentEngine.GetExperiment(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, exp)
+}
+
+// UpdateExperiment updates an existing experiment
+func (h *APIHandler) UpdateExperiment(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
+		return
+	}
+	id := c.Param("id")
+	var exp domain.Experiment
+	if err := c.ShouldBindJSON(&exp); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	exp.ID = id
+	saved, err := h.experimentEngine.UpsertExperiment(&exp)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, saved)
+}
+
+// PromoteExperimentWinner promotes winning variant to 100% traffic
+func (h *APIHandler) PromoteExperimentWinner(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
+		return
+	}
+	id := c.Param("id")
+	var req struct {
+		WinnerVariantID string `json:"winner_variant_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	promoted, err := h.experimentEngine.PromoteWinner(id, req.WinnerVariantID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, promoted)
+}
+
+// RecordExperimentFeedback captures user feedback/ratings
+func (h *APIHandler) RecordExperimentFeedback(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
+		return
+	}
+	var fb domain.ExperimentFeedback
+	if err := c.ShouldBindJSON(&fb); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.experimentEngine.RecordFeedback(fb); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Feedback recorded successfully"})
+}
+
+// GetExperimentStats returns global summary metrics across experiments
+func (h *APIHandler) GetExperimentStats(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusOK, domain.ExperimentStatsSummary{})
+		return
+	}
+	stats := h.experimentEngine.GetStatsSummary()
+	c.JSON(http.StatusOK, stats)
+}
+
+// SimulateExperiment triggers Monte Carlo simulation and Pareto frontier calculation
+func (h *APIHandler) SimulateExperiment(c *gin.Context) {
+	if h.experimentEngine == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
+		return
+	}
+	var req domain.ExperimentSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.experimentEngine.Simulate(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, resp)
 }
 

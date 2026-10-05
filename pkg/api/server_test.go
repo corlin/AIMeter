@@ -713,5 +713,137 @@ func TestClusterEndpoints(t *testing.T) {
 	}
 }
 
+func TestExperimentEndpoints(t *testing.T) {
+	store := storage.NewMemoryStore()
+	server := api.NewServer(
+		8080,
+		store,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+	)
+
+	// 1. GET /api/v1/experiments
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/experiments?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/experiments, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"exp-reasoning-vs-speed"`) {
+		t.Errorf("Expected seed experiment in response, got: %s", w.Body.String())
+	}
+
+	// 2. POST /api/v1/experiments
+	createJSON := `{
+		"id": "exp-custom-test",
+		"name": "Custom Model Comparison",
+		"tenant_id": "test-org",
+		"status": "running",
+		"split_ratio": 0.5,
+		"hash_key": "user_id",
+		"variants": [
+			{
+				"id": "A",
+				"name": "Variant A",
+				"model": "gpt-4o",
+				"system_prompt_override": "You are a standard bot."
+			},
+			{
+				"id": "B",
+				"name": "Variant B",
+				"model": "gpt-4o-mini",
+				"system_prompt_override": "You are a concise bot."
+			}
+		],
+		"eval_config": {
+			"enable_heuristic_rules": true,
+			"rules": [{"type": "min_length", "value": "20", "weight": 1.0}]
+		}
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/experiments", strings.NewReader(createJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/experiments, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"exp-custom-test"`) {
+		t.Errorf("Expected created experiment in response, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/experiments/:id
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/experiments/exp-custom-test", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/experiments/exp-custom-test, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 4. POST /api/v1/experiments/:id/promote
+	promoteJSON := `{"winner_variant_id": "B"}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/experiments/exp-custom-test/promote", strings.NewReader(promoteJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/experiments/exp-custom-test/promote, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"concluded"`) {
+		t.Errorf("Expected status concluded in promote response, got: %s", w.Body.String())
+	}
+
+	// 5. POST /api/v1/experiments/feedback
+	fbJSON := `{
+		"experiment_id": "exp-custom-test",
+		"variant_id": "B",
+		"trace_id": "trace-12345",
+		"score": 5.0,
+		"label": "resolved",
+		"feedback_text": "Great fast response!"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/experiments/feedback", strings.NewReader(fbJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/experiments/feedback, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 6. GET /api/v1/experiments/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/experiments/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/experiments/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_experiments"`) {
+		t.Errorf("Expected stats response, got: %s", w.Body.String())
+	}
+
+	// 7. POST /api/v1/experiments/simulate
+	simJSON := `{
+		"experiment_id": "exp-reasoning-vs-speed",
+		"simulated_requests": 300,
+		"override_split_ratio": 0.5
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/experiments/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/experiments/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"pareto_winner"`) || !strings.Contains(w.Body.String(), `"roi_multiplier"`) {
+		t.Errorf("Expected simulation pareto results, got: %s", w.Body.String())
+	}
+}
+
 
 
