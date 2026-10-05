@@ -1331,3 +1331,132 @@ type DLPSimulateResponse struct {
 	ScanDurationUs             int64               `json:"scan_duration_us"`
 	SimulatedUnmaskedResponse string              `json:"simulated_unmasked_response,omitempty"`
 }
+
+// ==========================================
+// Phase 22: Multi-Agent Swarm Topology & Loop Audit
+// ==========================================
+
+type SwarmLoopAction string
+
+const (
+	SwarmActionWarn        SwarmLoopAction = "warn"
+	SwarmActionBreakPrompt SwarmLoopAction = "break_prompt"
+	SwarmActionBlock       SwarmLoopAction = "block"
+)
+
+// SwarmPolicy configures loop detection and break intervention per tenant
+type SwarmPolicy struct {
+	TenantID         string          `json:"tenant_id"`
+	Enabled          bool            `json:"enabled"`
+	MaxPingPongTurns int             `json:"max_ping_pong_turns"` // e.g. 3 back-and-forth turns
+	MaxCyclicTurns   int             `json:"max_cyclic_turns"`    // e.g. 4 steps in N-gram cycle
+	BreakPromptText  string          `json:"break_prompt_text"`   // system intervention directive
+	DefaultAction    SwarmLoopAction `json:"default_action"`      // warn, break_prompt, block
+	MaxTotalTurns    int             `json:"max_total_turns"`     // total session agent call limit
+	UpdatedAt        time.Time       `json:"updated_at"`
+}
+
+// SwarmNode represents an individual Agent actor in the swarm
+type SwarmNode struct {
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Role             string    `json:"role"`
+	CallCount        int       `json:"call_count"`
+	SelfTokens       int       `json:"self_tokens"`
+	SelfCostUSD      float64   `json:"self_cost_usd"`
+	DelegatedTokens  int       `json:"delegated_tokens"`
+	DelegatedCostUSD float64   `json:"delegated_cost_usd"`
+	LastActiveAt     time.Time `json:"last_active_at"`
+}
+
+// SwarmEdge represents a delegation or communication vector between two agents
+type SwarmEdge struct {
+	FromAgent   string  `json:"from_agent"`
+	ToAgent     string  `json:"to_agent"`
+	CallCount   int     `json:"call_count"`
+	TotalTokens int     `json:"total_tokens"`
+	CostUSD     float64 `json:"cost_usd"`
+	IsLoopEdge  bool    `json:"is_loop_edge"`
+}
+
+// SwarmTransitionRecord records an atomic transition step in the swarm timeline
+type SwarmTransitionRecord struct {
+	StepIndex           int             `json:"step_index"`
+	Timestamp           time.Time       `json:"timestamp"`
+	FromAgent           string          `json:"from_agent"`
+	ToAgent             string          `json:"to_agent"`
+	Model               string          `json:"model"`
+	Tokens              int             `json:"tokens"`
+	CostUSD             float64         `json:"cost_usd"`
+	ActionTaken         SwarmLoopAction `json:"action_taken"`
+	InterventionApplied bool            `json:"intervention_applied"`
+	Summary             string          `json:"summary,omitempty"`
+}
+
+// SwarmTopology represents a complete collaborative swarm graph for a session/trace
+type SwarmTopology struct {
+	SessionID     string                  `json:"session_id"`
+	TraceID       string                  `json:"trace_id"`
+	TenantID      string                  `json:"tenant_id"`
+	Nodes         map[string]*SwarmNode   `json:"nodes"`
+	Edges         []*SwarmEdge            `json:"edges"`
+	Transitions   []SwarmTransitionRecord `json:"transitions"`
+	HasLoop       bool                    `json:"has_loop"`
+	LoopType      string                  `json:"loop_type,omitempty"` // "ping_pong", "cyclic", "none"
+	LoopAgents    []string                `json:"loop_agents,omitempty"`
+	LoopCount     int                     `json:"loop_count"`
+	TotalTokens   int                     `json:"total_tokens"`
+	TotalCostUSD  float64                 `json:"total_cost_usd"`
+	WastedCostUSD float64                 `json:"wasted_cost_usd"`
+	Status        string                  `json:"status"` // "active", "healed", "blocked", "completed"
+	CreatedAt     time.Time               `json:"created_at"`
+	UpdatedAt     time.Time               `json:"updated_at"`
+}
+
+// SwarmLoopEvent records a detected deadlock or cyclic loop incident
+type SwarmLoopEvent struct {
+	ID             string          `json:"id"`
+	SessionID      string          `json:"session_id"`
+	TraceID        string          `json:"trace_id"`
+	TenantID       string          `json:"tenant_id"`
+	LoopType       string          `json:"loop_type"` // "ping_pong", "cyclic"
+	AgentsInvolved []string        `json:"agents_involved"`
+	Turns          int             `json:"turns"`
+	ActionTaken    SwarmLoopAction `json:"action_taken"`
+	WastedCostUSD  float64         `json:"wasted_cost_usd"`
+	Timestamp      time.Time       `json:"timestamp"`
+}
+
+// SwarmStatsSummary reports aggregated swarm collaboration metrics
+type SwarmStatsSummary struct {
+	TotalSessions       int64   `json:"total_sessions"`
+	ActiveSwarmSessions int     `json:"active_swarm_sessions"`
+	TotalLoopIncidents  int64   `json:"total_loop_incidents"`
+	BreakInjectedCount  int64   `json:"break_injected_count"`
+	BlockedDeadlocks    int64   `json:"blocked_deadlocks"`
+	SelfHealedRate      float64 `json:"self_healed_rate"`
+	TotalWastedSpendUSD float64 `json:"total_wasted_spend_usd"`
+	AvoidedSpendUSD     float64 `json:"avoided_spend_usd"`
+}
+
+// SwarmSimulateRequest feeds a simulated sequence of agent transitions
+type SwarmSimulateRequest struct {
+	TenantID       string       `json:"tenant_id,omitempty"`
+	AgentSequence  []string     `json:"agent_sequence"` // e.g. ["Planner", "Coder", "Reviewer", "Coder", "Reviewer", "Coder"]
+	SimulateCost   float64      `json:"simulate_cost,omitempty"`
+	PolicyOverride *SwarmPolicy `json:"policy_override,omitempty"`
+}
+
+// SwarmSimulateResponse returns detection decision, graph, and intervention outcome
+type SwarmSimulateResponse struct {
+	HasLoop            bool                    `json:"has_loop"`
+	LoopType           string                  `json:"loop_type"`
+	LoopAgents         []string                `json:"loop_agents"`
+	TriggeredAtStep    int                     `json:"triggered_at_step"`
+	ActionTaken        SwarmLoopAction         `json:"action_taken"`
+	BreakPrompt        string                  `json:"break_prompt,omitempty"`
+	EstimatedWastedUSD float64                 `json:"estimated_wasted_usd"`
+	GraphNodes         []*SwarmNode            `json:"graph_nodes"`
+	GraphEdges         []*SwarmEdge            `json:"graph_edges"`
+	Timeline           []SwarmTransitionRecord `json:"timeline"`
+}

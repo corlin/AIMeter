@@ -27,6 +27,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/router"
+	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -93,6 +94,17 @@ type ProxyHandler struct {
 	clusterCoordinator *cluster.ClusterCoordinator
 	experimentEngine   *experiment.Engine
 	dlpManager         *dlp.Manager
+	swarmManager       *swarm.Manager
+}
+
+// SetSwarmManager attaches a swarm manager
+func (h *ProxyHandler) SetSwarmManager(sm *swarm.Manager) {
+	h.swarmManager = sm
+}
+
+// GetSwarmManager returns the attached swarm manager
+func (h *ProxyHandler) GetSwarmManager() *swarm.Manager {
+	return h.swarmManager
 }
 
 // SetDLPManager attaches a DLP manager
@@ -513,6 +525,70 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 			}
 		} else {
 			c.Header("X-AIMeter-DLP-Action", "disabled")
+		}
+	}
+
+	// 4.4 Multi-Agent Swarm Topology & Deadlock Guard (Phase 22)
+	agentName := c.GetHeader("X-AIMeter-Agent-Name")
+	parentAgent := c.GetHeader("X-AIMeter-Parent-Agent")
+	sessionID := c.GetHeader("X-AIMeter-Session-Id")
+	if sessionID == "" {
+		sessionID = c.GetHeader("X-Session-ID")
+	}
+	if sessionID == "" {
+		sessionID = traceID
+	}
+	if agentName == "" && parentAgent != "" {
+		agentName = "Agent"
+	}
+	if parentAgent == "" && agentName != "" {
+		parentAgent = "User"
+	}
+
+	if h.swarmManager != nil && agentName != "" {
+		estTokens := 1200
+		estCost := 0.018
+		_, loopDec := h.swarmManager.RecordTransition(tenantID, sessionID, traceID, parentAgent, agentName, actualModel, estTokens, estCost)
+
+		if loopDec.HasLoop {
+			c.Header("X-AIMeter-Swarm-Loop", string(loopDec.Action))
+			if len(loopDec.LoopAgents) > 0 {
+				c.Header("X-AIMeter-Swarm-Loop-Agents", strings.Join(loopDec.LoopAgents, ","))
+			}
+
+			// L3: Hard Block
+			if loopDec.Action == domain.SwarmActionBlock {
+				metrics.RecordProxyRequest(provider, actualModel, "409", false, time.Since(startTime))
+				c.JSON(http.StatusConflict, gin.H{
+					"error": gin.H{
+						"message": fmt.Sprintf("AI Meter Swarm Guard: Collaboration deadlock detected (%s). Request aborted to prevent runaway waste.", loopDec.Reason),
+						"type":    "agent_loop_deadlock_error",
+						"code":    "swarm_loop_blocked",
+						"action":  "block",
+						"agents":  loopDec.LoopAgents,
+					},
+				})
+				return
+			}
+
+			// L2: Break Prompt Injection
+			if loopDec.Action == domain.SwarmActionBreakPrompt && loopDec.TriggerBreakPrompt {
+				if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+					var chatMsgs []domain.ChatMessage
+					msgBytes, mErr := json.Marshal(rawMsgs)
+					if mErr == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
+						breakMsg := domain.ChatMessage{
+							Role:    "system",
+							Content: loopDec.BreakPromptText,
+						}
+						chatMsgs = append(chatMsgs, breakMsg)
+						payload["messages"] = chatMsgs
+						if modBytes, err := json.Marshal(payload); err == nil {
+							bodyBytes = modBytes
+						}
+					}
+				}
+			}
 		}
 	}
 

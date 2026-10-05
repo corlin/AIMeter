@@ -1051,3 +1051,118 @@ export interface DLPSimulateResponse {
   simulated_unmasked_response?: string;
 }
 
+// ==========================================
+// Phase 22: Multi-Agent Swarm Topology & Deadlock Audit
+// ==========================================
+
+export type SwarmLoopAction = "warn" | "break_prompt" | "block";
+
+export interface SwarmPolicy {
+  tenant_id: string;
+  enabled: boolean;
+  max_ping_pong_turns: number;
+  max_cyclic_turns: number;
+  break_prompt_text: string;
+  default_action: SwarmLoopAction;
+  max_total_turns: number;
+  updated_at?: string;
+}
+
+export interface SwarmNode {
+  id: string;
+  name: string;
+  role: string;
+  call_count: number;
+  self_tokens: number;
+  self_cost_usd: number;
+  delegated_tokens: number;
+  delegated_cost_usd: number;
+  last_active_at: string;
+}
+
+export interface SwarmEdge {
+  from_agent: string;
+  to_agent: string;
+  call_count: number;
+  total_tokens: number;
+  cost_usd: number;
+  is_loop_edge: boolean;
+}
+
+export interface SwarmTransitionRecord {
+  step_index: number;
+  timestamp: string;
+  from_agent: string;
+  to_agent: string;
+  model: string;
+  tokens: number;
+  cost_usd: number;
+  action_taken: SwarmLoopAction;
+  intervention_applied: boolean;
+  summary?: string;
+}
+
+export interface SwarmTopology {
+  session_id: string;
+  trace_id: string;
+  tenant_id: string;
+  nodes: Record<string, SwarmNode>;
+  edges: SwarmEdge[];
+  transitions: SwarmTransitionRecord[];
+  has_loop: boolean;
+  loop_type?: string;
+  loop_agents?: string[];
+  loop_count: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  wasted_cost_usd: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SwarmLoopEvent {
+  id: string;
+  session_id: string;
+  trace_id: string;
+  tenant_id: string;
+  loop_type: string;
+  agents_involved: string[];
+  turns: number;
+  action_taken: SwarmLoopAction;
+  wasted_cost_usd: number;
+  timestamp: string;
+}
+
+export interface SwarmStatsSummary {
+  total_sessions: number;
+  active_swarm_sessions: number;
+  total_loop_incidents: number;
+  break_injected_count: number;
+  blocked_deadlocks: number;
+  self_healed_rate: number;
+  total_wasted_spend_usd: number;
+  avoided_spend_usd: number;
+}
+
+export interface SwarmSimulateRequest {
+  tenant_id?: string;
+  agent_sequence: string[];
+  simulate_cost?: number;
+  policy_override?: SwarmPolicy;
+}
+
+export interface SwarmSimulateResponse {
+  has_loop: boolean;
+  loop_type: string;
+  loop_agents: string[];
+  triggered_at_step: number;
+  action_taken: SwarmLoopAction;
+  break_prompt?: string;
+  estimated_wasted_usd: number;
+  graph_nodes: SwarmNode[];
+  graph_edges: SwarmEdge[];
+  timeline: SwarmTransitionRecord[];
+}
+
+

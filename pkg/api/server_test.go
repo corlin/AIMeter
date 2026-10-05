@@ -935,6 +935,75 @@ func TestPrivacyEndpoints(t *testing.T) {
 	}
 }
 
+func TestSwarmEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/swarm/topologies
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/swarm/topologies", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/swarm/topologies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 2. POST /api/v1/swarm/policies
+	policyJSON := `{
+		"tenant_id": "swarm-test-tenant",
+		"enabled": true,
+		"max_ping_pong_turns": 2,
+		"max_cyclic_turns": 3,
+		"break_prompt_text": "Please summarize and conclude now.",
+		"default_action": "break_prompt",
+		"max_total_turns": 15
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/swarm/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/swarm/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 3. GET /api/v1/swarm/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/swarm/stats?tenant_id=swarm-test-tenant", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/swarm/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_sessions"`) {
+		t.Errorf("Expected total_sessions in stats, got: %s", w.Body.String())
+	}
+
+	// 4. GET /api/v1/swarm/loops
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/swarm/loops?tenant_id=swarm-test-tenant", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/swarm/loops, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/swarm/simulate (Ping-Pong simulation)
+	simJSON := `{
+		"tenant_id": "swarm-test-tenant",
+		"agent_sequence": ["Planner", "Coder", "Reviewer", "Coder", "Reviewer", "Coder", "Reviewer"],
+		"simulate_cost": 0.02
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/swarm/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/swarm/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"has_loop":true`) || !strings.Contains(body, `"ping_pong"`) {
+		t.Errorf("Expected loop detected in simulation response, got: %s", body)
+	}
+}
+
+
 
 
 

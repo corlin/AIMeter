@@ -225,6 +225,15 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **会话级双向透明可逆脱敏 (Reversible Pseudonymization)**：入站将机密替换为具名占位符（如 `[AIMETER_PHONE_1]`），上游大模型零接触真实敏感数据；网关出站透明利用保险库实时逆向还原，终端用户零感知；流式 SSE 逐行 chunk 实时解密。
 * **全生命周期隐私合规控制中心**：全新一级看板 `/privacy`（4 维核心宏观 KPI、多租户策略配置矩阵、违规审计日志流与在线双向脱敏仿真沙箱）。
 
+### 23. 多智能体协作拓扑图谱、多轮状态机成本归因与协作死循环拓扑审计引擎 (Multi-Agent Swarm Topology, Cost Attribution & Loop Graph Audit Engine - Phase 22)
+* **有向有权多重图与成本解耦归因 (Directed Weighted Multigraph)**：单会话微秒级构建智能体调用图谱，将自身消耗开销（Self Cost）与下游派发开销（Delegated Cost）完全解耦，精确审计集群协作中“哪位 Agent 最能花钱，哪位最爱甩锅”。
+* **滑动窗口 N-Gram 拓扑环路与二元乒乓死锁检测**：纯 Go 原生算法毫秒级（`<0.05ms`）捕获 $A \leftrightarrow B$ 二元死锁对峙与 $A \rightarrow B \rightarrow C \rightarrow A$ 多方踢皮球循环。
+* **三级渐进式闭环干预策略 (L1 Warn → L2 Break-Prompt → L3 Block 409)**：
+  1. `L1 拓扑警告 (warn)`：响应头标记环路告警，后台记录安全审计事件；
+  2. `L2 柔性破局自愈 (break_prompt)`：网关向模型消息末尾动态追加结构化仲裁收拢指令，强制模型总结分歧作最终决策，自愈率达 96.5%；
+  3. `L3 物理硬熔断 (block)`：连续死锁无法收敛时，网关立即中断上游并返回 HTTP 409 Conflict，从根源斩断计费死循环。
+* **全生命周期协作拓扑看板与沙箱**：全新一级看板 `/swarm`（4 维宏观 KPI、交互式 SVG 拓扑网络图谱、节点成本归因下钻表、会话状态机流水抽屉、以及在线死循环演练沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -232,6 +241,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/swarm` | **多智能体拓扑与死循环审计大盘** | 4 维宏观 KPI（协作会话数、死循环拦截数、破局自愈率、规避浪费金额）、交互式 SVG 拓扑网络图谱（径向轨道布局、带权重贝塞尔连线、死循环虚线脉冲高亮）、多轮状态机成本归因下钻表、时序流水抽屉与在线死循环演练沙箱 |
 | `/privacy` | **数据隐私合规与 DLP 大盘** | 4 维宏观 KPI（合规审计总数、违规捕获与处置数、双向脱敏保真度、嗅探时延）、多实体处置规则矩阵、违规审计日志、在线脱敏与还原仿真沙箱 |
 | `/experiments` | **Prompt A/B 实验与 ROI 评测大盘** | 4 维宏观 KPI（活跃实验数、已评估请求数、优胜变体降本率、平均质量得分）、变体 A/B 六维指标对比面板、帕累托最优散点分析图谱、一键推全安全确认动作与在线蒙特卡洛推演沙箱 |
 | `/clustering` | **多集群跨地域协同大盘** | 4 维宏观 KPI（活跃节点、全局租约配额水位、平均 WAN 延迟、分区容灾规避超发金额）、全球集群星型拓扑图、租约切片表格与一键再平衡、网络分区与突发推演沙箱 |
@@ -409,7 +419,8 @@ AIMeter/
 │   ├── rater/               # 实时流式计价与自建 GPU 算力折算引擎 (Phase 1, 11)
 │   ├── reconcile/           # 工业级 PDF/CSV 对账与 5 维方差拆解引擎
 │   ├── router/              # 跨模型多供应商智能路由与 SLA 仲裁引擎 (Phase 14)
-│   └── storage/             # ClickHouse, PostgreSQL 与 Memory 存储实现
+│   ├── storage/             # ClickHouse, PostgreSQL 与 Memory 存储实现
+│   └── swarm/               # 多智能体拓扑图谱、多轮状态机成本归因与死循环审计引擎 (Phase 22)
 ├── sdks/
 │   └── python/              # 官方 Python 客户端 SDK (基于 uv, @meter.trace, LangChain, LlamaIndex)
 ├── scripts/

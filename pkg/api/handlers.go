@@ -27,6 +27,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
+	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/gin-gonic/gin"
 )
@@ -51,6 +52,17 @@ type APIHandler struct {
 	clusterCoordinator *cluster.ClusterCoordinator
 	experimentEngine   *experiment.Engine
 	dlpManager         *dlp.Manager
+	swarmManager       *swarm.Manager
+}
+
+// SetSwarmManager attaches a swarm manager to the API handler
+func (h *APIHandler) SetSwarmManager(sm *swarm.Manager) {
+	h.swarmManager = sm
+}
+
+// GetSwarmManager returns the attached swarm manager
+func (h *APIHandler) GetSwarmManager() *swarm.Manager {
+	return h.swarmManager
 }
 
 // SetDLPManager attaches a DLP manager to the API handler
@@ -1697,6 +1709,93 @@ func (h *APIHandler) SimulateDLP(c *gin.Context) {
 	resp := h.dlpManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 22: Multi-Agent Swarm Topology & Loop Audit Endpoints
+// ==========================================
+
+// GetSwarmTopologies lists recent session graphs
+func (h *APIHandler) GetSwarmTopologies(c *gin.Context) {
+	if h.swarmManager == nil {
+		c.JSON(http.StatusOK, []*domain.SwarmTopology{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, _ := strconv.Atoi(limitStr)
+	topos := h.swarmManager.ListTopologies(tenantID, limit)
+	c.JSON(http.StatusOK, topos)
+}
+
+// GetSwarmTopology returns topology for a single session
+func (h *APIHandler) GetSwarmTopology(c *gin.Context) {
+	if h.swarmManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Swarm manager not initialized"})
+		return
+	}
+	sessionID := c.Param("session_id")
+	topo, found := h.swarmManager.GetTopology(sessionID)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Swarm session topology not found"})
+		return
+	}
+	c.JSON(http.StatusOK, topo)
+}
+
+// GetSwarmLoops lists loop deadlock events
+func (h *APIHandler) GetSwarmLoops(c *gin.Context) {
+	if h.swarmManager == nil {
+		c.JSON(http.StatusOK, []domain.SwarmLoopEvent{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+	events := h.swarmManager.ListLoopEvents(tenantID, limit)
+	c.JSON(http.StatusOK, events)
+}
+
+// GetSwarmStats returns macro swarm metrics
+func (h *APIHandler) GetSwarmStats(c *gin.Context) {
+	if h.swarmManager == nil {
+		c.JSON(http.StatusOK, domain.SwarmStatsSummary{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	stats := h.swarmManager.GetStats(tenantID)
+	c.JSON(http.StatusOK, stats)
+}
+
+// UpsertSwarmPolicy creates or updates a policy
+func (h *APIHandler) UpsertSwarmPolicy(c *gin.Context) {
+	if h.swarmManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Swarm manager not initialized"})
+		return
+	}
+	var policy domain.SwarmPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	saved := h.swarmManager.SetPolicy(policy)
+	c.JSON(http.StatusOK, saved)
+}
+
+// SimulateSwarm triggers a step-by-step sandbox simulation
+func (h *APIHandler) SimulateSwarm(c *gin.Context) {
+	if h.swarmManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Swarm manager not initialized"})
+		return
+	}
+	var req domain.SwarmSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.swarmManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

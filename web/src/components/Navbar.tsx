@@ -21,7 +21,8 @@ import {
   TrendingUp,
   Globe,
   FlaskConical,
-  ShieldCheck
+  ShieldCheck,
+  Share2
 } from "lucide-react";
 
 export function Navbar() {
@@ -29,6 +30,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Agent Swarm", href: "/swarm", icon: Share2 },
     { label: "Privacy DLP", href: "/privacy", icon: ShieldCheck },
     { label: "Experiments", href: "/experiments", icon: FlaskConical },
     { label: "Clustering", href: "/clustering", icon: Globe },

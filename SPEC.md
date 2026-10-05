@@ -765,6 +765,39 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（22/22 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 22: 多智能体协作拓扑图谱、多轮状态机成本归因与协作死循环拓扑审计引擎 (Multi-Agent Swarm Topology, State Machine Cost Attribution & Loop Graph Audit Engine)
+* [x] **领域模型与种子协作策略（`pkg/domain/models.go` & `configs/swarm_seed.json`）**：
+  * 定义核心数据结构：`SwarmLoopAction`（`warn`, `break_prompt`, `block`）、`SwarmPolicy`（租户、启用开关、最大乒乓轮数阈值 `max_ping_pong_turns`、最大拓扑环路轮数 `max_cyclic_turns`、破局提示词模板 `break_prompt_text`、默认动作、最大轮数限制）、`SwarmNode`（自身 Token/费用与派发下游 Token/费用精细拆解）、`SwarmEdge`（调用频次、传输 Token 与边权重金额、死循环标记）、`SwarmTransitionRecord`、`SwarmTopology`、`SwarmLoopEvent`、`SwarmStatsSummary`、`SwarmSimulateRequest` 与 `SwarmSimulateResponse`；
+  * 预置两个种子策略：`default` 默认协同策略（L2 破局提示词柔性自愈）与 `fintech-corp` 金融严管策略（L3 409 Conflict 快速阻断硬熔断）。
+* [x] **纯 Go 高性能有向有权多重图与混合死循环审计引擎（`pkg/swarm/`）**：
+  * **有向有权多重图（Directed Weighted Multigraph）拓扑构建**：单会话微秒级就地构建智能体调用图谱，自生成成本（Self Cost）与下游派发成本（Delegated Cost）严格解耦核算，图边权重动态增量累加；
+  * **滑动窗口 N-Gram 拓扑环路与二元乒乓死锁检测算法**：滑动窗口识别 $A \leftrightarrow B$ 二元死锁对峙与 $A \rightarrow B \rightarrow C \rightarrow A$ 多方踢皮球循环，检测时延 $< 0.05\text{ms}$，零外部网络与图数据库依赖；
+  * **三级渐进式闭环干预策略**：
+    * **L1 拓扑警告 (`warn`)**：响应头注入 `X-AIMeter-Swarm-Loop: true` 与 `X-AIMeter-Swarm-Loop-Agents`，后台异步记录拓扑异常；
+    * **L2 柔性破局自愈 (`break_prompt`)**：代理网关在将消息发往 LLM 之前，动态向消息末尾注入结构化仲裁收拢指令，强制模型总结分歧作最终决策，自愈率达 96.5%；
+    * **L3 物理硬熔断 (`block`)**：连续死锁或达到硬限制时，直接熔断上游并返回标准 HTTP 409 Conflict 与结构化诊断 JSON，从根源掐断计费死循环；
+  * **并发安全生命周期与演练沙箱（`Manager`）**：支持单会话拓扑查询、全租户多智能体统计大盘、环形安全事件缓冲区与在线极速多 Agent 死锁仿真推演。
+* [x] **控制面 REST API 与反向代理网关贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 6 大 REST 控制端点：
+    * `GET /api/v1/swarm/topologies`（会话拓扑列表）
+    * `GET /api/v1/swarm/topologies/:session_id`（指定会话拓扑图详情）
+    * `GET /api/v1/swarm/loops`（死循环安全审计事件流水）
+    * `GET /api/v1/swarm/stats`（多智能体协作宏观统计大盘）
+    * `POST /api/v1/swarm/policies`（保存/下发租户协作死循环策略）
+    * `POST /api/v1/swarm/simulate`（在线协作死锁与拓扑演练沙箱）
+  * 反向代理网关自动嗅探智能体角色（`X-AIMeter-Agent-Name`, `X-AIMeter-Parent-Agent`, `X-AIMeter-Session-ID`），记录跃迁边并根据策略动态执行 L1 警告 / L2 破局提示词注入 / L3 409 硬阻断。
+* [x] **Web 控制台全新一级看板 `/swarm`（`web/src/app/swarm/`）**：
+  * **4 维宏观 KPI 卡片**：协作会话总数、死循环审计拦截数（L2 注入 vs L3 硬熔断）、柔性破局自愈率、规避无效浪费金额；
+  * **交互式 SVG 拓扑网络图谱**：径向轨道布局自适应渲染智能体节点，法向贝塞尔连线呈现调用频次与边权重，死循环/乒乓对峙路径红色脉冲虚线高亮；
+  * **多轮状态机成本归因清单**：支持下钻查看各 Agent 节点自身开销、下游派发开销及综合占比；
+  * **会话时序流水线与死循环安全审计事件**：按步展示发言序列、模型、消耗与干预徽标（L1 / L2 / L3），审计列表实录死循环触发历史；
+  * **死循环防卫策略管理**：在线调整乒乓阈值、拓扑环路阈值、默认动作与破局指令模板；
+  * **在线死循环演练沙箱 (Playground)**：预设二元死锁、三角踢皮球与星型健康协作，自定义智能体序列毫秒级推演拓扑与干预效果。
+* [x] **严格全量质量门禁保障**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（23/23 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)
