@@ -148,6 +148,11 @@ type TraceTreeNode struct {
 	RoutedToModel        string           `json:"routed_to_model,omitempty"`
 	RouterStrategy       string           `json:"router_strategy,omitempty"`
 	FailoverCount        int              `json:"failover_count,omitempty"`
+	IsCacheHit           bool             `json:"is_cache_hit,omitempty"`
+	CacheMatchType       string           `json:"cache_match_type,omitempty"`
+	CacheSimilarity      float64          `json:"cache_similarity,omitempty"`
+	CacheAvoidedCostUSD  float64          `json:"cache_avoided_cost_usd,omitempty"`
+	CacheAvoidedLatencyMs int64           `json:"cache_avoided_latency_ms,omitempty"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
@@ -178,6 +183,11 @@ type TraceDetail struct {
 	RoutedToModel        string         `json:"routed_to_model,omitempty"`
 	RouterStrategy       string         `json:"router_strategy,omitempty"`
 	FailoverCount        int            `json:"failover_count,omitempty"`
+	IsCacheHit           bool           `json:"is_cache_hit,omitempty"`
+	CacheMatchType       string         `json:"cache_match_type,omitempty"`
+	CacheSimilarity      float64        `json:"cache_similarity,omitempty"`
+	CacheAvoidedCostUSD  float64        `json:"cache_avoided_cost_usd,omitempty"`
+	CacheAvoidedLatencyMs int64         `json:"cache_avoided_latency_ms,omitempty"`
 }
 
 // OverviewStats provides high level aggregate metrics for the dashboard
@@ -608,6 +618,91 @@ type RouterSimulateResponse struct {
 	Candidates       []CandidateComparison `json:"candidates"`
 	ProjectedSavings map[string]float64    `json:"projected_savings_usd"`
 	Reason           string                `json:"reason"`
+}
+
+// ==========================================
+// Phase 15: Semantic Response Caching & Cost Avoidance
+// ==========================================
+
+// SemanticCachePolicy defines the caching policy for a tenant
+type SemanticCachePolicy struct {
+	TenantID            string  `json:"tenant_id"`
+	Enabled             bool    `json:"enabled"`
+	SimilarityThreshold float64 `json:"similarity_threshold"` // default 0.85
+	TTLSeconds          int     `json:"ttl_seconds"`          // default 86400 (24h)
+	MaxCapacity         int     `json:"max_capacity"`         // default 5000 entries
+	MinPromptChars      int     `json:"min_prompt_chars"`     // default 10
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+// CacheEntry represents a stored response and its semantic metadata
+type CacheEntry struct {
+	ID                string    `json:"id"`
+	TenantID          string    `json:"tenant_id"`
+	Model             string    `json:"model"`
+	PromptText        string    `json:"prompt_text"`
+	PromptHash        string    `json:"prompt_hash"` // SHA-256
+	SimHash           uint64    `json:"sim_hash"`    // 64-bit SimHash
+	ResponseText      string    `json:"response_text"`
+	ResponseJSON      []byte    `json:"response_json,omitempty"`
+	InputTokens       int       `json:"input_tokens"`
+	OutputTokens      int       `json:"output_tokens"`
+	EstimatedCostUSD  float64   `json:"estimated_cost_usd"`
+	HitCount          int       `json:"hit_count"`
+	AvoidedCostUSD    float64   `json:"avoided_cost_usd"`
+	CreatedAt         time.Time `json:"created_at"`
+	ExpiresAt         time.Time `json:"expires_at"`
+	LastAccessedAt    time.Time `json:"last_accessed_at"`
+}
+
+// CacheEntrySummary is a lightweight representation for table views
+type CacheEntrySummary struct {
+	ID               string    `json:"id"`
+	TenantID         string    `json:"tenant_id"`
+	Model            string    `json:"model"`
+	PromptPreview    string    `json:"prompt_preview"`
+	ResponsePreview  string    `json:"response_preview"`
+	HitCount         int       `json:"hit_count"`
+	AvoidedCostUSD   float64   `json:"avoided_cost_usd"`
+	CreatedAt        time.Time `json:"created_at"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	TTLRemainingSec  int64     `json:"ttl_remaining_sec"`
+}
+
+// CacheStats provides aggregated metrics for the cache dashboard
+type CacheStats struct {
+	TenantID              string  `json:"tenant_id"`
+	TotalRequests         int64   `json:"total_requests"`
+	HitCount              int64   `json:"hit_count"`
+	HitRate               float64 `json:"hit_rate"`
+	ExactHits             int64   `json:"exact_hits"`
+	SemanticHits          int64   `json:"semantic_hits"`
+	TotalAvoidedCostUSD   float64 `json:"total_avoided_cost_usd"`
+	TotalAvoidedLatencyMs int64   `json:"total_avoided_latency_ms"`
+	ActiveEntries         int     `json:"active_entries"`
+	MaxCapacity           int     `json:"max_capacity"`
+}
+
+// CacheSimulateRequest represents a request to test prompt similarity
+type CacheSimulateRequest struct {
+	TenantID     string  `json:"tenant_id,omitempty"`
+	Model        string  `json:"model,omitempty"`
+	BasePrompt   string  `json:"base_prompt"`
+	TargetPrompt string  `json:"target_prompt"`
+	Threshold    float64 `json:"threshold,omitempty"` // default 0.85
+}
+
+// CacheSimulateResponse represents the similarity analysis and hit determination
+type CacheSimulateResponse struct {
+	Similarity              float64 `json:"similarity"`
+	IsHit                   bool    `json:"is_hit"`
+	MatchType               string  `json:"match_type"` // "exact", "semantic", "miss"
+	Threshold               float64 `json:"threshold"`
+	EstimatedAvoidedCostUSD float64 `json:"estimated_avoided_cost_usd"`
+	BaseSimHashHex          string  `json:"base_simhash_hex"`
+	TargetSimHashHex        string  `json:"target_simhash_hex"`
+	HammingDistance         int     `json:"hamming_distance"`
+	Analysis                string  `json:"analysis"`
 }
 
 

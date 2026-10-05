@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/corlin/AIMeter/pkg/budget"
+	"github.com/corlin/AIMeter/pkg/cache"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/normalizer"
+	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -44,6 +46,15 @@ type PromptCompressionStats struct {
 	Ratio          float64
 }
 
+// ProxyCacheStats captures metrics for semantic cache hits
+type ProxyCacheStats struct {
+	IsHit            bool
+	MatchType        string
+	Similarity       float64
+	AvoidedCostUSD   float64
+	AvoidedLatencyMs int64
+}
+
 // OpenAIUsage represents usage metrics in upstream OpenAI-compatible responses
 type OpenAIUsage struct {
 	PromptTokens            int `json:"prompt_tokens"`
@@ -66,6 +77,8 @@ type ProxyHandler struct {
 	budgetMgr        *budget.BudgetManager
 	compressEngine   *compress.Engine
 	slaArbiter       *router.SLAArbiter
+	cacheMgr         *cache.SemanticCacheManager
+	raterEngine      *rater.RatingEngine
 }
 
 // SetBudgetManager attaches a budget manager for stream capping policies
@@ -81,6 +94,16 @@ func (h *ProxyHandler) SetCompressEngine(ce *compress.Engine) {
 // SetSLAArbiter attaches a SLA arbiter for multi-provider smart routing
 func (h *ProxyHandler) SetSLAArbiter(arb *router.SLAArbiter) {
 	h.slaArbiter = arb
+}
+
+// SetCacheManager attaches a semantic cache manager
+func (h *ProxyHandler) SetCacheManager(cm *cache.SemanticCacheManager) {
+	h.cacheMgr = cm
+}
+
+// SetRaterEngine attaches a rater engine
+func (h *ProxyHandler) SetRaterEngine(re *rater.RatingEngine) {
+	h.raterEngine = re
 }
 
 func (h *ProxyHandler) resolveTargetURL(provider, headerTarget string) string {
@@ -138,6 +161,100 @@ func NewProxyHandler(
 // SetUpstreamURL overrides the base upstream URL for a specific provider
 func (h *ProxyHandler) SetUpstreamURL(provider, url string) {
 	h.defaultUpstreams[strings.ToLower(provider)] = strings.TrimRight(url, "/")
+}
+
+func extractPromptText(payload map[string]interface{}) string {
+	rawMsgs, ok := payload["messages"].([]interface{})
+	if !ok || len(rawMsgs) == 0 {
+		if promptStr, ok := payload["prompt"].(string); ok {
+			return promptStr
+		}
+		return ""
+	}
+
+	var sb strings.Builder
+	for _, m := range rawMsgs {
+		msgMap, ok := m.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		content, ok := msgMap["content"].(string)
+		if !ok {
+			continue
+		}
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(content)
+	}
+	return sb.String()
+}
+
+func renderJSONFromCache(c *gin.Context, entry *domain.CacheEntry, model string) {
+	if len(entry.ResponseJSON) > 0 {
+		c.Data(http.StatusOK, "application/json; charset=utf-8", entry.ResponseJSON)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":      "chatcmpl-cached-" + entry.ID,
+		"object":  "chat.completion",
+		"created": time.Now().Unix(),
+		"model":   model,
+		"choices": []gin.H{
+			{
+				"index": 0,
+				"message": gin.H{
+					"role":    "assistant",
+					"content": entry.ResponseText,
+				},
+				"finish_reason": "stop",
+			},
+		},
+		"usage": gin.H{
+			"prompt_tokens":     entry.InputTokens,
+			"completion_tokens": entry.OutputTokens,
+			"total_tokens":      entry.InputTokens + entry.OutputTokens,
+		},
+	})
+}
+
+func renderStreamFromCache(c *gin.Context, entry *domain.CacheEntry, model string) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		renderJSONFromCache(c, entry, model)
+		return
+	}
+
+	created := time.Now().Unix()
+	chunkID := "chatcmpl-cached-" + entry.ID
+
+	roleChunk := fmt.Sprintf("data: {\"id\":\"%s\",\"object\":\"chat.completion.chunk\",\"created\":%d,\"model\":\"%s\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\n",
+		chunkID, created, model)
+	_, _ = c.Writer.Write([]byte(roleChunk))
+	flusher.Flush()
+
+	escapedText, _ := json.Marshal(entry.ResponseText)
+	contentChunk := fmt.Sprintf("data: {\"id\":\"%s\",\"object\":\"chat.completion.chunk\",\"created\":%d,\"model\":\"%s\",\"choices\":[{\"index\":0,\"delta\":{\"content\":%s},\"finish_reason\":null}]}\n\n",
+		chunkID, created, model, string(escapedText))
+	_, _ = c.Writer.Write([]byte(contentChunk))
+	flusher.Flush()
+
+	finishChunk := fmt.Sprintf("data: {\"id\":\"%s\",\"object\":\"chat.completion.chunk\",\"created\":%d,\"model\":\"%s\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+		chunkID, created, model)
+	_, _ = c.Writer.Write([]byte(finishChunk))
+	flusher.Flush()
+
+	usageChunk := fmt.Sprintf("data: {\"id\":\"%s\",\"object\":\"chat.completion.chunk\",\"created\":%d,\"model\":\"%s\",\"choices\":[],\"usage\":{\"prompt_tokens\":%d,\"completion_tokens\":%d,\"total_tokens\":%d}}\n\n",
+		chunkID, created, model, entry.InputTokens, entry.OutputTokens, entry.InputTokens+entry.OutputTokens)
+	_, _ = c.Writer.Write([]byte(usageChunk))
+
+	_, _ = c.Writer.Write([]byte("data: [DONE]\n\n"))
+	flusher.Flush()
 }
 
 // HandleChatCompletions handles POST /v1/chat/completions (OpenAI standard compatible)
@@ -388,6 +505,95 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		}
 	}
 
+	// 6.5 Evaluate Semantic Response Cache (Phase 15)
+	promptText := extractPromptText(payload)
+	cacheStats := ProxyCacheStats{}
+	cacheHeader := c.GetHeader("X-AIMeter-Cache")
+	isCacheDisabled := strings.EqualFold(cacheHeader, "false") || cacheHeader == "0"
+	isCacheRefresh := strings.EqualFold(c.GetHeader("X-AIMeter-Cache-Refresh"), "true")
+	cacheThresholdOverride := 0.0
+	if thStr := c.GetHeader("X-AIMeter-Cache-Threshold"); thStr != "" {
+		if val, err := strconv.ParseFloat(thStr, 64); err == nil {
+			cacheThresholdOverride = val
+		}
+	}
+	cacheTTLOverride := 0
+	if ttlStr := c.GetHeader("X-AIMeter-Cache-TTL"); ttlStr != "" {
+		if val, err := strconv.Atoi(ttlStr); err == nil {
+			cacheTTLOverride = val
+		}
+	}
+
+	if h.cacheMgr != nil && !isCacheDisabled && !isCacheRefresh && len(promptText) > 0 {
+		cachedEntry, matchType, similarity, isHit := h.cacheMgr.Lookup(tenantID, actualModel, promptText, cacheThresholdOverride)
+		if isHit && cachedEntry != nil {
+			cacheStats.IsHit = true
+			cacheStats.MatchType = matchType
+			cacheStats.Similarity = similarity
+			cacheStats.AvoidedCostUSD = cachedEntry.EstimatedCostUSD
+			cacheStats.AvoidedLatencyMs = 650
+
+			c.Header("X-AIMeter-Cache-Hit", "true")
+			c.Header("X-AIMeter-Cache-Match-Type", matchType)
+			c.Header("X-AIMeter-Cache-Similarity", fmt.Sprintf("%.2f", similarity))
+			c.Header("X-AIMeter-Cost-Avoided", fmt.Sprintf("$%.4f", cachedEntry.EstimatedCostUSD))
+			c.Header("X-AIMeter-Latency-Saved-Ms", "650")
+			c.Header("X-AIMeter-Circuit-State", fbResult.CircuitState)
+			c.Header("X-AIMeter-Trace-ID", traceID)
+			if fbResult.Fallbacked {
+				c.Header("X-AIMeter-Fallback", "true")
+				c.Header("X-AIMeter-Original-Model", fbResult.OriginalModel)
+				c.Header("X-AIMeter-Actual-Model", fbResult.ActualModel)
+			}
+			if routingStats.IsRouted {
+				c.Header("X-AIMeter-Routed", "true")
+				c.Header("X-AIMeter-Routed-To", fmt.Sprintf("%s/%s", routingStats.TargetProvider, routingStats.TargetModel))
+				c.Header("X-AIMeter-Routing-Strategy", string(routingStats.Strategy))
+			}
+
+			if isStream {
+				renderStreamFromCache(c, cachedEntry, actualModel)
+			} else {
+				renderJSONFromCache(c, cachedEntry, actualModel)
+			}
+
+			cachedUsage := OpenAIUsage{
+				PromptTokens:     cachedEntry.InputTokens,
+				CompletionTokens: cachedEntry.OutputTokens,
+				TotalTokens:      cachedEntry.InputTokens + cachedEntry.OutputTokens,
+			}
+			cachedUsage.PromptTokensDetails.CachedTokens = cachedEntry.InputTokens
+
+			metrics.RecordProxyRequest(provider, actualModel, "200", fbResult.Fallbacked, time.Since(startTime))
+
+			go h.recordUsage(
+				provider,
+				actualModel,
+				model,
+				fbResult.Fallbacked,
+				fbResult.Reason,
+				traceID,
+				baggage,
+				tenantID,
+				appID,
+				workflowID,
+				c.GetHeader("X-AIMeter-GPU-Type"),
+				c.GetHeader("X-AIMeter-GPU-Count"),
+				c.GetHeader("X-AIMeter-Framework"),
+				false,
+				0,
+				cachedUsage,
+				15,
+				10,
+				200,
+				compStats,
+				routingStats,
+				cacheStats,
+			)
+			return
+		}
+	}
+
 	// 7. Execute upstream request with automatic failover support
 	customTargetHeader := c.GetHeader("X-AIMeter-Target-URL")
 	targetURL := h.resolveTargetURL(provider, customTargetHeader)
@@ -503,9 +709,9 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	isSSE := isStream && strings.Contains(strings.ToLower(contentType), "text/event-stream")
 
 	if isSSE {
-		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats)
+		h.handleStreamingResponse(c, resp, cancelUpstream, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, maxTokensLimit, customNotice, upstreamStart, compStats, routingStats, promptText, cacheTTLOverride)
 	} else {
-		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats)
+		h.handleNonStreamingResponse(c, resp, provider, model, fbResult, traceID, baggage, tenantID, appID, workflowID, gpuType, gpuCount, framework, roundtripDuration, compStats, routingStats, promptText, cacheTTLOverride)
 	}
 }
 
@@ -519,6 +725,8 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	duration time.Duration,
 	compStats PromptCompressionStats,
 	routingStats SmartRoutingStats,
+	promptText string,
+	cacheTTLOverride int,
 ) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -537,9 +745,23 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 
 	if resp.StatusCode == http.StatusOK {
 		var respData struct {
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
 			Usage OpenAIUsage `json:"usage"`
 		}
 		if err := json.Unmarshal(respBody, &respData); err == nil && respData.Usage.TotalTokens > 0 {
+			// Populate cache on successful response
+			if h.cacheMgr != nil && len(promptText) > 0 && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
+				costUSD := 0.0
+				if h.raterEngine != nil {
+					costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, respData.Usage.PromptTokens, respData.Usage.CompletionTokens)
+				}
+				h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, respData.Choices[0].Message.Content, respBody, respData.Usage.PromptTokens, respData.Usage.CompletionTokens, costUSD, cacheTTLOverride)
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -563,6 +785,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				uint16(resp.StatusCode),
 				compStats,
 				routingStats,
+				ProxyCacheStats{},
 			)
 		}
 	}
@@ -581,6 +804,8 @@ func (h *ProxyHandler) handleStreamingResponse(
 	startTime time.Time,
 	compStats PromptCompressionStats,
 	routingStats SmartRoutingStats,
+	promptText string,
+	cacheTTLOverride int,
 ) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -597,6 +822,7 @@ func (h *ProxyHandler) handleStreamingResponse(
 	var extractedUsage *OpenAIUsage
 	var accumulatedTokens int
 	var isCapped bool
+	var accumulatedContent strings.Builder
 
 	for {
 		line, err := reader.ReadBytes('\n')
@@ -618,6 +844,9 @@ func (h *ProxyHandler) handleStreamingResponse(
 				jsonBytes := bytes.TrimPrefix(trimmed, []byte("data: "))
 				deltaContent, nativeUsage, okData := ExtractDeltaFromSSELine(jsonBytes)
 				if okData {
+					if len(deltaContent) > 0 {
+						accumulatedContent.WriteString(deltaContent)
+					}
 					if nativeUsage != nil && nativeUsage.TotalTokens > 0 {
 						extractedUsage = nativeUsage
 						accumulatedTokens = nativeUsage.CompletionTokens
@@ -675,6 +904,21 @@ func (h *ProxyHandler) handleStreamingResponse(
 		}
 	}
 
+	// Populate cache on successful, uncapped streaming completion
+	if !isCapped && resp.StatusCode == http.StatusOK && accumulatedContent.Len() > 0 && h.cacheMgr != nil && len(promptText) > 0 {
+		costUSD := 0.0
+		inTokens := 0
+		outTokens := accumulatedTokens
+		if extractedUsage != nil {
+			inTokens = extractedUsage.PromptTokens
+			outTokens = extractedUsage.CompletionTokens
+		}
+		if h.raterEngine != nil {
+			costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, inTokens, outTokens)
+		}
+		h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, accumulatedContent.String(), nil, inTokens, outTokens, costUSD, cacheTTLOverride)
+	}
+
 	if extractedUsage != nil && extractedUsage.TotalTokens > 0 {
 		go h.recordUsage(
 			provider,
@@ -698,6 +942,7 @@ func (h *ProxyHandler) handleStreamingResponse(
 			uint16(resp.StatusCode),
 			compStats,
 			routingStats,
+			ProxyCacheStats{},
 		)
 	}
 }
@@ -715,6 +960,7 @@ func (h *ProxyHandler) recordUsage(
 	statusCode uint16,
 	compStats PromptCompressionStats,
 	routingStats SmartRoutingStats,
+	cacheStats ProxyCacheStats,
 ) {
 	if h.collectorSvc == nil {
 		return
@@ -735,6 +981,14 @@ func (h *ProxyHandler) recordUsage(
 		attrs["aimeter.routed_to_model"] = routingStats.TargetModel
 		attrs["aimeter.router_strategy"] = string(routingStats.Strategy)
 		attrs["aimeter.failover_count"] = strconv.Itoa(routingStats.FailoverCount)
+	}
+
+	if cacheStats.IsHit {
+		attrs["aimeter.cache_hit"] = "true"
+		attrs["aimeter.cache_match_type"] = cacheStats.MatchType
+		attrs["aimeter.cache_similarity"] = fmt.Sprintf("%.4f", cacheStats.Similarity)
+		attrs["aimeter.cache_avoided_cost_usd"] = fmt.Sprintf("%.6f", cacheStats.AvoidedCostUSD)
+		attrs["aimeter.cache_avoided_latency_ms"] = strconv.FormatInt(cacheStats.AvoidedLatencyMs, 10)
 	}
 
 	if compStats.Compressed {

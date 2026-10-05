@@ -80,6 +80,11 @@ export interface TraceTreeNode {
   routed_to_model?: string;
   router_strategy?: string;
   failover_count?: number;
+  is_cache_hit?: boolean;
+  cache_match_type?: string;
+  cache_similarity?: number;
+  cache_avoided_cost_usd?: number;
+  cache_avoided_latency_ms?: number;
 }
 
 export interface TraceDetail {
@@ -109,6 +114,11 @@ export interface TraceDetail {
   routed_to_model?: string;
   router_strategy?: string;
   failover_count?: number;
+  is_cache_hit?: boolean;
+  cache_match_type?: string;
+  cache_similarity?: number;
+  cache_avoided_cost_usd?: number;
+  cache_avoided_latency_ms?: number;
 }
 
 export interface RateEntry {
@@ -485,6 +495,63 @@ export interface RouterSimulateResponse {
   candidates: CandidateComparison[];
   projected_savings_usd: Record<string, number>;
   reason: string;
+}
+
+// Phase 15: Semantic Response Cache
+export interface SemanticCachePolicy {
+  tenant_id: string;
+  enabled: boolean;
+  similarity_threshold: number;
+  ttl_seconds: number;
+  max_capacity: number;
+  min_prompt_chars: number;
+  updated_at?: string;
+}
+
+export interface CacheEntrySummary {
+  id: string;
+  tenant_id: string;
+  model: string;
+  prompt_preview: string;
+  response_preview: string;
+  hit_count: number;
+  avoided_cost_usd: number;
+  created_at: string;
+  expires_at: string;
+  ttl_remaining_sec: number;
+}
+
+export interface CacheStats {
+  tenant_id: string;
+  total_requests: number;
+  hit_count: number;
+  hit_rate: number;
+  exact_hits: number;
+  semantic_hits: number;
+  total_avoided_cost_usd: number;
+  total_avoided_latency_ms: number;
+  active_entries: number;
+  max_capacity: number;
+}
+
+export interface CacheSimulateRequest {
+  tenant_id?: string;
+  model?: string;
+  base_prompt: string;
+  target_prompt: string;
+  threshold?: number;
+}
+
+export interface CacheSimulateResponse {
+  similarity: number;
+  is_hit: boolean;
+  match_type: string; // "exact", "semantic", "miss"
+  threshold: number;
+  estimated_avoided_cost_usd: number;
+  base_simhash_hex: string;
+  target_simhash_hex: string;
+  hamming_distance: number;
+  analysis: string;
 }
 
 

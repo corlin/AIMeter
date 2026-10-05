@@ -284,3 +284,68 @@ func TestSmartRouterEndpoints(t *testing.T) {
 	}
 }
 
+func TestSemanticCacheEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	engine := rater.NewRatingEngine()
+	server := api.NewServer(8080, memStore, nil, engine, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/cache/policy
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/cache/policy?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/cache/policy, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"policy"`) || !strings.Contains(w.Body.String(), `"similarity_threshold"`) {
+		t.Errorf("Expected policy in response, got: %s", w.Body.String())
+	}
+
+	// 2. POST /api/v1/cache/policy
+	updatePolicyJSON := `{"tenant_id":"default","enabled":true,"similarity_threshold":0.88,"ttl_seconds":7200,"max_capacity":2000,"min_prompt_chars":8}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cache/policy", strings.NewReader(updatePolicyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/cache/policy, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `0.88`) {
+		t.Errorf("Expected updated threshold 0.88, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/cache/entries
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/cache/entries?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for GET /api/v1/cache/entries, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"entries"`) {
+		t.Errorf("Expected entries array in response, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/cache/simulate
+	simReq := `{"base_prompt":"如何用 Golang 编写高并发 Web 代理？","target_prompt":"怎样使用 Go 语言开发高性能 HTTP 反向代理？","threshold":0.75}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cache/simulate", strings.NewReader(simReq))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for POST /api/v1/cache/simulate, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"similarity"`) || !strings.Contains(w.Body.String(), `"is_hit"`) {
+		t.Errorf("Expected simulate response with similarity and is_hit, got: %s", w.Body.String())
+	}
+
+	// 5. POST /api/v1/cache/entries/clear
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/cache/entries/clear?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for clear entries, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"cleared":true`) {
+		t.Errorf("Expected cleared confirmation, got: %s", w.Body.String())
+	}
+}
+

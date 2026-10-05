@@ -367,6 +367,12 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 		strategy  string
 		failover  int
 	})
+	cacheHitMap := make(map[string]struct {
+		matchType  string
+		similarity float64
+		avoidedUSD float64
+		avoidedLat int64
+	})
 
 	for _, u := range s.usages {
 		if u.RawAttributes != nil {
@@ -411,6 +417,22 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 					failover:  fc,
 				}
 			}
+			if u.RawAttributes["aimeter.cache_hit"] == "true" {
+				sim, _ := strconv.ParseFloat(u.RawAttributes["aimeter.cache_similarity"], 64)
+				usd, _ := strconv.ParseFloat(u.RawAttributes["aimeter.cache_avoided_cost_usd"], 64)
+				lat, _ := strconv.ParseInt(u.RawAttributes["aimeter.cache_avoided_latency_ms"], 10, 64)
+				cacheHitMap[u.TraceID] = struct {
+					matchType  string
+					similarity float64
+					avoidedUSD float64
+					avoidedLat int64
+				}{
+					matchType:  u.RawAttributes["aimeter.cache_match_type"],
+					similarity: sim,
+					avoidedUSD: usd,
+					avoidedLat: lat,
+				}
+			}
 		}
 	}
 
@@ -439,6 +461,13 @@ func (s *MemoryStore) GetTraceSummaries(ctx context.Context, tenantID string, li
 			td.RoutedToModel = sr.toModel
 			td.RouterStrategy = sr.strategy
 			td.FailoverCount = sr.failover
+		}
+		if ch, ok := cacheHitMap[td.TraceID]; ok {
+			td.IsCacheHit = true
+			td.CacheMatchType = ch.matchType
+			td.CacheSimilarity = ch.similarity
+			td.CacheAvoidedCostUSD = ch.avoidedUSD
+			td.CacheAvoidedLatencyMs = ch.avoidedLat
 		}
 		result = append(result, *td)
 	}
@@ -480,6 +509,11 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	var isSmartRouted bool
 	var routedFromModel, routedToModel, routerStrategy string
 	var failoverCount int
+	var isCacheHit bool
+	var cacheMatchType string
+	var cacheSimilarity float64
+	var cacheAvoidedCostUSD float64
+	var cacheAvoidedLatencyMs int64
 
 	for _, u := range s.usages {
 		if u.TraceID == traceID {
@@ -506,6 +540,13 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 					routedToModel = u.RawAttributes["aimeter.routed_to_model"]
 					routerStrategy = u.RawAttributes["aimeter.router_strategy"]
 					failoverCount, _ = strconv.Atoi(u.RawAttributes["aimeter.failover_count"])
+				}
+				if u.RawAttributes["aimeter.cache_hit"] == "true" {
+					isCacheHit = true
+					cacheMatchType = u.RawAttributes["aimeter.cache_match_type"]
+					cacheSimilarity, _ = strconv.ParseFloat(u.RawAttributes["aimeter.cache_similarity"], 64)
+					cacheAvoidedCostUSD, _ = strconv.ParseFloat(u.RawAttributes["aimeter.cache_avoided_cost_usd"], 64)
+					cacheAvoidedLatencyMs, _ = strconv.ParseInt(u.RawAttributes["aimeter.cache_avoided_latency_ms"], 10, 64)
 				}
 			}
 		}
@@ -549,6 +590,11 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 				RoutedToModel:        routedToModel,
 				RouterStrategy:       routerStrategy,
 				FailoverCount:        failoverCount,
+				IsCacheHit:           isCacheHit,
+				CacheMatchType:       cacheMatchType,
+				CacheSimilarity:      cacheSimilarity,
+				CacheAvoidedCostUSD:  cacheAvoidedCostUSD,
+				CacheAvoidedLatencyMs: cacheAvoidedLatencyMs,
 			}
 			if node.SpanName == "" {
 				node.SpanName = item.Model
@@ -632,5 +678,10 @@ func (s *MemoryStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 		RoutedToModel:        routedToModel,
 		RouterStrategy:       routerStrategy,
 		FailoverCount:        failoverCount,
+		IsCacheHit:           isCacheHit,
+		CacheMatchType:       cacheMatchType,
+		CacheSimilarity:      cacheSimilarity,
+		CacheAvoidedCostUSD:  cacheAvoidedCostUSD,
+		CacheAvoidedLatencyMs: cacheAvoidedLatencyMs,
 	}, nil
 }

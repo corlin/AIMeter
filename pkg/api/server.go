@@ -11,6 +11,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
+	"github.com/corlin/AIMeter/pkg/cache"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/metrics"
@@ -54,8 +55,8 @@ func NewServer(
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache, X-AIMeter-Cache-Threshold, X-AIMeter-Cache-Refresh, X-AIMeter-Cache-TTL, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
@@ -86,6 +87,8 @@ func NewServer(
 	handler := NewAPIHandler(store, pg, r, budgetMgr, detector, costAdvisor, guardSvc, nil, authSvc)
 	slaArbiter := aimeterRouter.NewSLAArbiter(r)
 	handler.SetSLAArbiter(slaArbiter)
+	cacheMgr := cache.NewSemanticCacheManager()
+	handler.SetCacheManager(cacheMgr)
 
 	// Prometheus Metrics Endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -155,6 +158,8 @@ func NewServer(
 	proxyHandler := proxy.NewProxyHandler(fbMgr, collectorSvc, nil)
 	proxyHandler.SetBudgetManager(budgetMgr)
 	proxyHandler.SetSLAArbiter(slaArbiter)
+	proxyHandler.SetCacheManager(cacheMgr)
+	proxyHandler.SetRaterEngine(r)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
@@ -215,6 +220,14 @@ func NewServer(
 		apiV1.POST("/router/pools", handler.UpsertRouterPool)
 		apiV1.GET("/router/health", handler.GetRouterHealth)
 		apiV1.POST("/router/simulate", handler.SimulateRouter)
+
+		// Phase 15: Semantic Response Caching & Cost Avoidance
+		apiV1.GET("/cache/policy", handler.GetCachePolicy)
+		apiV1.POST("/cache/policy", handler.UpdateCachePolicy)
+		apiV1.GET("/cache/entries", handler.GetCacheEntries)
+		apiV1.DELETE("/cache/entries/:id", handler.DeleteCacheEntry)
+		apiV1.POST("/cache/entries/clear", handler.ClearCacheEntries)
+		apiV1.POST("/cache/simulate", handler.SimulateCache)
 	}
 
 	return &Server{

@@ -47,6 +47,12 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
                 <span>🌿 Prompt Slimmed (-{trace.prompt_saved_tokens?.toLocaleString() || "0"} Tok)</span>
               </span>
             )}
+            {trace.is_cache_hit && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-emerald-400" />
+                <span>⚡ Cached ({trace.cache_match_type?.toUpperCase()} {trace.cache_similarity ? `${(trace.cache_similarity * 100).toFixed(0)}%` : ""})</span>
+              </span>
+            )}
             <span className="text-xs font-mono text-zinc-400">ID: {trace.trace_id}</span>
           </div>
           <h3 className="mt-1 text-lg font-bold text-white flex items-center gap-2">
@@ -61,6 +67,14 @@ export function TraceTreeViewer({ trace }: TraceTreeViewerProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
+          {trace.is_cache_hit && (trace.cache_avoided_cost_usd ?? 0) > 0 && (
+            <div className="rounded-lg bg-emerald-950/40 border border-emerald-500/30 px-4 py-2.5 text-right">
+              <span className="block text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Cache Avoided Spend</span>
+              <span className="text-xl font-bold font-mono text-emerald-300">
+                +${trace.cache_avoided_cost_usd?.toFixed(4)}
+              </span>
+            </div>
+          )}
           {trace.is_prompt_compressed && (trace.prompt_saved_usd ?? 0) > 0 && (
             <div className="rounded-lg bg-emerald-950/40 border border-emerald-500/30 px-4 py-2.5 text-right">
               <span className="block text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Prompt Slimming Savings</span>
@@ -221,6 +235,12 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
                       <span>🔀 Routed: {node.routed_from_model} ➔ {node.routed_to_model || node.model}</span>
                     </span>
                   )}
+                  {node.is_cache_hit && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-mono">
+                      <Zap className="h-3 w-3 text-emerald-400" />
+                      <span>⚡ Cached ({node.cache_match_type?.toUpperCase() || "HIT"}{node.cache_similarity ? ` ${(node.cache_similarity * 100).toFixed(0)}%` : ""})</span>
+                    </span>
+                  )}
                   {isRoot && (
                     <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                       Orchestrator
@@ -253,6 +273,11 @@ function TreeNodeItem({ node, isRoot = false, depth = 0 }: { node: TraceTreeNode
               {node.is_self_hosted && (node.equivalent_token_rate ?? 0) > 0 && (
                 <span className="block text-[10px] text-purple-400 font-mono">
                   ~${node.equivalent_token_rate?.toFixed(2)} / 1M
+                </span>
+              )}
+              {node.is_cache_hit && (node.cache_avoided_cost_usd ?? 0) > 0 && (
+                <span className="block text-[10px] text-emerald-400 font-mono">
+                  Avoided: +${node.cache_avoided_cost_usd?.toFixed(4)}
                 </span>
               )}
               {node.is_stream_capped && (node.avoided_waste_usd ?? 0) > 0 && (

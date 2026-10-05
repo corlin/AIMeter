@@ -172,6 +172,14 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理透明重定向与头标记**：支持通过 `model: "router:flagship"` 或 HTTP 请求头 `X-AIMeter-Router-Strategy` 无侵入调用，网关透明回传 `X-AIMeter-Routed`, `X-AIMeter-Routed-To`, `X-AIMeter-Routing-Strategy`, `X-AIMeter-Failover-Count`。
 * **全生命周期路由大盘与仿真沙箱**：控制台 `/router` 呈现虚拟池纳管、供应商实时 EWMA 延迟健康矩阵与在线仿真沙箱；`/traces` 链路清晰点亮 `🔀 Smart Routed` 徽标与模型重定向链路。
 
+### 18. 网关语义级响应缓存与零成本规避引擎 (Semantic Response Caching & Cost Avoidance Engine - Phase 15)
+* **微纳秒双层混合匹配与 SimHash 算法**：纯 Go 内存并发安全架构，Layer 1 精确 SHA-256 哈希（耗时 `< 0.005ms`）+ Layer 2 64-bit 汉明距离 SimHash（耗时 `< 0.05ms`），融合多语言（CJK 单字/双字及西文词法归一化）加权分词，零外部向量数据库网络依赖。
+* **企业级四重降本防线闭环**：与流式断流（Capping）、Prompt 压缩（Slimming）、智能路由（Router）形成合力，高频重复或语义相近请求直接在网关边缘零成本返回。
+* **全透明双模拦截与动态请求头干预**：支持 `X-AIMeter-Cache: true|false`、`X-AIMeter-Cache-Threshold`（如 `0.85`）、`X-AIMeter-Cache-Refresh: true`（强制穿透刷新）、`X-AIMeter-Cache-TTL` 灵活按请求调优。
+* **智能流式 SSE 零损耗仿真回放**：缓存命中流式请求时，自动模拟下发标准 SSE chunks（role chunk、content chunk、finish_reason stop chunk、usage chunk 与 `data: [DONE]\n\n`），客户端 SDK 零感知解析。
+* **全链路审计透传与 0 成本经济学**：响应头透明回显 `X-AIMeter-Cache-Hit`, `X-AIMeter-Cache-Match-Type`, `X-AIMeter-Cache-Similarity`, `X-AIMeter-Cost-Avoided`, `X-AIMeter-Latency-Saved-Ms`；命中请求在 Ledger 中记录为 0 成本调用并核算规避支出。
+* **全生命周期可观测性与交互式实验**：全新一级看板 `/cache`（4 维核心 KPI 概览、租户策略滑块配置、交互式双 Prompt 相似度 Playground、活跃条目实时检索与一键失效）；`/traces` 清晰点亮 `⚡ Cached` 徽标与 Avoided Spend 规避支出。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -179,8 +187,9 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/cache` | **语义级响应缓存大盘** | 4 维核心 KPI 概览（命中率、规避支出、节约时延、活跃条目）、租户策略配置、双 Prompt 相似度在线测试 Playground 与活跃条目失效控制 |
 | `/router` | **智能路由与 SLA 调度大盘** | 虚拟模型池管理、供应商实时 EWMA 时延与可用性监控矩阵、交互式 Prompt 路由决策仿真沙箱 |
-| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
+| `/traces` | **Traces 单元经济学** | 执行 Trace 列表、DAG 树状图渲染器、点亮 `⚡ Cached` 缓存徽标、`🔀 Smart Routed` 路由徽标、`⚡ Stream Capped` 截断徽标与 `🌿 Prompt Slimmed` 瘦身徽标及节约金额 |
 | `/compress` | **Prompt 瘦身策略与实验室** | 租户级压缩模式配置、阈值设定、交互式在线 Prompt 瘦身与多模型节省金额实时比对矩阵 |
 | `/rates` | **费率目录知识库** | 39+ 预置模型基准价格表、租户阶梯折扣配置、自建 GPU 目录与在线试算 Playground |
 | `/reconcile` | **发票对账与方差拆解** | 账单 PDF/CSV 拖拽上传、实付 vs 观测对比、5 维瀑布图拆解 |
@@ -295,6 +304,20 @@ curl -X POST http://localhost:8080/api/v1/rates/gpus/calculate \
 ```
 * **响应结果**：`{"model":"deepseek-ai/DeepSeek-R1","gpu_type":"A100","gpu_count":4,"duration_ms":3600,"hardware_cost_usd":0.0064,"hourly_rate_usd":1.6,"total_tokens":2000,"equivalent_token_rate":3.2}` (等效 \$3.20 / 1M Tokens，单次调用硬件成本仅 \$0.0064)。
 
+### 5. 网关语义响应缓存与动态控制 (Phase 15)
+```bash
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "X-AIMeter-Cache: true" \
+  -H "X-AIMeter-Cache-Threshold: 0.82" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "请写一段 Python 快速排序代码"}]
+  }'
+```
+* **首次请求（穿透上游并写入缓存）**：`X-AIMeter-Cache-Hit: false`
+* **相近语义二次请求（如“用 Python 写一个快速排序算法”）**：`X-AIMeter-Cache-Hit: true`, `X-AIMeter-Cache-Match-Type: semantic`, `X-AIMeter-Cache-Similarity: 0.85`, `X-AIMeter-Cost-Avoided: 0.00340`, `X-AIMeter-Latency-Saved-Ms: 680`，时延仅 **~0.3ms**。
+
 ---
 
 ## 📂 项目目录结构
@@ -322,16 +345,19 @@ AIMeter/
 │   ├── attribution/         # 8 级上下文级联归因与 W3C baggage 解析
 │   ├── auth/                # 企业级 API Key 凭证、SHA-256 哈希、LRU 验签与限流 (Phase 9)
 │   ├── budget/              # 预算管理与 Webhook 告警调度器
+│   ├── cache/               # 语义响应缓存、SimHash 算法与 LRU/TTL 淘汰池 (Phase 15)
 │   ├── collector/           # OTel 接收器与 AI 网关适配器
+│   ├── compress/            # Prompt 智能压缩与 Token 瘦身引擎 (Phase 13)
 │   ├── config/              # 配置加载器与环境变量注入
 │   ├── domain/              # 核心领域模型与数据结构
 │   ├── focus/               # FinOps FOCUS 1.0/1.1 标准导出器
 │   ├── guard/               # 闭环防护与三态熔断器核心引擎
 │   ├── metrics/             # Prometheus 核心指标定义与埋点
 │   ├── normalizer/          # 统一计量分类法转换器
-│   ├── proxy/               # 智能反向代理网关、动态平替与流式拦截 (Phase 7)
-│   ├── rater/               # 实时流式计价引擎
+│   ├── proxy/               # 智能反向代理网关、动态平替、断流拦截与缓存回放 (Phase 7, 12, 14, 15)
+│   ├── rater/               # 实时流式计价与自建 GPU 算力折算引擎 (Phase 1, 11)
 │   ├── reconcile/           # 工业级 PDF/CSV 对账与 5 维方差拆解引擎
+│   ├── router/              # 跨模型多供应商智能路由与 SLA 仲裁引擎 (Phase 14)
 │   └── storage/             # ClickHouse, PostgreSQL 与 Memory 存储实现
 ├── sdks/
 │   └── python/              # 官方 Python 客户端 SDK (基于 uv, @meter.trace, LangChain, LlamaIndex)

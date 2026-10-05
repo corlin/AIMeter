@@ -17,6 +17,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/focus"
 	"github.com/corlin/AIMeter/pkg/guard"
 	"github.com/corlin/AIMeter/pkg/metrics"
+	"github.com/corlin/AIMeter/pkg/cache"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/router"
@@ -37,11 +38,17 @@ type APIHandler struct {
 	alertDispatcher *alert.AlertDispatcher
 	authSvc         *auth.AuthService
 	slaArbiter      *router.SLAArbiter
+	cacheMgr        *cache.SemanticCacheManager
 }
 
 // SetSLAArbiter attaches a SLA arbiter to the API handler
 func (h *APIHandler) SetSLAArbiter(arb *router.SLAArbiter) {
 	h.slaArbiter = arb
+}
+
+// SetCacheManager attaches a semantic cache manager to the API handler
+func (h *APIHandler) SetCacheManager(cm *cache.SemanticCacheManager) {
+	h.cacheMgr = cm
 }
 
 func NewAPIHandler(
@@ -915,6 +922,104 @@ func (h *APIHandler) SimulateRouter(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// ==========================================
+// Phase 15: Semantic Response Cache Handlers
+// ==========================================
+
+// GetCachePolicy returns caching policy and statistics for a tenant
+func (h *APIHandler) GetCachePolicy(c *gin.Context) {
+	tenantID := c.DefaultQuery("tenant_id", "default")
+	if h.cacheMgr == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"policy": domain.SemanticCachePolicy{TenantID: tenantID, Enabled: true, SimilarityThreshold: 0.85, TTLSeconds: 86400, MaxCapacity: 5000, MinPromptChars: 10},
+			"stats":  domain.CacheStats{TenantID: tenantID, MaxCapacity: 5000},
+		})
+		return
+	}
+	policy := h.cacheMgr.GetPolicy(tenantID)
+	stats := h.cacheMgr.GetStats(tenantID)
+	c.JSON(http.StatusOK, gin.H{
+		"policy": policy,
+		"stats":  stats,
+	})
+}
+
+// UpdateCachePolicy updates caching policy for a tenant
+func (h *APIHandler) UpdateCachePolicy(c *gin.Context) {
+	if h.cacheMgr == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cache Manager not initialized"})
+		return
+	}
+	var policy domain.SemanticCachePolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if policy.TenantID == "" {
+		policy.TenantID = "default"
+	}
+	h.cacheMgr.UpdatePolicy(&policy)
+	c.JSON(http.StatusOK, policy)
+}
+
+// GetCacheEntries returns active cache entries with pagination
+func (h *APIHandler) GetCacheEntries(c *gin.Context) {
+	if h.cacheMgr == nil {
+		c.JSON(http.StatusOK, gin.H{"entries": []domain.CacheEntrySummary{}, "total": 0})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "all")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	entries, total := h.cacheMgr.GetEntries(tenantID, limit, offset)
+	c.JSON(http.StatusOK, gin.H{
+		"entries": entries,
+		"total":   total,
+	})
+}
+
+// DeleteCacheEntry deletes a specific entry
+func (h *APIHandler) DeleteCacheEntry(c *gin.Context) {
+	if h.cacheMgr == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cache Manager not initialized"})
+		return
+	}
+	entryID := c.Param("id")
+	tenantID := c.DefaultQuery("tenant_id", "default")
+	deleted := h.cacheMgr.DeleteEntry(tenantID, entryID)
+	if !deleted {
+		deleted = h.cacheMgr.DeleteEntry("all", entryID)
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": deleted, "id": entryID})
+}
+
+// ClearCacheEntries purges all cached entries for a tenant
+func (h *APIHandler) ClearCacheEntries(c *gin.Context) {
+	if h.cacheMgr == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cache Manager not initialized"})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "all")
+	h.cacheMgr.Clear(tenantID)
+	c.JSON(http.StatusOK, gin.H{"cleared": true, "tenant_id": tenantID})
+}
+
+// SimulateCache performs prompt similarity matching simulation
+func (h *APIHandler) SimulateCache(c *gin.Context) {
+	if h.cacheMgr == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cache Manager not initialized"})
+		return
+	}
+	var req domain.CacheSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.cacheMgr.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
 

@@ -28,7 +28,12 @@ import {
   VirtualModelPool,
   EndpointHealthStats,
   RouterSimulateRequest,
-  RouterSimulateResponse
+  RouterSimulateResponse,
+  SemanticCachePolicy,
+  CacheEntrySummary,
+  CacheStats,
+  CacheSimulateRequest,
+  CacheSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -546,6 +551,90 @@ export async function simulateRouter(req: RouterSimulateRequest): Promise<Router
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Failed to simulate router" }));
     throw new Error(err.error || "Failed to simulate router");
+  }
+  return await res.json();
+}
+
+// Phase 15: Semantic Response Cache
+export async function fetchCachePolicy(tenantId = "default"): Promise<{ policy: SemanticCachePolicy; stats: CacheStats }> {
+  try {
+    const res = await fetch(`${API_BASE}/cache/policy?tenant_id=${tenantId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch cache policy");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for cache policy", err);
+    return {
+      policy: {
+        tenant_id: tenantId,
+        enabled: true,
+        similarity_threshold: 0.85,
+        ttl_seconds: 86400,
+        max_capacity: 5000,
+        min_prompt_chars: 10,
+      },
+      stats: {
+        tenant_id: tenantId,
+        total_requests: 0,
+        hit_count: 0,
+        hit_rate: 0,
+        exact_hits: 0,
+        semantic_hits: 0,
+        total_avoided_cost_usd: 0,
+        total_avoided_latency_ms: 0,
+        active_entries: 0,
+        max_capacity: 5000,
+      },
+    };
+  }
+}
+
+export async function updateCachePolicy(policy: SemanticCachePolicy): Promise<SemanticCachePolicy> {
+  const res = await fetch(`${API_BASE}/cache/policy`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to update cache policy" }));
+    throw new Error(err.error || "Failed to update cache policy");
+  }
+  return await res.json();
+}
+
+export async function fetchCacheEntries(tenantId = "all", limit = 50, offset = 0): Promise<{ entries: CacheEntrySummary[]; total: number }> {
+  try {
+    const res = await fetch(`${API_BASE}/cache/entries?tenant_id=${tenantId}&limit=${limit}&offset=${offset}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch cache entries");
+    return await res.json();
+  } catch (err) {
+    console.warn("API fetch error for cache entries", err);
+    return { entries: [], total: 0 };
+  }
+}
+
+export async function deleteCacheEntry(id: string, tenantId = "default"): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/cache/entries/${id}?tenant_id=${tenantId}`, {
+    method: "DELETE",
+  });
+  return res.ok;
+}
+
+export async function clearCacheEntries(tenantId = "all"): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/cache/entries/clear?tenant_id=${tenantId}`, {
+    method: "POST",
+  });
+  return res.ok;
+}
+
+export async function simulateCache(req: CacheSimulateRequest): Promise<CacheSimulateResponse> {
+  const res = await fetch(`${API_BASE}/cache/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate cache" }));
+    throw new Error(err.error || "Failed to simulate cache");
   }
   return await res.json();
 }

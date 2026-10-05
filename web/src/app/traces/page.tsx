@@ -123,6 +123,11 @@ function TracesExplorerContent() {
                             🔀 Routed
                           </span>
                         )}
+                        {t.is_cache_hit && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shrink-0">
+                            ⚡ Cached
+                          </span>
+                        )}
                         {t.is_stream_capped && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0">
                             ⚡ Capped
@@ -150,6 +155,11 @@ function TracesExplorerContent() {
                         {t.is_smart_routed && t.routed_from_model && t.routed_to_model && (
                           <span className="text-[10px] text-indigo-400 font-mono font-medium truncate max-w-[140px]" title={`${t.routed_from_model} → ${t.routed_to_model}`}>
                             {t.routed_to_model}
+                          </span>
+                        )}
+                        {t.is_cache_hit && (t.cache_avoided_cost_usd ?? 0) > 0 && (
+                          <span className="text-[10px] text-emerald-400 font-mono font-medium">
+                            Avoided +${t.cache_avoided_cost_usd?.toFixed(4)}
                           </span>
                         )}
                         {t.is_stream_capped && (t.avoided_waste_usd ?? 0) > 0 && (

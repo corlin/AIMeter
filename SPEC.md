@@ -630,6 +630,17 @@ AIMeter/
 * [x] 交付 Web 控制台全新一级看板 `/router`（虚拟模型池策略管理、供应商实时 EWMA 时延与健康度监控矩阵、交互式在线 Prompt 路由决策仿真沙箱）。
 * [x] 升级 `/traces` 列表及 `TraceTreeViewer` 节点：点亮 `🔀 Smart Routed` 徽标、原模型/目标模型重定向映射、调度策略说明与容灾跳数。
 
+### Phase 15: 网关语义级响应缓存与零成本规避引擎 (Semantic Response Caching & Cost Avoidance Engine)
+* [x] 构建微纳秒双层混合匹配与 SimHash 语义缓存引擎（`pkg/cache/`），融合 Layer 1 Exact SHA-256（耗时 `< 0.005ms`）与 Layer 2 64-bit 汉明距离 SimHash（耗时 `< 0.05ms`），支持 CJK 字符与西文分词归一化，纯 Go 内存并发安全，零外部向量数据库网络依赖。
+* [x] 实现带读写锁与并发安全的 TTL 过期与 LRU 内存淘汰池，支持租户独立策略（默认启用、相似度阈值 0.82、最大容量 10,000 条、TTL 24h）。
+* [x] 反向代理网关全透明拦截与请求头动态干预：支持通过 `X-AIMeter-Cache: true|false`、`X-AIMeter-Cache-Threshold`、`X-AIMeter-Cache-Refresh`、`X-AIMeter-Cache-TTL` 灵活控制；未命中时穿透上游并异步写入缓存。
+* [x] 智能流式 SSE 零损耗仿真回放：缓存命中流式请求时，自动模拟下发标准 SSE chunks（role chunk、content chunk、finish_reason stop chunk、usage chunk 与 `data: [DONE]\n\n`），客户端 SDK 零感知解析。
+* [x] 响应头透明回传全链路缓存审计指标：`X-AIMeter-Cache-Hit: true|false`、`X-AIMeter-Cache-Match-Type: exact|semantic`、`X-AIMeter-Cache-Similarity`、`X-AIMeter-Cost-Avoided`、`X-AIMeter-Latency-Saved-Ms`。
+* [x] 零成本经济学核算（0-Cost Economics）：缓存命中请求在 Usage Ledger 中记录为 0 成本调用，并将规避的等效模型花费与节省的往返时延写入 Trace 遥测。
+* [x] 暴露语义缓存租户策略管理、活跃条目清理与在线仿真 REST API：`GET/POST /api/v1/cache/policy`、`GET /api/v1/cache/entries`、`DELETE /api/v1/cache/entries/:id`、`POST /api/v1/cache/entries/clear`、`POST /api/v1/cache/simulate`。
+* [x] 交付 Web 控制台全新一级看板 `/cache`：4 维核心 KPI 概览（命中率、累计规避支出、节约时延、活跃条目）、租户策略滑块配置、交互式双 Prompt 相似度 Playground、活跃缓存条目表格与一键失效。
+* [x] 升级 `/traces` 列表及 `TraceTreeViewer` 节点：点亮 `⚡ Cached` 徽标、匹配模式（EXACT/SEMANTIC）、相似度百分比与 Avoided Spend 规避支出核算。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)
