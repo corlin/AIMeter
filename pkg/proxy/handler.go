@@ -35,6 +35,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/corlin/AIMeter/pkg/hierarchy"
 	"github.com/corlin/AIMeter/pkg/federation"
+	"github.com/corlin/AIMeter/pkg/finetuning"
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
@@ -111,6 +112,17 @@ type ProxyHandler struct {
 	sandboxManager     *sandbox.SandboxManager
 	hierarchyManager   *hierarchy.HierarchyManager
 	federationManager  *federation.FederationManager
+	finetuningManager  *finetuning.Manager
+}
+
+// SetFineTuningManager attaches a fine-tuning manager
+func (h *ProxyHandler) SetFineTuningManager(fm *finetuning.Manager) {
+	h.finetuningManager = fm
+}
+
+// GetFineTuningManager returns the attached fine-tuning manager
+func (h *ProxyHandler) GetFineTuningManager() *finetuning.Manager {
+	return h.finetuningManager
 }
 
 // SetFederationManager attaches a federation manager
@@ -1726,6 +1738,21 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				}
 			}
 
+			// Phase 31: LoRA Adapter Inference Savings & Break-Even Audit
+			if h.finetuningManager != nil {
+				adapterID := c.GetHeader("X-AIMeter-Adapter-ID")
+				if adapterID != "" {
+					benchmarkModel := c.GetHeader("X-AIMeter-Benchmark-Model")
+					savedUSD, adapter, err := h.finetuningManager.AuditInferenceSavings(adapterID, benchmarkModel, fbResult.ActualModel, costUSD)
+					if err == nil && adapter != nil {
+						c.Header("X-AIMeter-Adapter-ID", adapter.ID)
+						c.Header("X-AIMeter-Adapter-ROI", fmt.Sprintf("%.2f%%", adapter.ROIPercent))
+						c.Header("X-AIMeter-Break-Even-Status", string(adapter.Status))
+						c.Header("X-AIMeter-Inference-Saved-USD", fmt.Sprintf("%.4f", savedUSD))
+					}
+				}
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -2024,6 +2051,21 @@ func (h *ProxyHandler) handleStreamingResponse(
 					c.Writer.Header().Set("X-AIMeter-Settled-Amount-USD", fmt.Sprintf("%.6f", finalVch.ActualCostUSD))
 					c.Writer.Header().Set("X-AIMeter-Clearing-Fee-USD", fmt.Sprintf("%.6f", finalVch.ClearingFeeUSD))
 					c.Writer.Header().Set("X-AIMeter-Proof-Hash", finalVch.ProofHash)
+				}
+			}
+		}
+
+		// Phase 31: LoRA Adapter Inference Savings & Break-Even Audit
+		if h.finetuningManager != nil {
+			adapterID := c.GetHeader("X-AIMeter-Adapter-ID")
+			if adapterID != "" {
+				benchmarkModel := c.GetHeader("X-AIMeter-Benchmark-Model")
+				savedUSD, adapter, err := h.finetuningManager.AuditInferenceSavings(adapterID, benchmarkModel, fbResult.ActualModel, costUSD)
+				if err == nil && adapter != nil {
+					c.Writer.Header().Set("X-AIMeter-Adapter-ID", adapter.ID)
+					c.Writer.Header().Set("X-AIMeter-Adapter-ROI", fmt.Sprintf("%.2f%%", adapter.ROIPercent))
+					c.Writer.Header().Set("X-AIMeter-Break-Even-Status", string(adapter.Status))
+					c.Writer.Header().Set("X-AIMeter-Inference-Saved-USD", fmt.Sprintf("%.4f", savedUSD))
 				}
 			}
 		}

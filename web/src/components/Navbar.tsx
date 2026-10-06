@@ -30,7 +30,8 @@ import {
   GitFork,
   Terminal,
   Building2,
-  Coins
+  Coins,
+  Boxes
 } from "lucide-react";
 
 export function Navbar() {
@@ -38,6 +39,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Fine-Tuning & LoRA", href: "/finetuning", icon: Boxes },
     { label: "Federation", href: "/federation", icon: Coins },
     { label: "Org Hierarchy", href: "/hierarchy", icon: Building2 },
     { label: "Sandboxes", href: "/sandboxes", icon: Terminal },

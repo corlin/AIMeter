@@ -1758,6 +1758,130 @@ func TestFederationEndpoints(t *testing.T) {
 	}
 }
 
+func TestFineTuningEndpoints(t *testing.T) {
+	store := storage.NewMemoryStore()
+	server := api.NewServer(
+		8080,
+		store,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+	)
+
+	// 1. GET /api/v1/finetuning/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/finetuning/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/finetuning/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "active_adapters") {
+		t.Errorf("Expected active_adapters in stats, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/finetuning/gpu-catalog
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/finetuning/gpu-catalog", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/finetuning/gpu-catalog, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "gpu_catalog") {
+		t.Errorf("Expected gpu_catalog in response, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/finetuning/adapters
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/finetuning/adapters", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/finetuning/adapters, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "adapters") {
+		t.Errorf("Expected adapters in response, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/finetuning/adapters
+	adapterJSON := `{
+		"id": "lora-test-cust-1",
+		"tenant_id": "test-tenant",
+		"name": "Custom Test Adapter",
+		"base_model": "Qwen/Qwen2.5-7B",
+		"benchmark_model": "gpt-4o",
+		"total_capex_usd": 150.0,
+		"avg_cost_benchmark_usd": 0.015,
+		"avg_cost_student_usd": 0.002
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/finetuning/adapters", strings.NewReader(adapterJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/finetuning/adapters, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. GET /api/v1/finetuning/jobs
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/finetuning/jobs", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/finetuning/jobs, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 6. POST /api/v1/finetuning/jobs
+	jobJSON := `{
+		"tenant_id": "test-tenant",
+		"name": "E-Commerce Product Copywriter Distillation",
+		"job_type": "distillation",
+		"base_model": "Qwen/Qwen2.5-7B-Instruct",
+		"teacher_model": "DeepSeek-R1",
+		"target_adapter_id": "lora-ecommerce-copywriter",
+		"gpu_model": "NVIDIA-H100-SXM",
+		"gpu_count": 8,
+		"duration_hours": 3.0,
+		"synthetic_samples": 15000,
+		"benchmark_model": "gpt-4o"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/finetuning/jobs", strings.NewReader(jobJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/finetuning/jobs, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "lora-ecommerce-copywriter") {
+		t.Errorf("Expected target adapter in created job, got: %s", w.Body.String())
+	}
+
+	// 7. POST /api/v1/finetuning/simulate
+	simJSON := `{
+		"teacher_model": "DeepSeek-R1",
+		"student_model": "Qwen-2.5-7B",
+		"synthetic_samples": 60000,
+		"gpu_model": "NVIDIA-H100-SXM",
+		"gpu_count": 8,
+		"training_hours": 4.5,
+		"monthly_invocations": 300000,
+		"benchmark_model": "gpt-4o"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/finetuning/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/finetuning/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "break_even_months") || !strings.Contains(w.Body.String(), "timeline") {
+		t.Errorf("Expected simulation response, got: %s", w.Body.String())
+	}
+}
+
 
 
 

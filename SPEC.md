@@ -1047,7 +1047,40 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（31/31 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 31: 模型微调与知识蒸馏算力计量、合成数据飞轮经济学与 LoRA 增量资产记账引擎 (Model Fine-Tuning & Distillation Compute Metering, Synthetic Data Economics & LoRA Asset Accounting Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/finetuning_seed.json`）**：
+  * 定义核心数据结构：`FineTuningJobType`（distillation, sft, dpo, lora_train）、`FineTuningJobStatus`（queued, generating_data, training, evaluating, completed, failed, cancelled）、`BreakEvenStatus`（recovering, achieved）、`GPUCatalogItem`（型号、显存、单卡时费率、定位与描述）、`FineTuningJob`（任务 ID、租户、名称、类型、状态、端侧基模、教师模型、目标 LoRA ID、GPU 规格与卡时、算力成本、合成数据样本量与 Token 费用、评测得分与成本、总 CapEx 原值）、`LoRAAdapterAsset`（资产 ID、名称、基模、对标旗舰、总 CapEx、旗舰/学生单次调用成本、单次净省、累计调用量、累计已节省金额、净超额收益 Net Alpha、ROI 百分比、盈亏平衡调用阈值、达成状态）、`FineTuningStatsSummary`、`FineTuningJobCreateRequest`、`LoRAAdapterCreateRequest`、`FineTuningSimulateTurn`、`FineTuningSimulateRequest` 与 `FineTuningSimulateResponse`；
+  * 预置种子配置：`configs/finetuning_seed.json` 包含 4 款主流 GPU 集群定价字典（H100, A100-80G, L40S, RTX 4090）及 3 大典型企业微调资产（量化金融专属适配器 `lora-quant-sentiment-v2`、网络安全代码审计 `lora-security-audit-7b`、多语言合规对话 `lora-compliance-agent-8b`）与对应的历史推理节约流水。
+* [x] **纯 Go 高性能推训一体化与资产折旧核心引擎（`pkg/finetuning/`）**：
+  * **GPU 算力与合成数据计量（`compute.go`）**：精确按秒换算 GPU 集群卡时开销，支持多卡并行系数；基于大模型 Token 混合费率计算教师模型合成数据生成开销；并发安全纳管 GPU 硬件费率目录；
+  * **LoRA 适配器资产账本（`adapter.go`）**：并发安全纳管 LoRA 资产，动态测算盈亏平衡阈值 $\text{BreakEven} = \frac{\text{TotalCapEx}}{c_{flagship} - c_{student}}$，原子累加线上推理调用量与回收节省金额，实时评估超额收益 Net Alpha 与 ROI 百分比；
+  * **任务状态机与资本化绑定（`job.go`）**：管理任务生命周期流转，任务完成后自动资本化生成或更新 LoRA 资产；
+  * **网关审计与推训一体化飞轮推演（`manager.go`）**：提供网关实时调用节省审计（`AuditInferenceSavings`）与多变量 12 个月推训一体化 ROI 飞轮推演沙箱（`SimulateFlywheel`）。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 7 大 REST 控制端点：
+    * `GET /api/v1/finetuning/stats`（宏观微调蒸馏成本、产出资产总值、累计推理净省与总体 ROI 统计）
+    * `GET /api/v1/finetuning/jobs`（微调与蒸馏任务列表）
+    * `POST /api/v1/finetuning/jobs`（发起微调/蒸馏任务并资本化 LoRA 资产）
+    * `GET /api/v1/finetuning/adapters`（LoRA 适配器资产列表与盈亏平衡进度）
+    * `POST /api/v1/finetuning/adapters`（注册外部微调 LoRA 资产）
+    * `GET /api/v1/finetuning/gpu-catalog`（GPU 训练集群规格与卡时费率字典）
+    * `POST /api/v1/finetuning/simulate`（在线推训一体化 ROI 与盈亏平衡 What-If 推演沙箱）
+  * 反向代理网关双向协同与全息响应头：
+    * **入站 LoRA 适配器感知**：网关提取 `X-AIMeter-Adapter-ID` 与 `X-AIMeter-Benchmark-Model`；
+    * **出站动态旗舰差额审计与原子记账**：自动测算与基准旗舰模型的单次节省差额，原子累加至 LoRA 资产回收池并透传全息响应头 `X-AIMeter-Adapter-ID`、`X-AIMeter-Adapter-ROI`、`X-AIMeter-Break-Even-Status`、`X-AIMeter-Inference-Saved-USD`。
+* [x] **Web 控制台全新一级看板 `/finetuning`（`web/src/app/finetuning/`）**：
+  * **4 维宏观核心 KPI 卡片**：累计微调蒸馏总投入 CapEx、纳管 LoRA 适配器总数、线上推理累计净节省、综合投资回报率 Portfolio ROI 与已达平衡资产数；
+  * **LoRA 适配器资产矩阵与盈亏平衡进度卡片**：展示各适配器基模、对标旗舰、CapEx 原值、单次净省、累计调用量、盈亏平衡达成进度条与资产详情抽屉；
+  * **微调与蒸馏任务流水表**：展示各任务类型、模型配置、GPU 卡时、合成数据量、CapEx 构成与评测指标；
+  * **推训一体化 ROI 飞轮推演沙箱 (Playground)**：在线调节教师模型、端侧模型、合成样本量、GPU 型号/卡数与月调用量，实时渲染初始 CapEx、单次净省、平衡点月份、首年 Net Alpha 收益与 12 个月逐月累计对比；
+  * **交互式操作弹窗**：支持“发起微调/蒸馏流水线任务”与“注册外部微调 LoRA 资产”。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（32/32 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
+
 
 
 

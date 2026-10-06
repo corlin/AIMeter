@@ -37,6 +37,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/hierarchy"
 	"github.com/corlin/AIMeter/pkg/federation"
+	"github.com/corlin/AIMeter/pkg/finetuning"
 	"github.com/gin-gonic/gin"
 )
 
@@ -69,6 +70,17 @@ type APIHandler struct {
 	sandboxManager     *sandbox.SandboxManager
 	hierarchyManager   *hierarchy.HierarchyManager
 	federationManager  *federation.FederationManager
+	finetuningManager  *finetuning.Manager
+}
+
+// SetFineTuningManager attaches a fine-tuning manager to the API handler
+func (h *APIHandler) SetFineTuningManager(fm *finetuning.Manager) {
+	h.finetuningManager = fm
+}
+
+// GetFineTuningManager returns the attached fine-tuning manager
+func (h *APIHandler) GetFineTuningManager() *finetuning.Manager {
+	return h.finetuningManager
 }
 
 // SetFederationManager attaches a federation manager to the API handler
@@ -2620,6 +2632,115 @@ func (h *APIHandler) SimulateFederation(c *gin.Context) {
 	resp := h.federationManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 31: Fine-Tuning, Distillation & LoRA Adapter Asset Handlers
+// ==========================================
+
+// GetFineTuningStats returns macro dashboard metrics for fine-tuning & LoRA assets
+func (h *APIHandler) GetFineTuningStats(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	stats := h.finetuningManager.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetFineTuningJobs returns all fine-tuning and distillation jobs
+func (h *APIHandler) GetFineTuningJobs(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	jobs := h.finetuningManager.GetJobManager().ListJobs()
+	c.JSON(http.StatusOK, gin.H{"jobs": jobs, "total": len(jobs)})
+}
+
+// CreateFineTuningJob launches a new fine-tuning/distillation job and capitalizes the adapter
+func (h *APIHandler) CreateFineTuningJob(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	var req domain.FineTuningJobCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	job, err := h.finetuningManager.GetJobManager().CreateJob(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+// GetLoRAAdapters lists all registered LoRA adapter assets with break-even status
+func (h *APIHandler) GetLoRAAdapters(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	adapters := h.finetuningManager.GetAdapterLedger().ListAdapters()
+	c.JSON(http.StatusOK, gin.H{"adapters": adapters, "total": len(adapters)})
+}
+
+// CreateLoRAAdapter registers or updates an external LoRA adapter asset
+func (h *APIHandler) CreateLoRAAdapter(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	var req domain.LoRAAdapterCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	now := time.Now()
+	adapter := &domain.LoRAAdapterAsset{
+		ID:                  req.ID,
+		TenantID:            req.TenantID,
+		Name:                req.Name,
+		BaseModel:           req.BaseModel,
+		BenchmarkModel:      req.BenchmarkModel,
+		JobID:               req.JobID,
+		TotalCapExUSD:       req.TotalCapExUSD,
+		AvgCostBenchmarkUSD: req.AvgCostBenchmarkUSD,
+		AvgCostStudentUSD:   req.AvgCostStudentUSD,
+		Status:              domain.BreakEvenStatusRecovering,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	h.finetuningManager.GetAdapterLedger().RegisterAdapter(adapter)
+	c.JSON(http.StatusOK, adapter)
+}
+
+// GetFineTuningGPUCatalog returns available GPU hardware clusters and hourly rental rates
+func (h *APIHandler) GetFineTuningGPUCatalog(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	catalog := h.finetuningManager.GetComputeEngine().GetGPUCatalog()
+	c.JSON(http.StatusOK, gin.H{"gpu_catalog": catalog, "total": len(catalog)})
+}
+
+// SimulateFineTuningFlywheel performs What-If train-to-inference ROI and break-even projection
+func (h *APIHandler) SimulateFineTuningFlywheel(c *gin.Context) {
+	if h.finetuningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fine-tuning manager not initialized"})
+		return
+	}
+	var req domain.FineTuningSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.finetuningManager.SimulateFlywheel(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

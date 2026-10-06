@@ -2036,5 +2036,141 @@ export interface FederationSimulateResponse {
   finops_advice: string[];
 }
 
+// ==========================================
+// Phase 31: Fine-Tuning, Distillation & LoRA Adapter Asset Types
+// ==========================================
+
+export type FineTuningJobType = "distillation" | "sft" | "dpo" | "lora_train";
+export type FineTuningJobStatus = "queued" | "generating_data" | "training" | "evaluating" | "completed" | "failed" | "cancelled";
+export type BreakEvenStatus = "recovering" | "achieved";
+
+export interface GPUCatalogItem {
+  model: string;
+  vram_gb: number;
+  hourly_rate_usd: number;
+  category: string;
+  description: string;
+}
+
+export interface FineTuningJob {
+  id: string;
+  tenant_id: string;
+  name: string;
+  job_type: FineTuningJobType;
+  status: FineTuningJobStatus;
+  base_model: string;
+  teacher_model?: string;
+  target_adapter_id: string;
+  gpu_model: string;
+  gpu_count: number;
+  duration_hours: number;
+  compute_cost_usd: number;
+  synthetic_tokens: number;
+  synthetic_samples: number;
+  synthetic_cost_usd: number;
+  eval_metric: string;
+  eval_score: number;
+  eval_cost_usd: number;
+  total_capex_usd: number;
+  error_message?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface LoRAAdapterAsset {
+  id: string;
+  tenant_id: string;
+  name: string;
+  base_model: string;
+  benchmark_model: string;
+  job_id: string;
+  total_capex_usd: number;
+  avg_cost_benchmark_usd: number;
+  avg_cost_student_usd: number;
+  unit_saved_usd: number;
+  inference_count: number;
+  total_savings_usd: number;
+  net_alpha_usd: number;
+  roi_percent: number;
+  break_even_invocations: number;
+  status: BreakEvenStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FineTuningStatsSummary {
+  total_capex_usd: number;
+  active_adapters: number;
+  total_inference_savings_usd: number;
+  net_alpha_savings_usd: number;
+  portfolio_roi: number;
+  achieved_adapters: number;
+  total_jobs: number;
+  completed_jobs: number;
+}
+
+export interface FineTuningJobCreateRequest {
+  tenant_id?: string;
+  name: string;
+  job_type: FineTuningJobType;
+  base_model: string;
+  teacher_model?: string;
+  target_adapter_id: string;
+  gpu_model: string;
+  gpu_count: number;
+  duration_hours: number;
+  synthetic_samples?: number;
+  synthetic_tokens?: number;
+  benchmark_model?: string;
+}
+
+export interface LoRAAdapterCreateRequest {
+  tenant_id?: string;
+  id: string;
+  name: string;
+  base_model: string;
+  benchmark_model: string;
+  job_id?: string;
+  total_capex_usd: number;
+  avg_cost_benchmark_usd: number;
+  avg_cost_student_usd: number;
+}
+
+export interface FineTuningSimulateTurn {
+  month: number;
+  monthly_invocations: number;
+  cumulative_invocations: number;
+  cumulative_flagship_spend_usd: number;
+  cumulative_distilled_spend_usd: number;
+  cumulative_net_savings_usd: number;
+  net_roi_percent: number;
+  status: BreakEvenStatus;
+}
+
+export interface FineTuningSimulateRequest {
+  teacher_model: string;
+  student_model: string;
+  synthetic_samples: number;
+  gpu_model: string;
+  gpu_count: number;
+  training_hours: number;
+  monthly_invocations: number;
+  benchmark_model: string;
+}
+
+export interface FineTuningSimulateResponse {
+  total_capex_usd: number;
+  synthetic_cost_usd: number;
+  compute_cost_usd: number;
+  unit_saved_usd: number;
+  break_even_invocations: number;
+  break_even_months: number;
+  year_one_savings_usd: number;
+  year_one_net_alpha_usd: number;
+  timeline: FineTuningSimulateTurn[];
+  finops_recommendations: string[];
+}
+
+
 
 

@@ -288,6 +288,12 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理双向协同与全息响应头审计**：入站自动预冻结（余额不足直接 HTTP 402 `Payment Required` 与 `escrow_insufficient_balance` 拦截）；出站自动 2PC 划转并透传 `X-AIMeter-Escrow-Voucher-ID`、`X-AIMeter-Settlement-Status`、`X-AIMeter-Settled-Amount-USD`、`X-AIMeter-Clearing-Fee-USD` 与 `X-AIMeter-Proof-Hash`。
 * **全生命周期跨域清算所看板与沙箱**：全新一级看板 `/federation`（4 维宏观 KPI、工作区代币账本矩阵、跨域悬赏任务大厅与凭证详情抽屉、What-If 竞标撮合与 2PC 清算沙箱及 3 个操作弹窗）。
 
+### 32. 模型微调与知识蒸馏算力计量、合成数据飞轮经济学与 LoRA 增量资产记账引擎 (Model Fine-Tuning & Distillation Compute Metering, Synthetic Data Economics & LoRA Asset Accounting Engine - Phase 31)
+* **GPU 算力集群与合成数据计量 (`pkg/finetuning/compute.go`)**：精准按秒换算 GPU 集群卡时开销，支持多卡并行系数；基于大模型 Token 混合费率计算教师模型合成数据生成开销；并发安全纳管 GPU 硬件费率目录。
+* **LoRA 适配器资产账本与动态平衡点 (`pkg/finetuning/adapter.go`)**：并发安全纳管 LoRA 资产，动态测算盈亏平衡阈值 $\text{BreakEven} = \frac{\text{TotalCapEx}}{c_{flagship} - c_{student}}$，原子累加线上推理调用量与回收节省金额，实时评估超额收益 Net Alpha 与 ROI 百分比。
+* **反向代理双向协同与全息响应头审计**：网关嗅探 `X-AIMeter-Adapter-ID` 与 `X-AIMeter-Benchmark-Model`；出站自动测算与基准旗舰模型的单次节省差额，原子累加至 LoRA 资产回收池并透传全息响应头 `X-AIMeter-Adapter-ID`、`X-AIMeter-Adapter-ROI`、`X-AIMeter-Break-Even-Status`、`X-AIMeter-Inference-Saved-USD`。
+* **全生命周期微调资产看板与沙箱**：全新一级看板 `/finetuning`（4 维宏观 KPI、LoRA 适配器资产矩阵与盈亏平衡进度条、微调与蒸馏任务流水表、推训一体化 ROI 飞轮推演沙箱与新建任务/注册资产弹窗）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -295,6 +301,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/finetuning` | **模型微调、知识蒸馏与 LoRA 资产记账中心** | 4 维宏观 KPI（总 CapEx 投入、纳管 LoRA 数、累计推理净省、综合 ROI）、LoRA 资产矩阵与回收进度条、微调任务流水表、推训一体化 ROI 飞轮推演沙箱与新建任务/注册资产弹窗 |
 | `/federation` | **多智能体跨域协作与代币清算所看板** | 4 维宏观 KPI（总清算代币规模、托管中保障金、平台清算手续费收入、已决算凭证数）、工作区代币账本矩阵（余额/冻结额/信用分/充值入口）、跨域悬赏任务大厅与加密托管凭证抽屉（SHA-256证明/2PC决算）、What-If 竞标撮合与 2PC 清算沙箱及任务发布/竞标/充值弹窗 |
 | `/hierarchy` | **企业组织架构预算树与双轨配额管控中心** | 4 维宏观 KPI（中央总预算池、组织节点数与架构深度、预警与熔断管控、P0核心业务保障）、交互式可折叠组织拓扑树、配额利用率进度条、快速配额探测器、What-If 级联冲击仿真沙箱与节点配置抽屉 |
 | `/sandboxes` | **Agent 沙箱代码解释器与工具微事务清算中心** | 4 维宏观 KPI（三合一总账本、沙箱算力累计、工具微事务累计、超时截断与预算阻断）、三合一全口径成本解耦瀑布、审计流水抽屉、预置工具单价字典在线编辑与交互式算力推演沙箱 |
