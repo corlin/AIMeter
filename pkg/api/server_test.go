@@ -1073,6 +1073,83 @@ func TestMemoryEndpoints(t *testing.T) {
 	}
 }
 
+func TestReasoningEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/reasoning/traces
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/reasoning/traces?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/reasoning/traces, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 2. POST /api/v1/reasoning/policies
+	policyJSON := `{
+		"tenant_id": "reasoning-test-tenant",
+		"enabled": true,
+		"max_thinking_tokens": 3000,
+		"max_oscillation_turns": 2,
+		"max_redundancy_score": 0.30,
+		"default_action": "converged",
+		"auto_prune_on_streaming": true,
+		"adaptive_param_inject": true
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/reasoning/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/reasoning/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 3. GET /api/v1/reasoning/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/reasoning/stats?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/reasoning/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_traces_audited"`) {
+		t.Errorf("Expected total_traces_audited in stats, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/reasoning/prune
+	pruneJSON := `{
+		"thinking_text": "首先分析问题。慢着，方案不对。慢着，方案真的不对吗？Wait, let me rethink. 总结：确定采用方案 A。",
+		"max_turns": 2
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/reasoning/prune", strings.NewReader(pruneJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/reasoning/prune, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"oscillation_count"`) {
+		t.Errorf("Expected oscillation_count in prune response, got: %s", w.Body.String())
+	}
+
+	// 5. POST /api/v1/reasoning/simulate
+	simJSON := `{
+		"tenant_id": "reasoning-test-tenant",
+		"model": "deepseek-r1"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/reasoning/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/reasoning/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	simBody := w.Body.String()
+	if !strings.Contains(simBody, `"total_raw_tokens"`) || !strings.Contains(simBody, `"savings_pct"`) {
+		t.Errorf("Expected total_raw_tokens and savings_pct in simulate response, got: %s", simBody)
+	}
+}
+
+
 
 
 

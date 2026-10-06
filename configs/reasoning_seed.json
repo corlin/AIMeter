@@ -1,0 +1,191 @@
+{
+  "policies": [
+    {
+      "tenant_id": "default",
+      "enabled": true,
+      "max_thinking_tokens": 4000,
+      "max_oscillation_turns": 3,
+      "max_redundancy_score": 0.35,
+      "default_action": "converged",
+      "auto_prune_on_streaming": true,
+      "adaptive_param_inject": true,
+      "updated_at": "2026-10-06T08:00:00Z"
+    },
+    {
+      "tenant_id": "fintech-corp",
+      "enabled": true,
+      "max_thinking_tokens": 2500,
+      "max_oscillation_turns": 2,
+      "max_redundancy_score": 0.25,
+      "default_action": "capped",
+      "auto_prune_on_streaming": true,
+      "adaptive_param_inject": true,
+      "updated_at": "2026-10-06T08:00:00Z"
+    }
+  ],
+  "traces": [
+    {
+      "id": "trace-rt-001",
+      "tenant_id": "default",
+      "session_id": "sess-algo-opt-01",
+      "request_id": "req-deepseek-r1-7891",
+      "model": "deepseek-r1",
+      "prompt_preview": "请推导多模态大模型中跨模态注意力 Cross-Attention 的计算复杂度与键值缓存显存占用公式",
+      "full_thinking_text": "首先分析输入维度。设视觉序列长度为 Lv，文本序列长度为 Lt，隐藏层维度为 d。\n在 Cross-Attention 阶段，Query 通常来自于文本 Lt，Key 和 Value 来自视觉特征 Lv。\n注意力权重矩阵的维度为 Lt × Lv，计算点积注意力需要 O(Lt * Lv * d) 的 FLOPs。\n等等，如果是自注意力加交叉注意力的混合结构，需要考虑是否保留双向 KV Cache。\n让我们仔细验证：KV Cache 仅在自回归生成时缓存文本的 KV，视觉特征通常在预填充阶段一次性计算。\n因此 KV 显存开销主要随解码步数线性增长。结论成立，收敛整理最终公式。",
+      "pruned_thinking_text": "首先分析输入维度。设视觉序列长度为 Lv，文本序列长度为 Lt，隐藏层维度为 d。\n在 Cross-Attention 阶段，Query 通常来自于文本 Lt，Key 和 Value 来自视觉特征 Lv。\n注意力权重矩阵的维度为 Lt × Lv，计算点积注意力需要 O(Lt * Lv * d) 的 FLOPs。\nKV 显存开销主要随解码步数线性增长。结论成立，收敛整理最终公式。",
+      "segments": [
+        {
+          "index": 0,
+          "stage": "hypothesis",
+          "text": "首先分析输入维度。设视觉序列长度为 Lv，文本序列长度为 Lt，隐藏层维度为 d。",
+          "tokens": 42,
+          "is_oscillating": false
+        },
+        {
+          "index": 1,
+          "stage": "deduction",
+          "text": "在 Cross-Attention 阶段，Query 通常来自于文本 Lt，Key 和 Value 来自视觉特征 Lv。注意力权重矩阵的维度为 Lt × Lv，计算点积注意力需要 O(Lt * Lv * d) 的 FLOPs。",
+          "tokens": 68,
+          "is_oscillating": false
+        },
+        {
+          "index": 2,
+          "stage": "reflection",
+          "text": "等等，如果是自注意力加交叉注意力的混合结构，需要考虑是否保留双向 KV Cache。让我们仔细验证：KV Cache 仅在自回归生成时缓存文本的 KV，视觉特征通常在预填充阶段一次性计算。",
+          "tokens": 75,
+          "is_oscillating": false,
+          "keyword_trigger": "等等"
+        },
+        {
+          "index": 3,
+          "stage": "convergence",
+          "text": "因此 KV 显存开销主要随解码步数线性增长。结论成立，收敛整理最终公式。",
+          "tokens": 35,
+          "is_oscillating": false
+        }
+      ],
+      "total_thinking_tokens": 220,
+      "pruned_thinking_tokens": 145,
+      "tokens_saved": 75,
+      "thinking_cost_usd": 0.00044,
+      "wasted_cost_usd": 0.00005,
+      "oscillation_count": 1,
+      "oscillation_index": 0.12,
+      "redundancy_score": 0.08,
+      "action_taken": "passthrough",
+      "created_at": "2026-10-06T08:01:00Z"
+    },
+    {
+      "id": "trace-rt-002",
+      "tenant_id": "default",
+      "session_id": "sess-backend-refactor-99",
+      "request_id": "req-deepseek-r1-9921",
+      "model": "deepseek-r1",
+      "prompt_preview": "编写一个纯 Go 的并发安全双端队列，支持超时等待与优先级排序",
+      "full_thinking_text": "用户需要一个支持超时的优先级双端队列。我可以用 container/heap 加上 sync.Cond。\n慢着，container/heap 是单向最小堆，如何做到双端队列的两端弹出？\n等等，也许我应该用红黑树或者跳表？\n慢着，跳表实现太复杂了，标准库没有。不对，等等，用户只要求两端弹出，如果维护一个平衡二叉树行不行？\n再想想，Wait, let me rethink. 如果直接维护两个堆，一个大顶堆一个小顶堆？不行，同步删除两个堆的元素复杂度也是 O(N)。\nWait, actually... 也许维护有序切片切片插入？但插入是 O(N)。\n等等，再等等，Wait, hold on, let me reconsider this again. 到底要不要支持双端？用户说优先级双端队列，通常指获取最大值和最小值。\nWait, but wait! 我刚才是不是漏掉了最简单的方案？直接用双向链表加有序插入？",
+      "pruned_thinking_text": "用户需要一个支持超时的优先级双端队列。我可以用 container/heap 加上 sync.Cond。\n通常双端优先级队列可以通过维护最小堆与最大堆互引，或者使用红黑树/B树节点维护。\n[AIMeter: 检测到思维链在数据结构选型上陷入多次重复反思(COI: 0.78)，已触发提前收敛]",
+      "segments": [
+        {
+          "index": 0,
+          "stage": "hypothesis",
+          "text": "用户需要一个支持超时的优先级双端队列。我可以用 container/heap 加上 sync.Cond。",
+          "tokens": 40,
+          "is_oscillating": false
+        },
+        {
+          "index": 1,
+          "stage": "reflection",
+          "text": "慢着，container/heap 是单向最小堆，如何做到双端队列的两端弹出？等等，也许我应该用红黑树或者跳表？",
+          "tokens": 62,
+          "is_oscillating": true,
+          "keyword_trigger": "慢着"
+        },
+        {
+          "index": 2,
+          "stage": "reflection",
+          "text": "慢着，跳表实现太复杂了，标准库没有。不对，等等，用户只要求两端弹出，如果维护一个平衡二叉树行不行？",
+          "tokens": 65,
+          "is_oscillating": true,
+          "keyword_trigger": "慢着"
+        },
+        {
+          "index": 3,
+          "stage": "reflection",
+          "text": "再想想，Wait, let me rethink. 如果直接维护两个堆，一个大顶堆一个小顶堆？不行，同步删除两个堆的元素复杂度也是 O(N)。",
+          "tokens": 78,
+          "is_oscillating": true,
+          "keyword_trigger": "Wait, let me rethink"
+        },
+        {
+          "index": 4,
+          "stage": "reflection",
+          "text": "Wait, actually... 也许维护有序切片切片插入？但插入是 O(N)。等等，再等等，Wait, hold on, let me reconsider this again.",
+          "tokens": 85,
+          "is_oscillating": true,
+          "keyword_trigger": "Wait, hold on"
+        },
+        {
+          "index": 5,
+          "stage": "convergence",
+          "text": "Wait, but wait! 我刚才是不是漏掉了最简单的方案？直接用双向链表加有序插入？",
+          "tokens": 50,
+          "is_oscillating": true,
+          "keyword_trigger": "Wait, but wait"
+        }
+      ],
+      "total_thinking_tokens": 380,
+      "pruned_thinking_tokens": 110,
+      "tokens_saved": 270,
+      "thinking_cost_usd": 0.00076,
+      "wasted_cost_usd": 0.00054,
+      "oscillation_count": 5,
+      "oscillation_index": 0.78,
+      "redundancy_score": 0.71,
+      "action_taken": "converged",
+      "created_at": "2026-10-06T08:03:00Z"
+    },
+    {
+      "id": "trace-rt-003",
+      "tenant_id": "fintech-corp",
+      "session_id": "sess-compliance-check-04",
+      "request_id": "req-o1-preview-3320",
+      "model": "o1-preview",
+      "prompt_preview": "审查欧盟 DORA 法案下第三方信息技术外包合同的退出战略与审计权条款合规性",
+      "full_thinking_text": "审阅欧盟金融数字化运营弹性法案 (DORA) 第 30 条关于关键第三方 ICT 服务提供商的合同要求。\n第一，检查全面审计权条款。合同必须明确金融实体及其主管机关的无限制现场审计权利。\n第二，检查退出战略与数据迁移保证。必须包含过渡期不少于 12 个月的协助义务，且明确不得收取惩罚性迁移费用。\n第三，审查次级转包风险约束机制。供应商更换转包方需提前 60 天书面通知。\n第四，反复对比第 28 条总则与第 31 条关于重大变更的具体程序要求...",
+      "pruned_thinking_text": "审阅欧盟金融数字化运营弹性法案 (DORA) 第 30 条关于关键第三方 ICT 服务提供商的合同要求。\n第一，检查全面审计权条款。合同必须明确金融实体及其主管机关的无限制现场审计权利。\n第二，检查退出战略与数据迁移保证。必须包含过渡期不少于 12 个月的协助义务，且明确不得收取惩罚性迁移费用。\n[AIMeter: 思考 Token 触及金融云租户上限 2500 tokens，触发安全硬截断]",
+      "segments": [
+        {
+          "index": 0,
+          "stage": "hypothesis",
+          "text": "审阅欧盟金融数字化运营弹性法案 (DORA) 第 30 条关于关键第三方 ICT 服务提供商的合同要求。",
+          "tokens": 60,
+          "is_oscillating": false
+        },
+        {
+          "index": 1,
+          "stage": "deduction",
+          "text": "第一，检查全面审计权条款。合同必须明确金融实体及其主管机关的无限制现场审计权利。第二，检查退出战略与数据迁移保证。",
+          "tokens": 85,
+          "is_oscillating": false
+        },
+        {
+          "index": 2,
+          "stage": "deduction",
+          "text": "第三，审查次级转包风险约束机制。供应商更换转包方需提前 60 天书面通知。第四，反复对比第 28 条总则与第 31 条关于重大变更的具体程序要求...",
+          "tokens": 95,
+          "is_oscillating": false
+        }
+      ],
+      "total_thinking_tokens": 240,
+      "pruned_thinking_tokens": 145,
+      "tokens_saved": 95,
+      "thinking_cost_usd": 0.00360,
+      "wasted_cost_usd": 0.00142,
+      "oscillation_count": 0,
+      "oscillation_index": 0.05,
+      "redundancy_score": 0.10,
+      "action_taken": "capped",
+      "created_at": "2026-10-06T08:05:00Z"
+    }
+  ]
+}

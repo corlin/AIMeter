@@ -79,7 +79,14 @@ import {
   MemoryStatsSummary,
   MemorySimulateRequest,
   MemorySimulateResponse,
-  MemoryTier
+  MemoryTier,
+  ReasoningTrace,
+  ReasoningPolicy,
+  ReasoningStatsSummary,
+  ReasoningPruneRequest,
+  ReasoningPruneResponse,
+  ReasoningSimulateRequest,
+  ReasoningSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1447,6 +1454,88 @@ export async function simulateMemory(req: MemorySimulateRequest): Promise<Memory
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 24: AI Reasoning Chain-of-Thought API
+// ==========================================
+
+export async function fetchReasoningTraces(tenantId?: string, limit = 50): Promise<ReasoningTrace[]> {
+  try {
+    const params = new URLSearchParams();
+    if (tenantId && tenantId !== "all") params.append("tenant_id", tenantId);
+    params.append("limit", limit.toString());
+    const res = await fetch(`${API_BASE}/reasoning/traces?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch reasoning traces");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchReasoningTraces failed:", err);
+    return [];
+  }
+}
+
+export async function fetchReasoningStats(tenantId?: string): Promise<ReasoningStatsSummary> {
+  try {
+    const url = tenantId && tenantId !== "all"
+      ? `${API_BASE}/reasoning/stats?tenant_id=${tenantId}`
+      : `${API_BASE}/reasoning/stats`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch reasoning stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchReasoningStats failed:", err);
+    return {
+      total_traces_audited: 0,
+      total_thinking_tokens: 0,
+      pruned_thinking_tokens: 0,
+      thinking_spend_usd: 0,
+      wasted_spend_usd: 0,
+      avoided_spend_usd: 0,
+      avg_oscillation_index: 0.15,
+      avg_redundancy_score: 0.12,
+      high_oscillation_count: 0,
+    };
+  }
+}
+
+export async function saveReasoningPolicy(policy: ReasoningPolicy): Promise<ReasoningPolicy> {
+  const res = await fetch(`${API_BASE}/reasoning/policies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save reasoning policy" }));
+    throw new Error(err.error || "Failed to save reasoning policy");
+  }
+  return await res.json();
+}
+
+export async function pruneReasoning(req: ReasoningPruneRequest): Promise<ReasoningPruneResponse> {
+  const res = await fetch(`${API_BASE}/reasoning/prune`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to prune reasoning" }));
+    throw new Error(err.error || "Failed to prune reasoning");
+  }
+  return await res.json();
+}
+
+export async function simulateReasoning(req: ReasoningSimulateRequest): Promise<ReasoningSimulateResponse> {
+  const res = await fetch(`${API_BASE}/reasoning/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate reasoning" }));
+    throw new Error(err.error || "Failed to simulate reasoning");
+  }
+  return await res.json();
+}
+
 
 
 

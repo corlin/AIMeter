@@ -830,6 +830,38 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（24/24 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 24: AI 推理思维链深度审计、认知冗余剪枝与反思停机经济学控制引擎 (Chain-of-Thought / Reasoning Depth Audit, Cognitive Redundancy Pruning & Thinking Economy Engine)
+* [x] **领域模型与种子数据（`pkg/domain/models.go` & `configs/reasoning_seed.json`）**：
+  * 定义核心数据结构：`CognitiveStage`（`hypothesis`, `deduction`, `reflection`, `convergence`）、`ReasoningAction`（`allow`, `soft_prune`, `early_stop`）、`CognitiveSegment`（分段文本、阶段类型、Token 开销、震荡标记、冗余标记）、`ReasoningTrace`（跟踪 ID、模型名、总思考 Token、思考成本、阶段分布字典、反思震荡指数 COI、认知冗余度评分、命中动作、自愈剪枝后 Token 与节约金额）、`ReasoningPolicy`（租户、启用开关、硬思考预算 `max_thinking_tokens`、最大思考预算金额、允许反思震荡上限 `max_reflection_oscillations`、冗余截断线 `redundancy_prune_threshold`、动作）、`ReasoningStatsSummary`、`ReasoningPruneRequest`、`ReasoningPruneResponse`、`ReasoningSimulateTurn`、`ReasoningSimulateRequest` 与 `ReasoningSimulateResponse`；
+  * 预置种子数据：`configs/reasoning_seed.json` 提供默认与金融严管策略，以及覆盖健康单向推演、病态反思纠结与超长高风险长链的基准 Trace 数据。
+* [x] **纯 Go 高性能四阶段认知状态机与震荡度量引擎（`pkg/reasoning/`）**：
+  * **四阶段认知状态机（Four-Stage Cognitive State Machine）**：纯 Go 原生提取解析 `<think>` / `<thought>` 思考块，结合模式识别与句法标点分段，自动将思考流归类为 `Hypothesis`（假设/意图理解） $\rightarrow$ `Deduction`（演绎推导） $\rightarrow$ `Reflection`（反思/验算质疑） $\rightarrow$ `Convergence`（收敛结论）；
+  * **反思震荡指数 (COI, Cognitive Oscillation Index, 0~1)**：连续反思状态切换惩罚模型，量化大模型在多阶段推演中的自我怀疑与纠结程度；
+  * **认知冗余度评分 (Redundancy Score, 0~1)**：基于 Jaccard 重叠度度量段落间概念重合度，精确识别“说了又说、反复车轱辘话”的低效思考段；
+  * **确定性认知剪枝文本重构（`SynthesizePrunedThinkingText`）**：保留首轮假设与最终收敛推导，智能剔除中间无实质价值的震荡与高重合反思段，生成精简 CoT 摘要，最高降低 70% 思考代币浪费；
+  * **并发安全审计池与推演沙箱（`Manager`）**：提供多租户策略纳管、运行时思维审计（`AuditThinking`）、交互剪枝（`PruneThinking`）与 4 场景推演沙箱（`Simulate`）。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 5 大 REST 控制端点：
+    * `GET /api/v1/reasoning/traces`（思维链审计追踪列表）
+    * `GET /api/v1/reasoning/stats`（思考经济学宏观统计大盘）
+    * `POST /api/v1/reasoning/policies`（保存/下发租户思考策略）
+    * `POST /api/v1/reasoning/prune`（交互式认知冗余剪枝与重构接口）
+    * `POST /api/v1/reasoning/simulate`（思维链经济学 4 场景推演沙箱）
+  * 反向代理网关三级自适应弹性干预：
+    * **入站参数自适应注入**：针对支持原生思考参数的模型（DeepSeek-R1 / OpenAI o1/o3-mini / Claude 3.7 Thinking），按策略动态注入 `max_thinking_tokens`；
+    * **出站非流式透明审计**：提取 `<think>` 标签，计算 Token 与 COI 指标，并在响应头全息透传 `X-AIMeter-Reasoning-Tokens`、`X-AIMeter-Reasoning-Cost`、`X-AIMeter-Thinking-Oscillation`、`X-AIMeter-Thinking-Action`、`X-AIMeter-Thinking-Budget`；
+    * **流式 SSE 动态闭合与优雅收敛**：在流式输出达到思考预算阈值时，自动注入闭合 `</think>` 标签并注入收敛声明，既截断无底洞思考消耗，又确保下游客户端 Markdown 树零解析崩溃；流结束异步记录审计 Trace。
+* [x] **Web 控制台全新一级看板 `/reasoning`（`web/src/app/reasoning/`）**：
+  * **4 维宏观 KPI 卡片**：审计思考流总数、节省思考 Tokens、规避过度反思支出、平均反思震荡指数 (COI)；
+  * **思维链认知时序审计 (Cognitive Timeline Audit)**：分步展示 Hypothesis、Deduction、Reflection 与 Convergence 四大认知阶段的时序演进、耗时与 Token 消耗，直观高亮异常震荡与冗余标记；
+  * **反思震荡热力榜 (Oscillation Heatmap)**：按租户与模型维度透视高震荡低效思考请求，定位模型“精神内耗”重灾区；
+  * **思考预算与冗余剪枝策略配置 (Reasoning Policy Matrix)**：可视化调节最大思考 Tokens、预算金额、允许反思震荡上限与动作阶梯；
+  * **思维经济学沙箱 (Thinking Economy Playground)**：内置健康单向推演、纠结反思震荡、超长法务分析与自定义思考文本四类场景，支持即时计算 COI、冗余度与剪枝效果对比。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（25/25 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

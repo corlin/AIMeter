@@ -25,6 +25,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/rater"
+	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
@@ -55,6 +56,12 @@ type APIHandler struct {
 	dlpManager         *dlp.Manager
 	swarmManager       *swarm.Manager
 	memoryManager      *memory.MemoryManager
+	reasoningManager   *reasoning.ReasoningManager
+}
+
+// SetReasoningManager attaches a reasoning manager to the API handler
+func (h *APIHandler) SetReasoningManager(rm *reasoning.ReasoningManager) {
+	h.reasoningManager = rm
 }
 
 // SetMemoryManager attaches a memory manager to the API handler
@@ -1896,6 +1903,85 @@ func (h *APIHandler) SimulateMemory(c *gin.Context) {
 	resp := h.memoryManager.Simulate(&req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 24: AI Reasoning Chain-of-Thought Handlers
+// ==========================================
+
+// GetReasoningTraces retrieves audited reasoning traces
+func (h *APIHandler) GetReasoningTraces(c *gin.Context) {
+	if h.reasoningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reasoning manager not initialized"})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	limitStr := c.Query("limit")
+	limit := 50
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+	traces := h.reasoningManager.GetTraces(tenantID, limit)
+	c.JSON(http.StatusOK, traces)
+}
+
+// GetReasoningStats retrieves macro metrics on thinking spend and avoided waste
+func (h *APIHandler) GetReasoningStats(c *gin.Context) {
+	if h.reasoningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reasoning manager not initialized"})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	stats := h.reasoningManager.GetStats(tenantID)
+	c.JSON(http.StatusOK, stats)
+}
+
+// SaveReasoningPolicy saves or updates a tenant's thinking budget and early convergence policy
+func (h *APIHandler) SaveReasoningPolicy(c *gin.Context) {
+	if h.reasoningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reasoning manager not initialized"})
+		return
+	}
+	var policy domain.ReasoningPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.reasoningManager.SetPolicy(&policy)
+	c.JSON(http.StatusOK, policy)
+}
+
+// PruneReasoning performs interactive testing of reasoning pruning
+func (h *APIHandler) PruneReasoning(c *gin.Context) {
+	if h.reasoningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reasoning manager not initialized"})
+		return
+	}
+	var req domain.ReasoningPruneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.reasoningManager.PruneThinking(&req)
+	c.JSON(http.StatusOK, resp)
+}
+
+// SimulateReasoning runs multi-scenario reasoning benchmark simulation
+func (h *APIHandler) SimulateReasoning(c *gin.Context) {
+	if h.reasoningManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reasoning manager not initialized"})
+		return
+	}
+	var req domain.ReasoningSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.reasoningManager.Simulate(&req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

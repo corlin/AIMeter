@@ -27,6 +27,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
+	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
@@ -97,6 +98,17 @@ type ProxyHandler struct {
 	dlpManager         *dlp.Manager
 	swarmManager       *swarm.Manager
 	memoryManager      *memory.MemoryManager
+	reasoningManager   *reasoning.ReasoningManager
+}
+
+// SetReasoningManager attaches a reasoning manager
+func (h *ProxyHandler) SetReasoningManager(rm *reasoning.ReasoningManager) {
+	h.reasoningManager = rm
+}
+
+// GetReasoningManager returns the attached reasoning manager
+func (h *ProxyHandler) GetReasoningManager() *reasoning.ReasoningManager {
+	return h.reasoningManager
 }
 
 // SetMemoryManager attaches a memory manager
@@ -618,6 +630,20 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 					if modBytes, err := json.Marshal(payload); err == nil {
 						bodyBytes = modBytes
 					}
+				}
+			}
+		}
+	}
+
+	// 4.7 Evaluate AI Reasoning & Thinking Budget Guard (Phase 24)
+	if h.reasoningManager != nil {
+		rPolicy := h.reasoningManager.GetPolicy(tenantID)
+		if rPolicy != nil && rPolicy.Enabled && rPolicy.AdaptiveParamInject {
+			if maxThinking, hasThinking := payload["max_thinking_tokens"].(float64); !hasThinking || int(maxThinking) > rPolicy.MaxThinkingTokens {
+				payload["max_thinking_tokens"] = rPolicy.MaxThinkingTokens
+				c.Header("X-AIMeter-Thinking-Budget", strconv.Itoa(rPolicy.MaxThinkingTokens))
+				if modBytes, err := json.Marshal(payload); err == nil {
+					bodyBytes = modBytes
 				}
 			}
 		}
@@ -1220,6 +1246,26 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				go h.memoryManager.EvaluateSessionOutput(sessID, respData.Choices[0].Message.Content)
 			}
 
+			// Audit AI Reasoning & Thinking Depth (Phase 24)
+			if h.reasoningManager != nil && len(respData.Choices) > 0 {
+				rawMsg := respData.Choices[0].Message.Content
+				thinkingText := ""
+				if strings.Contains(rawMsg, "<think>") && strings.Contains(rawMsg, "</think>") {
+					start := strings.Index(rawMsg, "<think>") + len("<think>")
+					end := strings.Index(rawMsg, "</think>")
+					if end > start {
+						thinkingText = strings.TrimSpace(rawMsg[start:end])
+					}
+				}
+				if thinkingText != "" {
+					trace := h.reasoningManager.AuditThinking(tenantID, sessID, traceID, fbResult.ActualModel, promptText, thinkingText)
+					c.Header("X-AIMeter-Reasoning-Tokens", strconv.Itoa(trace.TotalThinkingTokens))
+					c.Header("X-AIMeter-Reasoning-Cost", fmt.Sprintf("%.6f", trace.ThinkingCostUSD))
+					c.Header("X-AIMeter-Thinking-Oscillation", fmt.Sprintf("%.2f", trace.OscillationIndex))
+					c.Header("X-AIMeter-Thinking-Action", string(trace.ActionTaken))
+				}
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1328,6 +1374,24 @@ func (h *ProxyHandler) handleStreamingResponse(
 					}
 				}
 
+				// Early finalization for reasoning thinking guard (Phase 24)
+				if h.reasoningManager != nil && !isCapped {
+					rPolicy := h.reasoningManager.GetPolicy(tenantID)
+					if rPolicy != nil && rPolicy.Enabled && rPolicy.AutoPruneOnStreaming {
+						currStr := accumulatedContent.String()
+						if strings.Contains(currStr, "<think>") && !strings.Contains(currStr, "</think>") {
+							if accumulatedTokens >= rPolicy.MaxThinkingTokens {
+								closureChunk := []byte("data: {\"choices\":[{\"delta\":{\"content\":\"\\n</think>\\n\\n[AIMeter: 思考深度已达到最佳预算阈值，已动态收敛进入最终回答]\\n\"},\"index\":0}]}\n\n")
+								_, _ = c.Writer.Write(closureChunk)
+								if ok {
+									flusher.Flush()
+								}
+								accumulatedContent.WriteString("\n</think>\n\n")
+							}
+						}
+					}
+				}
+
 				// Check streaming cutoff threshold
 				if maxTokensLimit > 0 && accumulatedTokens >= maxTokensLimit && !isCapped {
 					isCapped = true
@@ -1408,6 +1472,22 @@ func (h *ProxyHandler) handleStreamingResponse(
 	}
 	if h.memoryManager != nil && streamSessID != "" && accumulatedContent.Len() > 0 {
 		go h.memoryManager.EvaluateSessionOutput(streamSessID, accumulatedContent.String())
+	}
+
+	// Audit AI Reasoning & Thinking Depth (Phase 24)
+	if h.reasoningManager != nil && accumulatedContent.Len() > 0 {
+		rawStream := accumulatedContent.String()
+		thinkingText := ""
+		if strings.Contains(rawStream, "<think>") && strings.Contains(rawStream, "</think>") {
+			start := strings.Index(rawStream, "<think>") + len("<think>")
+			end := strings.Index(rawStream, "</think>")
+			if end > start {
+				thinkingText = strings.TrimSpace(rawStream[start:end])
+			}
+		}
+		if thinkingText != "" {
+			go h.reasoningManager.AuditThinking(tenantID, streamSessID, traceID, fbResult.ActualModel, promptText, thinkingText)
+		}
 	}
 
 	var mmDetail *domain.MultimodalUsageDetail

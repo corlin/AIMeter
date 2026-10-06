@@ -243,6 +243,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **代理网关双向协同与无感压实**：网关自动嗅探 `X-AIMeter-Memory-Session`，将超出 Hot 窗口的历史消息替换为紧凑的 Fact Memo 摘要卡片，出站异步评估记忆语义重合度，零延迟阻塞正常流量。
 * **全生命周期记忆大盘与膨胀推演沙箱**：全新一级看板 `/memory`（4 维宏观 KPI、三层记忆资产泳道、有效率与低效噪声审计、生命周期策略配置、以及长程记忆膨胀对比沙箱）。
 
+### 25. AI 推理思维链深度审计、认知冗余剪枝与反思停机经济学控制引擎 (Chain-of-Thought / Reasoning Depth Audit, Cognitive Redundancy Pruning & Thinking Economy Engine - Phase 24)
+* **四阶段认知状态机与极速语法分段**：纯 Go 原生模式识别与状态机，将 `<think>` 思考流自动分段归类为 `Hypothesis`（假设分析） → `Deduction`（演绎推导） → `Reflection`（反思验算） → `Convergence`（结论收敛），耗时 `< 0.05ms`。
+* **反思震荡指数 (COI) 与认知冗余度双轨度量**：量化模型推理过程中的自我怀疑、循环对峙与反复纠结；基于 Jaccard 重叠度精准识别低效车轱辘话与低价值无效思考段落。
+* **确定性认知剪枝重构 (Cognitive Pruning Synthesis)**：保留核心假设与最终收敛推导，智能剔除中间无实质价值的震荡与高重合反思段，生成精简 CoT 摘要，最高降低 70% 思考代币浪费。
+* **网关三级弹性干预与流式 SSE 优雅收敛**：入站按策略自适应注入 `max_thinking_tokens`；出站透传 `X-AIMeter-Reasoning-Tokens`、`X-AIMeter-Reasoning-Cost`、`X-AIMeter-Thinking-Oscillation`、`X-AIMeter-Thinking-Action`、`X-AIMeter-Thinking-Budget`；流式超出思考预算时动态闭合 `</think>` 标签并注入收敛声明，保证客户端 UI 零崩溃。
+* **全生命周期思维大盘与沙箱**：全新一级看板 `/reasoning`（4 维宏观 KPI、思维链认知时序审计、反思震荡热力榜、思考预算策略配置、以及内置 4 场景推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -250,6 +257,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/reasoning` | **AI 推理思维链深度审计与认知剪枝大盘** | 4 维宏观 KPI（思考流总数、节省思考 Tokens、规避过度反思支出、平均反思震荡指数 COI）、思维链认知时序审计（Hypothesis/Deduction/Reflection/Convergence）、反思震荡热力榜、思考预算策略配置与思维经济学推演沙箱 |
 | `/memory` | **Agent 记忆生命周期与分层压缩大盘** | 4 维宏观 KPI（记忆资产总量、节省 Context Tokens、规避浪费支出、平均记忆有效率与噪声拦截）、三层资产泳道（Hot 活跃窗口、Warm Fact Memo 事实摘要、Cold 向量冷存）、有效率与低效噪声审计、策略在线配置与长程对话记忆膨胀沙箱 |
 | `/swarm` | **多智能体拓扑与死循环审计大盘** | 4 维宏观 KPI（协作会话数、死循环拦截数、破局自愈率、规避浪费金额）、交互式 SVG 拓扑网络图谱（径向轨道布局、带权重贝塞尔连线、死循环虚线脉冲高亮）、多轮状态机成本归因下钻表、时序流水抽屉与在线死循环演练沙箱 |
 | `/privacy` | **数据隐私合规与 DLP 大盘** | 4 维宏观 KPI（合规审计总数、违规捕获与处置数、双向脱敏保真度、嗅探时延）、多实体处置规则矩阵、违规审计日志、在线脱敏与还原仿真沙箱 |
@@ -423,10 +431,12 @@ AIMeter/
 │   ├── domain/              # 核心领域模型与数据结构
 │   ├── focus/               # FinOps FOCUS 1.0/1.1 标准导出器
 │   ├── guard/               # 闭环防护与三态熔断器核心引擎
+│   ├── memory/              # Agent 记忆生命周期、长期上下文向量检索归因与冷热压缩归档引擎 (Phase 23)
 │   ├── metrics/             # Prometheus 核心指标定义与埋点
 │   ├── normalizer/          # 统一计量分类法转换器
-│   ├── proxy/               # 智能反向代理网关、动态平替、断流拦截与缓存回放 (Phase 7, 12, 14, 15)
+│   ├── proxy/               # 智能反向代理网关、动态平替、断流拦截、缓存回放与思维截断收敛 (Phase 7, 12, 14, 15, 24)
 │   ├── rater/               # 实时流式计价与自建 GPU 算力折算引擎 (Phase 1, 11)
+│   ├── reasoning/           # 推理思维链深度审计、四阶段认知状态机与冗余剪枝引擎 (Phase 24)
 │   ├── reconcile/           # 工业级 PDF/CSV 对账与 5 维方差拆解引擎
 │   ├── router/              # 跨模型多供应商智能路由与 SLA 仲裁引擎 (Phase 14)
 │   ├── storage/             # ClickHouse, PostgreSQL 与 Memory 存储实现

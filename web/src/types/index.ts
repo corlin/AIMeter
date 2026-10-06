@@ -1248,5 +1248,119 @@ export interface MemorySimulateResponse {
   recommendations: string[];
 }
 
+// ==========================================
+// Phase 24: AI Reasoning Chain-of-Thought Audit & Pruning
+// ==========================================
+
+export type CognitiveStage = "hypothesis" | "deduction" | "reflection" | "convergence";
+
+export type ReasoningAction = "passthrough" | "capped" | "converged" | "pruned";
+
+export interface CognitiveSegment {
+  index: number;
+  stage: CognitiveStage;
+  text: string;
+  tokens: number;
+  is_oscillating: boolean;
+  keyword_trigger?: string;
+}
+
+export interface ReasoningTrace {
+  id: string;
+  tenant_id: string;
+  session_id?: string;
+  request_id: string;
+  model: string;
+  prompt_preview: string;
+  full_thinking_text: string;
+  pruned_thinking_text?: string;
+  segments: CognitiveSegment[];
+  total_thinking_tokens: number;
+  pruned_thinking_tokens: number;
+  tokens_saved: number;
+  thinking_cost_usd: number;
+  wasted_cost_usd: number;
+  oscillation_count: number;
+  oscillation_index: number;
+  redundancy_score: number;
+  action_taken: ReasoningAction;
+  created_at: string;
+}
+
+export interface ReasoningPolicy {
+  tenant_id: string;
+  enabled: boolean;
+  max_thinking_tokens: number;
+  max_oscillation_turns: number;
+  max_redundancy_score: number;
+  default_action: ReasoningAction;
+  auto_prune_on_streaming: boolean;
+  adaptive_param_inject: boolean;
+  updated_at?: string;
+}
+
+export interface ReasoningStatsSummary {
+  total_traces_audited: number;
+  total_thinking_tokens: number;
+  pruned_thinking_tokens: number;
+  thinking_spend_usd: number;
+  wasted_spend_usd: number;
+  avoided_spend_usd: number;
+  avg_oscillation_index: number;
+  avg_redundancy_score: number;
+  high_oscillation_count: number;
+}
+
+export interface ReasoningPruneRequest {
+  thinking_text: string;
+  max_tokens?: number;
+  max_turns?: number;
+  policy?: ReasoningPolicy;
+}
+
+export interface ReasoningPruneResponse {
+  original_tokens: number;
+  pruned_tokens: number;
+  tokens_saved: number;
+  oscillation_count: number;
+  oscillation_index: number;
+  redundancy_score: number;
+  original_segments: CognitiveSegment[];
+  pruned_text: string;
+  action_taken: ReasoningAction;
+  explanation: string;
+}
+
+export interface ReasoningSimulateTurn {
+  scenario_name: string;
+  complexity_level: string;
+  raw_thinking_tokens: number;
+  pruned_tokens: number;
+  tokens_saved: number;
+  raw_cost_usd: number;
+  pruned_cost_usd: number;
+  avoided_cost_usd: number;
+  oscillation_index: number;
+  action: ReasoningAction;
+}
+
+export interface ReasoningSimulateRequest {
+  tenant_id?: string;
+  model?: string;
+  policy_override?: ReasoningPolicy;
+}
+
+export interface ReasoningSimulateResponse {
+  scenarios: ReasoningSimulateTurn[];
+  total_raw_tokens: number;
+  total_pruned_tokens: number;
+  savings_pct: number;
+  total_raw_cost_usd: number;
+  total_pruned_cost_usd: number;
+  net_avoided_cost_usd: number;
+  recommendations: string[];
+}
+
+
 
 

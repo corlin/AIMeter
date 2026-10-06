@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/corlin/AIMeter/pkg/domain"
@@ -16,6 +17,7 @@ import (
 // MemoryManager coordinates memory lifecycle, tiering, attribution, and simulation
 type MemoryManager struct {
 	mu           sync.RWMutex
+	itemSeq      uint64
 	policies     map[string]*domain.MemoryPolicy
 	items        map[string]*domain.MemoryItem
 	sessionIndex map[string][]string // sessionID -> itemIDs in temporal order
@@ -142,8 +144,8 @@ func (m *MemoryManager) RecordMemory(tenantID, sessionID, agentName, role, conte
 
 	// Cost estimate benchmark: $0.005 / 1k tokens
 	costUSD := float64(rawTokens) * 0.000005
-
-	itemID := fmt.Sprintf("mem_%s_%d", sessionID, now.UnixNano())
+	seq := atomic.AddUint64(&m.itemSeq, 1)
+	itemID := fmt.Sprintf("mem_%s_%d_%d", sessionID, now.UnixNano(), seq)
 	item := &domain.MemoryItem{
 		ID:                itemID,
 		TenantID:          tenantID,

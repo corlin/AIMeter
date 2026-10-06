@@ -1557,3 +1557,142 @@ type MemorySimulateResponse struct {
 	Recommendations         []string             `json:"recommendations"`
 }
 
+// ==========================================
+// Phase 24: AI Reasoning Chain-of-Thought Audit & Pruning Engine
+// ==========================================
+
+// CognitiveStage defines the 4-phase reasoning progression
+type CognitiveStage string
+
+const (
+	CognitiveStageHypothesis  CognitiveStage = "hypothesis"  // Initial problem framing & assumptions
+	CognitiveStageDeduction   CognitiveStage = "deduction"   // Detailed derivations & logical proofs
+	CognitiveStageReflection  CognitiveStage = "reflection"  // Self-criticism, sanity checks, "wait/hold on"
+	CognitiveStageConvergence CognitiveStage = "convergence" // Final synthesized answer or summary
+)
+
+// ReasoningAction defines the intervention action applied to a reasoning chain
+type ReasoningAction string
+
+const (
+	ReasoningActionPassthrough ReasoningAction = "passthrough" // Within normal cognitive budget
+	ReasoningActionCapped      ReasoningAction = "capped"      // Clamped by hard token ceiling
+	ReasoningActionConverged   ReasoningAction = "converged"   // Synthetic early finalization injected
+	ReasoningActionPruned      ReasoningAction = "pruned"      // Redundant oscillation segments trimmed
+)
+
+// CognitiveSegment represents an atomic logical reasoning thought fragment
+type CognitiveSegment struct {
+	Index          int            `json:"index"`
+	Stage          CognitiveStage `json:"stage"`
+	Text           string         `json:"text"`
+	Tokens         int            `json:"tokens"`
+	IsOscillating  bool           `json:"is_oscillating"`
+	KeywordTrigger string         `json:"keyword_trigger,omitempty"`
+}
+
+// ReasoningTrace represents an audited chain-of-thought event
+type ReasoningTrace struct {
+	ID                  string             `json:"id"`
+	TenantID            string             `json:"tenant_id"`
+	SessionID           string             `json:"session_id,omitempty"`
+	RequestID           string             `json:"request_id"`
+	Model               string             `json:"model"`
+	PromptPreview       string             `json:"prompt_preview"`
+	FullThinkingText    string             `json:"full_thinking_text"`
+	PrunedThinkingText  string             `json:"pruned_thinking_text,omitempty"`
+	Segments            []CognitiveSegment `json:"segments"`
+	TotalThinkingTokens int                `json:"total_thinking_tokens"`
+	PrunedThinkingTokens int               `json:"pruned_thinking_tokens"`
+	TokensSaved         int                `json:"tokens_saved"`
+	ThinkingCostUSD     float64            `json:"thinking_cost_usd"`
+	WastedCostUSD       float64            `json:"wasted_cost_usd"`
+	OscillationCount    int                `json:"oscillation_count"`
+	OscillationIndex    float64            `json:"oscillation_index"` // 0.0 - 1.0 (COI)
+	RedundancyScore     float64            `json:"redundancy_score"`  // 0.0 - 1.0
+	ActionTaken         ReasoningAction    `json:"action_taken"`
+	CreatedAt           time.Time          `json:"created_at"`
+}
+
+// ReasoningPolicy defines the configuration for thinking budgets and early convergence
+type ReasoningPolicy struct {
+	TenantID             string          `json:"tenant_id"`
+	Enabled              bool            `json:"enabled"`
+	MaxThinkingTokens    int             `json:"max_thinking_tokens"`    // default 4000
+	MaxOscillationTurns  int             `json:"max_oscillation_turns"`  // default 3
+	MaxRedundancyScore   float64         `json:"max_redundancy_score"`   // default 0.35
+	DefaultAction        ReasoningAction `json:"default_action"`         // "converged" or "capped"
+	AutoPruneOnStreaming bool            `json:"auto_prune_on_streaming"`// Early SSE finalization
+	AdaptiveParamInject  bool            `json:"adaptive_param_inject"`  // Adaptive max_thinking_tokens injection
+	UpdatedAt            time.Time       `json:"updated_at"`
+}
+
+// ReasoningStatsSummary provides aggregate metrics for the reasoning dashboard
+type ReasoningStatsSummary struct {
+	TotalTracesAudited   int     `json:"total_traces_audited"`
+	TotalThinkingTokens  int     `json:"total_thinking_tokens"`
+	PrunedThinkingTokens int     `json:"pruned_thinking_tokens"`
+	ThinkingSpendUSD     float64 `json:"thinking_spend_usd"`
+	WastedSpendUSD       float64 `json:"wasted_spend_usd"`
+	AvoidedSpendUSD      float64 `json:"avoided_spend_usd"`
+	AvgOscillationIndex  float64 `json:"avg_oscillation_index"`
+	AvgRedundancyScore   float64 `json:"avg_redundancy_score"`
+	HighOscillationCount int     `json:"high_oscillation_count"`
+}
+
+// ReasoningPruneRequest simulates or executes pruning on a raw reasoning text
+type ReasoningPruneRequest struct {
+	ThinkingText string           `json:"thinking_text"`
+	MaxTokens    int              `json:"max_tokens,omitempty"`
+	MaxTurns     int              `json:"max_turns,omitempty"`
+	Policy       *ReasoningPolicy `json:"policy,omitempty"`
+}
+
+// ReasoningPruneResponse returns segment analysis and pruned results
+type ReasoningPruneResponse struct {
+	OriginalTokens   int                `json:"original_tokens"`
+	PrunedTokens     int                `json:"pruned_tokens"`
+	TokensSaved      int                `json:"tokens_saved"`
+	OscillationCount int                `json:"oscillation_count"`
+	OscillationIndex float64            `json:"oscillation_index"`
+	RedundancyScore  float64            `json:"redundancy_score"`
+	OriginalSegments []CognitiveSegment `json:"original_segments"`
+	PrunedText       string             `json:"pruned_text"`
+	ActionTaken      ReasoningAction    `json:"action_taken"`
+	Explanation      string             `json:"explanation"`
+}
+
+// ReasoningSimulateTurn records scenario comparison in simulation
+type ReasoningSimulateTurn struct {
+	ScenarioName      string          `json:"scenario_name"`
+	ComplexityLevel   string          `json:"complexity_level"` // "simple", "moderate", "complex", "pathological_loop"
+	RawThinkingTokens int             `json:"raw_thinking_tokens"`
+	PrunedTokens      int             `json:"pruned_tokens"`
+	TokensSaved       int             `json:"tokens_saved"`
+	RawCostUSD        float64         `json:"raw_cost_usd"`
+	PrunedCostUSD     float64         `json:"pruned_cost_usd"`
+	AvoidedCostUSD    float64         `json:"avoided_cost_usd"`
+	OscillationIndex  float64         `json:"oscillation_index"`
+	Action            ReasoningAction `json:"action"`
+}
+
+// ReasoningSimulateRequest represents simulation playground input
+type ReasoningSimulateRequest struct {
+	TenantID       string           `json:"tenant_id,omitempty"`
+	Model          string           `json:"model,omitempty"`
+	PolicyOverride *ReasoningPolicy `json:"policy_override,omitempty"`
+}
+
+// ReasoningSimulateResponse returns the simulation matrix and recommendations
+type ReasoningSimulateResponse struct {
+	Scenarios          []ReasoningSimulateTurn `json:"scenarios"`
+	TotalRawTokens     int                     `json:"total_raw_tokens"`
+	TotalPrunedTokens  int                     `json:"total_pruned_tokens"`
+	SavingsPct         float64                 `json:"savings_pct"`
+	TotalRawCostUSD    float64                 `json:"total_raw_cost_usd"`
+	TotalPrunedCostUSD float64                 `json:"total_pruned_cost_usd"`
+	NetAvoidedCostUSD  float64                 `json:"net_avoided_cost_usd"`
+	Recommendations    []string                `json:"recommendations"`
+}
+
+
