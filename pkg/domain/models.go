@@ -1950,6 +1950,140 @@ type QualitySimulateResponse struct {
 	Recommendations    []string              `json:"recommendations"`
 }
 
+// ==========================================
+// Phase 27: Long-Running Agent DAG Workflow Billing & Checkpoint Engine
+// ==========================================
+
+// WorkflowStepStatus defines the lifecycle of a DAG node
+type WorkflowStepStatus string
+
+const (
+	StepStatusPending         WorkflowStepStatus = "pending"
+	StepStatusRunning         WorkflowStepStatus = "running"
+	StepStatusCompleted       WorkflowStepStatus = "completed"
+	StepStatusFailed          WorkflowStepStatus = "failed"
+	StepStatusSkippedReplayed WorkflowStepStatus = "skipped_replayed"
+	StepStatusCircuitBroken   WorkflowStepStatus = "circuit_broken"
+)
+
+// WorkflowInstanceStatus defines the overall execution state of a workflow
+type WorkflowInstanceStatus string
+
+const (
+	WorkflowStatusRunning       WorkflowInstanceStatus = "running"
+	WorkflowStatusCompleted     WorkflowInstanceStatus = "completed"
+	WorkflowStatusFailed        WorkflowInstanceStatus = "failed"
+	WorkflowStatusSuspended     WorkflowInstanceStatus = "suspended"
+	WorkflowStatusCircuitBroken WorkflowInstanceStatus = "circuit_broken"
+)
+
+// WorkflowStep represents an individual execution node inside a DAG
+type WorkflowStep struct {
+	StepID            string             `json:"step_id"`
+	Name              string             `json:"name"`
+	AgentRole         string             `json:"agent_role"`
+	Parents           []string           `json:"parents"`            // Upstream step dependencies
+	Children          []string           `json:"children,omitempty"`  // Downstream dependents
+	Status            WorkflowStepStatus `json:"status"`
+	InputTokens       int                `json:"input_tokens"`
+	OutputTokens      int                `json:"output_tokens"`
+	CostUSD           float64            `json:"cost_usd"`
+	DurationMs        int64              `json:"duration_ms"`
+	IdempotencyKey    string             `json:"idempotency_key"`
+	CheckpointPayload string             `json:"checkpoint_payload,omitempty"`
+	RetryCount        int                `json:"retry_count"`
+	ErrorMsg          string             `json:"error_msg,omitempty"`
+	CompletedAt       *time.Time         `json:"completed_at,omitempty"`
+}
+
+// WorkflowInstance tracks runtime state, DAG topology, 4D cost ledger, and sunk-cost limits
+type WorkflowInstance struct {
+	ID                   string                 `json:"id"`
+	TenantID             string                 `json:"tenant_id"`
+	WorkflowName         string                 `json:"workflow_name"`
+	Status               WorkflowInstanceStatus `json:"status"`
+	Steps                []WorkflowStep         `json:"steps"`
+	TotalIncurredCostUSD float64                `json:"total_incurred_cost_usd"`
+	EffectiveCostUSD     float64                `json:"effective_cost_usd"`
+	AvoidedWasteUSD      float64                `json:"avoided_waste_usd"`
+	SunkCostUSD          float64                `json:"sunk_cost_usd"`
+	SunkCostCapUSD       float64                `json:"sunk_cost_cap_usd"` // Stop-loss circuit breaker threshold
+	MaxStepRetries       int                    `json:"max_step_retries"`
+	ResumedCount         int                    `json:"resumed_count"`
+	CreatedAt            time.Time              `json:"created_at"`
+	UpdatedAt            time.Time              `json:"updated_at"`
+}
+
+// WorkflowStatsSummary aggregates macro metrics across long-running DAG workflows
+type WorkflowStatsSummary struct {
+	TotalWorkflows       int64   `json:"total_workflows"`
+	ActiveWorkflows      int64   `json:"active_workflows"`
+	CompletedWorkflows   int64   `json:"completed_workflows"`
+	FailedWorkflows      int64   `json:"failed_workflows"`
+	ResumeSuccessRate    float64 `json:"resume_success_rate"`
+	TotalIncurredUSD     float64 `json:"total_incurred_usd"`
+	TotalEffectiveUSD    float64 `json:"total_effective_usd"`
+	TotalAvoidedWasteUSD float64 `json:"total_avoided_waste_usd"`
+	TotalSunkCostUSD     float64 `json:"total_sunk_cost_usd"`
+	CircuitBreakerTrips  int64   `json:"circuit_breaker_trips"`
+}
+
+// WorkflowResumeRequest invokes recovery from latest checkpoint or failed node
+type WorkflowResumeRequest struct {
+	WorkflowID     string `json:"workflow_id"`
+	TenantID       string `json:"tenant_id,omitempty"`
+	ForceStepID    string `json:"force_step_id,omitempty"` // Optional specific step to resume from
+	OverridePrompt string `json:"override_prompt,omitempty"`
+}
+
+// WorkflowResumeResponse returns resumed execution details and avoided waste
+type WorkflowResumeResponse struct {
+	WorkflowID          string                 `json:"workflow_id"`
+	Status              WorkflowInstanceStatus `json:"status"`
+	ResumedStepID       string                 `json:"resumed_step_id"`
+	SkippedSteps        []string               `json:"skipped_steps"`
+	AvoidedCostUSD      float64                `json:"avoided_cost_usd"`
+	AvoidedTokens       int                    `json:"avoided_tokens"`
+	EstimatedSavingsPct float64                `json:"estimated_savings_pct"`
+	Message             string                 `json:"message"`
+}
+
+// WorkflowScenarioTurn represents comparison between naive full restart vs checkpoint resume
+type WorkflowScenarioTurn struct {
+	ScenarioName        string  `json:"scenario_name"`
+	Description         string  `json:"description"`
+	TotalSteps          int     `json:"total_steps"`
+	FailedAtStep        int     `json:"failed_at_step"`
+	NaiveRestartCostUSD float64 `json:"naive_restart_cost_usd"`
+	ResumeCostUSD       float64 `json:"resume_cost_usd"`
+	SavedCostUSD        float64 `json:"saved_cost_usd"`
+	SavingsPct          float64 `json:"savings_pct"`
+	TimeSavedSeconds    int     `json:"time_saved_seconds"`
+}
+
+// WorkflowSimulateRequest triggers interactive workflow failure & resumption simulation
+type WorkflowSimulateRequest struct {
+	TenantID      string  `json:"tenant_id,omitempty"`
+	WorkflowName  string  `json:"workflow_name,omitempty"`
+	FailedStepIdx int     `json:"failed_step_idx,omitempty"` // 1-based index where failure occurred
+	SunkCostCap   float64 `json:"sunk_cost_cap_usd,omitempty"`
+}
+
+// WorkflowSimulateResponse provides breakdown of avoided waste and comparison scenarios
+type WorkflowSimulateResponse struct {
+	WorkflowName    string                 `json:"workflow_name"`
+	SimulatedSteps  []WorkflowStep         `json:"simulated_steps"`
+	NaiveCostUSD    float64                `json:"naive_cost_usd"`
+	ResumedCostUSD  float64                `json:"resumed_cost_usd"`
+	AvoidedWasteUSD float64                `json:"avoided_waste_usd"`
+	AvoidedTokens   int                    `json:"avoided_tokens"`
+	SunkCostUSD     float64                `json:"sunk_cost_usd"`
+	CircuitBroken   bool                   `json:"circuit_broken"`
+	Scenarios       []WorkflowScenarioTurn `json:"scenarios"`
+	Recommendations []string               `json:"recommendations"`
+}
+
+
 
 
 

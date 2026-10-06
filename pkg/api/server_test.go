@@ -1330,6 +1330,92 @@ func TestQualityEndpoints(t *testing.T) {
 	}
 }
 
+func TestWorkflowEndpoints(t *testing.T) {
+	server := api.NewServer(0, nil, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/workflows/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/workflows/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/workflows/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_workflows") {
+		t.Errorf("Expected total_workflows in stats response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/workflows
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/workflows?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/workflows, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "wf-") {
+		t.Errorf("Expected workflow instances in response, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/workflows/wf-fin-report-01
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/workflows/wf-fin-report-01", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/workflows/wf-fin-report-01, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "step-1-gather") {
+		t.Errorf("Expected step-1-gather in instance response, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/workflows
+	createJSON := `{
+		"id": "wf-test-new",
+		"tenant_id": "tenant-test",
+		"workflow_name": "自动化测试流水线",
+		"steps": [
+			{"step_id": "s1", "name": "Step 1", "agent_role": "AgentA", "parents": []},
+			{"step_id": "s2", "name": "Step 2", "agent_role": "AgentB", "parents": ["s1"]}
+		],
+		"sunk_cost_cap_usd": 0.50
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/workflows", strings.NewReader(createJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 for POST /api/v1/workflows, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/workflows/:id/resume
+	resumeJSON := `{"workflow_id": "wf-fin-report-01"}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/workflows/wf-default-01/resume", strings.NewReader(resumeJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/workflows/wf-default-01/resume, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "resumed_step_id") {
+		t.Errorf("Expected resumed_step_id in resume response, got: %s", w.Body.String())
+	}
+
+	// 6. POST /api/v1/workflows/simulate
+	simJSON := `{
+		"workflow_name": "跨国商业尽调流水线",
+		"failed_step_idx": 4,
+		"sunk_cost_cap": 0.25
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/workflows/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/workflows/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "avoided_waste_usd") || !strings.Contains(w.Body.String(), "scenarios") {
+		t.Errorf("Expected avoided_waste_usd and scenarios in simulation response, got: %s", w.Body.String())
+	}
+}
+
 
 
 

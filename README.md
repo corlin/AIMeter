@@ -264,6 +264,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理双向协同与全息响应头审计**：透传 `X-AIMeter-Drift-Status`、`X-AIMeter-Hallucination-Score`、`X-AIMeter-Penalty-USD`、`X-AIMeter-Bad-Debt`、`X-AIMeter-Repaired`，非流式与流式异步入库审计 Trace。
 * **全生命周期质量大盘与沙箱**：全新一级看板 `/quality`（4 维宏观 KPI、供应商可信度评分排行榜、在线自愈与损失推演沙箱、坏账审计流水表与策略配置面板）。
 
+### 28. 长程 Agent 异步工作流 DAG 编排计费、检查点持久化与断点续算幂等重试引擎 (Long-Running Agent DAG Workflow Billing, Checkpointing & Resilient Idempotency Engine - Phase 27)
+* **纯 Go 并发安全 DAG 拓扑状态机 (`pkg/workflow/dag.go`)**：基于 Kahn 算法实现高鲁棒性拓扑排序与环路检测，动态解析长程 Agent 各步骤依赖并判定下游可执行步骤（`GetNextExecutableSteps`）。
+* **增量差分检查点与微秒级幂等回放 (`pkg/workflow/checkpoint.go`)**：支持基于 `(WorkflowID, StepID)` 及全局唯一幂等键 `IdempotencyKey` 微秒级读写，固化 SHA-256 Payload 快照、单步成本、Token 消耗与耗时；入站命中快照时瞬时毫秒级回放并跳过上游重复调用。
+* **四维细粒度工作流全景账本 (`pkg/workflow/manager.go`)**：四维细粒度分解工作流开销（累计实际发生 `TotalIncurred`、有效产出净额 `EffectiveCost`、续算规避浪费 `AvoidedWaste`、失败沉没成本 `SunkCost`）。
+* **断点续算与沉没止损熔断保护 (Sunk-Cost Circuit Breaker)**：续算时自动跳过所有已完成并固化快照的前序步骤，规避无谓重复计算；支持单工作流配置沉没成本上限（`SunkCostCapUSD`，如 $0.25），当连续失败重试累计浪费达到上限时即刻熔断，防止资损雪崩。
+* **全生命周期工作流控制中心与沙箱**：全新一级看板 `/workflows`（4 维宏观 KPI、交互式 DAG 流程拓扑图谱、检查点增量快照抽屉、一键断点续算触发、实例审计表与全量重跑 vs 增量续算对比推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -271,6 +278,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/workflows` | **长程 Agent DAG 工作流编排计费与检查点控制中心** | 4 维宏观 KPI（累计发生、有效成本、续算规避浪费、失败沉没成本）、交互式 DAG 拓扑流程时序流、增量快照 Payload 预览抽屉、一键断点续算触发器、全量重跑 vs 断点续算经济学对比沙箱与实例审计表 |
 | `/quality` | **质量漂移检测与幻觉惩罚经济学大盘** | 4 维宏观 KPI（评估请求数、自愈成功率、幻觉拦截数、SLA 惩罚与坏账冲销金额）、供应商可信度排行榜 (0~100)、在线自愈与损失推演沙箱（带自愈前后 Diff 与阶梯扣减拆解）、坏账审计流水表与策略配置面板 |
 | `/kvcache` | **前缀缓存共享与 KV-Cache 经济学大盘** | 4 维宏观 KPI（前缀请求数、命中 Tokens、KV 命中率、节省金额）、交互式 Radix 前缀树拓扑图谱（展开/折叠/命中热力）、变量沉底规范化收益对比沙箱、主动 1-Token 预热工作台与实时审计流水 |
 | `/reasoning` | **AI 推理思维链深度审计与认知剪枝大盘** | 4 维宏观 KPI（思考流总数、节省思考 Tokens、规避过度反思支出、平均反思震荡指数 COI）、思维链认知时序审计（Hypothesis/Deduction/Reflection/Convergence）、反思震荡热力榜、思考预算策略配置与思维经济学推演沙箱 |

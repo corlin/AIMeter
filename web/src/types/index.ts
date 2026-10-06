@@ -1589,8 +1589,104 @@ export interface QualitySimulateResponse {
   recommendations: string[];
 }
 
+// ==========================================
+// Phase 27: Long-Running Agent DAG Workflow Billing & Checkpointing Engine
+// ==========================================
 
+export type WorkflowStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+export type WorkflowInstanceStatus = 'running' | 'completed' | 'failed' | 'circuit_broken';
 
+export interface WorkflowStep {
+  step_id: string;
+  name: string;
+  agent_role: string;
+  parents: string[];
+  children?: string[];
+  status: WorkflowStepStatus;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: number;
+  duration_ms?: number;
+  idempotency_key?: string;
+  checkpoint_payload?: string;
+  error_msg?: string;
+  retry_count?: number;
+}
 
+export interface WorkflowInstance {
+  id: string;
+  tenant_id: string;
+  workflow_name: string;
+  status: WorkflowInstanceStatus;
+  steps: WorkflowStep[];
+  total_incurred_cost_usd: number;
+  effective_cost_usd: number;
+  avoided_waste_usd: number;
+  sunk_cost_usd: number;
+  sunk_cost_cap_usd: number;
+  max_step_retries: number;
+  resumed_count: number;
+  created_at: string;
+  updated_at: string;
+}
 
+export interface WorkflowStatsSummary {
+  total_workflows: number;
+  active_workflows: number;
+  completed_workflows: number;
+  failed_workflows: number;
+  resume_success_rate: number;
+  total_incurred_usd: number;
+  total_effective_usd: number;
+  total_avoided_waste_usd: number;
+  total_sunk_cost_usd: number;
+  circuit_breaker_trips: number;
+}
 
+export interface WorkflowResumeRequest {
+  workflow_id: string;
+  from_step_id?: string;
+  force_retry?: boolean;
+}
+
+export interface WorkflowResumeResponse {
+  workflow_id: string;
+  status: WorkflowInstanceStatus;
+  resumed_step_id: string;
+  skipped_steps: string[];
+  avoided_cost_usd: number;
+  avoided_tokens: number;
+  estimated_savings_pct: number;
+  message: string;
+}
+
+export interface WorkflowScenarioTurn {
+  scenario_name: string;
+  description: string;
+  total_steps: number;
+  failed_at_step: number;
+  naive_restart_cost_usd: number;
+  resume_cost_usd: number;
+  saved_cost_usd: number;
+  savings_pct: number;
+  time_saved_seconds: number;
+}
+
+export interface WorkflowSimulateRequest {
+  workflow_name?: string;
+  failed_step_idx?: number;
+  sunk_cost_cap?: number;
+}
+
+export interface WorkflowSimulateResponse {
+  workflow_name: string;
+  simulated_steps: WorkflowStep[];
+  naive_cost_usd: number;
+  resumed_cost_usd: number;
+  avoided_waste_usd: number;
+  avoided_tokens: number;
+  sunk_cost_usd: number;
+  circuit_broken: boolean;
+  scenarios: WorkflowScenarioTurn[];
+  recommendations: string[];
+}

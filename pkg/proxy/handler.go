@@ -33,6 +33,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
+	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -103,6 +104,17 @@ type ProxyHandler struct {
 	reasoningManager   *reasoning.ReasoningManager
 	kvCacheManager     *kvcache.Manager
 	qualityManager     *quality.QualityManager
+	workflowManager    *workflow.WorkflowManager
+}
+
+// SetWorkflowManager attaches a workflow manager
+func (h *ProxyHandler) SetWorkflowManager(wm *workflow.WorkflowManager) {
+	h.workflowManager = wm
+}
+
+// GetWorkflowManager returns the attached workflow manager
+func (h *ProxyHandler) GetWorkflowManager() *workflow.WorkflowManager {
+	return h.workflowManager
 }
 
 // SetQualityManager attaches a quality manager
@@ -453,8 +465,13 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	}
 	workflowID := c.GetHeader("X-Workflow-ID")
 	if workflowID == "" {
+		workflowID = c.GetHeader("X-AIMeter-Workflow-ID")
+	}
+	if workflowID == "" {
 		workflowID = appID
 	}
+	stepID := c.GetHeader("X-AIMeter-Step-ID")
+	idempKey := c.GetHeader("X-AIMeter-Idempotency-Key")
 	traceID := c.GetHeader("traceparent")
 	if traceID == "" {
 		traceID = c.GetHeader("X-Trace-ID")
@@ -462,6 +479,28 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	if traceID == "" {
 		traceID = uuid.New().String()
 	}
+
+	// Phase 27: Microsecond Checkpoint Replay on Idempotency Key Hit
+	if idempKey != "" && h.workflowManager != nil {
+		if cp, found := h.workflowManager.LookupCheckpoint(idempKey); found && cp != nil {
+			c.Header("X-AIMeter-Idempotency-Key", idempKey)
+			c.Header("X-AIMeter-Step-Replayed", "true")
+			c.Header("X-AIMeter-Workflow-Avoided-USD", fmt.Sprintf("%.4f", cp.CostUSD))
+			c.Header("X-AIMeter-Workflow-Status", "COMPLETED")
+			c.Header("X-AIMeter-Workflow-Resumed", "true")
+			if workflowID != "" {
+				c.Header("X-AIMeter-Workflow-ID", workflowID)
+			}
+			if stepID != "" {
+				c.Header("X-AIMeter-Step-ID", stepID)
+			}
+			c.Header("X-AIMeter-Trace-ID", traceID)
+			metrics.RecordProxyRequest(provider, model, "200", false, time.Since(startTime))
+			c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(cp.OutputPayload))
+			return
+		}
+	}
+
 	baggage := c.GetHeader("baggage")
 	disableFallback := strings.EqualFold(c.GetHeader("X-AIMeter-Disable-Fallback"), "true")
 
@@ -1158,6 +1197,21 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		c.Header("X-AIMeter-Failover-Count", strconv.Itoa(routingStats.FailoverCount))
 	}
 
+	// Phase 27: Workflow Control Headers
+	if idempKey != "" || (workflowID != "" && stepID != "") {
+		c.Header("X-AIMeter-Step-Replayed", "false")
+		if workflowID != "" {
+			c.Header("X-AIMeter-Workflow-ID", workflowID)
+			c.Header("X-AIMeter-Workflow-Status", "RUNNING")
+		}
+		if stepID != "" {
+			c.Header("X-AIMeter-Step-ID", stepID)
+		}
+		if idempKey != "" {
+			c.Header("X-AIMeter-Idempotency-Key", idempKey)
+		}
+	}
+
 	// Extract GPU headers
 	gpuType := c.GetHeader("X-AIMeter-GPU-Type")
 	gpuCount := c.GetHeader("X-AIMeter-GPU-Count")
@@ -1375,6 +1429,28 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				c.Header("X-AIMeter-Penalty-USD", fmt.Sprintf("%.6f", qTrace.PenaltyUSD))
 				c.Header("X-AIMeter-Bad-Debt", strconv.FormatBool(qTrace.IsBadDebt))
 				c.Header("X-AIMeter-Repaired", strconv.FormatBool(qTrace.WasRepaired))
+			}
+
+			// Phase 27: Save Step Checkpoint on Successful Output
+			if h.workflowManager != nil {
+				iKey := c.GetHeader("X-AIMeter-Idempotency-Key")
+				sID := c.GetHeader("X-AIMeter-Step-ID")
+				wfID := c.GetHeader("X-AIMeter-Workflow-ID")
+				if wfID == "" {
+					wfID = c.GetHeader("X-Workflow-ID")
+				}
+				if iKey != "" {
+					h.workflowManager.SaveCheckpoint(
+						wfID,
+						sID,
+						iKey,
+						string(respBody),
+						costUSD,
+						respData.Usage.PromptTokens,
+						respData.Usage.CompletionTokens,
+						duration.Milliseconds(),
+					)
+				}
 			}
 
 			// Async Ingestion

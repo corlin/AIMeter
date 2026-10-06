@@ -102,7 +102,14 @@ import {
   QualityRepairRequest,
   QualityRepairResponse,
   QualitySimulateRequest,
-  QualitySimulateResponse
+  QualitySimulateResponse,
+  WorkflowStep,
+  WorkflowInstance,
+  WorkflowStatsSummary,
+  WorkflowResumeRequest,
+  WorkflowResumeResponse,
+  WorkflowSimulateRequest,
+  WorkflowSimulateResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1730,8 +1737,93 @@ export async function simulateQuality(req: QualitySimulateRequest): Promise<Qual
   return await res.json();
 }
 
+// ==========================================
+// Phase 27: Long-Running Agent DAG Workflow Billing & Checkpointing Engine
+// ==========================================
 
+export async function fetchWorkflowStats(): Promise<WorkflowStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/workflows/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch workflow stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchWorkflowStats failed:", err);
+    return {
+      total_workflows: 0,
+      active_workflows: 0,
+      completed_workflows: 0,
+      failed_workflows: 0,
+      resume_success_rate: 0,
+      total_incurred_usd: 0,
+      total_effective_usd: 0,
+      total_avoided_waste_usd: 0,
+      total_sunk_cost_usd: 0,
+      circuit_breaker_trips: 0,
+    };
+  }
+}
 
+export async function fetchWorkflowInstances(tenantId?: string): Promise<WorkflowInstance[]> {
+  try {
+    const url = tenantId && tenantId !== "all" 
+      ? `${API_BASE}/workflows?tenant_id=${tenantId}` 
+      : `${API_BASE}/workflows`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch workflow instances");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("fetchWorkflowInstances failed:", err);
+    return [];
+  }
+}
 
+export async function fetchWorkflowInstance(id: string): Promise<WorkflowInstance | null> {
+  try {
+    const res = await fetch(`${API_BASE}/workflows/${id}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchWorkflowInstance failed:", err);
+    return null;
+  }
+}
 
+export async function createWorkflowInstance(inst: Partial<WorkflowInstance>): Promise<WorkflowInstance> {
+  const res = await fetch(`${API_BASE}/workflows`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(inst),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create workflow instance" }));
+    throw new Error(err.error || "Failed to create workflow instance");
+  }
+  return await res.json();
+}
 
+export async function resumeWorkflow(req: WorkflowResumeRequest): Promise<WorkflowResumeResponse> {
+  const res = await fetch(`${API_BASE}/workflows/${req.workflow_id}/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to resume workflow" }));
+    throw new Error(err.message || err.error || "Failed to resume workflow");
+  }
+  return await res.json();
+}
+
+export async function simulateWorkflow(req: WorkflowSimulateRequest): Promise<WorkflowSimulateResponse> {
+  const res = await fetch(`${API_BASE}/workflows/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate workflow" }));
+    throw new Error(err.error || "Failed to simulate workflow");
+  }
+  return await res.json();
+}

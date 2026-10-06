@@ -924,7 +924,37 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（27/27 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 27: 长程 Agent 异步工作流 DAG 编排计费、检查点持久化与断点续算幂等重试引擎 (Long-Running Agent DAG Workflow Billing, Checkpointing & Resilient Idempotency Engine)
+* [x] **纯 Go 原生并发安全 DAG 拓扑状态机与增量检查点引擎（`pkg/workflow/`）**：
+  * **DAG 拓扑编排与环路检测（`dag.go`）**：基于 Kahn 算法实现高鲁棒性拓扑排序与环路检测，动态解析各步骤依赖并判定下游可执行步骤（`GetNextExecutableSteps`）；
+  * **增量差分检查点存储（`checkpoint.go`）**：支持基于 `(WorkflowID, StepID)` 及全局唯一幂等键 `IdempotencyKey` 微秒级读写，固化 SHA-256 Payload 快照、单步成本、Token 消耗与耗时；
+  * **工作流全景生命周期与四维账本核算（`manager.go`）**：四维细粒度分解工作流开销（累计实际发生 `TotalIncurred`、有效产出净额 `EffectiveCost`、续算规避浪费 `AvoidedWaste`、失败沉没成本 `SunkCost`）；
+  * **断点续算与沉没止损熔断器（`manager.ResumeWorkflow`）**：续算时自动跳过所有已完成并固化快照的前序步骤，规避无谓重复计算，并具备沉没成本上限熔断保护（`SunkCostCapUSD`），切断异常重试死循环；
+  * **多场景经济学对比推演沙箱（`manager.Simulate`）**：预置 3 大典型故障场景，对比传统冷启动全量重跑 vs AI Meter 检查点断点续算的成本、Token 与耗时收益。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 6 大 REST 控制端点：
+    * `GET /api/v1/workflows/stats`（工作流宏观执行与经济学大盘汇总）
+    * `GET /api/v1/workflows`（工作流实例列表，支持租户过滤）
+    * `GET /api/v1/workflows/:id`（工作流详细 DAG 拓扑与各步骤执行状态）
+    * `POST /api/v1/workflows`（创建并校验新 DAG 工作流）
+    * `POST /api/v1/workflows/:id/resume`（从最新断点一键安全续算恢复）
+    * `POST /api/v1/workflows/simulate`（多场景续算与全量重跑经济学推演）
+  * 反向代理网关双向协同与全息响应头：
+    * **入站幂等键检查点微秒级瞬时回放**：请求头携带 `X-AIMeter-Idempotency-Key` 命中已固化快照时，直接毫秒级返回已缓存结果，并透传 `X-AIMeter-Step-Replayed: true` 与 `X-AIMeter-Workflow-Avoided-USD`，零上游真实调用；
+    * **出站异步固化检查点**：步骤正常调用完成后固化快照，透传 `X-AIMeter-Workflow-ID`、`X-AIMeter-Step-ID`、`X-AIMeter-Idempotency-Key`。
+* [x] **Web 控制台全新一级看板 `/workflows`（`web/src/app/workflows/`）**：
+  * **4 维宏观核心 KPI 卡片**：累计实际发生、有效产出成本、续算规避浪费（节约率与成功率）、失败沉没成本与熔断保护次数；
+  * **交互式可视化 DAG 流程拓扑图谱**：时序流直观展现各步骤依赖关系、运行状态徽标、单步开销与 Tokens，点击步骤展示检查点详情抽屉（Input/Output Tokens、耗时、SHA-256 快照 Payload 与幂等键）；
+  * **一键断点续算触发器**：直接在界面恢复中断流水线，实时反馈跳过步骤与规避开销；
+  * **断点续算对比推演沙箱 (Sandbox)**：滑块调节沉没止损上限与故障步骤，直观对比全量重跑 vs 断点续算的支出瀑布图与 FinOps 优化建议；
+  * **工作流实例审计列表**：表格展示所有长程工作流实例、总发生、有效净额、规避浪费与止损上限。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（28/28 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
+
 
 ## 8. 安全与隐私原则 (Security & Privacy)
 

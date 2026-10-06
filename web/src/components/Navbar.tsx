@@ -26,7 +26,8 @@ import {
   BrainCircuit,
   Cpu,
   Database,
-  BadgeCheck
+  BadgeCheck,
+  GitFork
 } from "lucide-react";
 
 export function Navbar() {
@@ -34,6 +35,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Workflows", href: "/workflows", icon: GitFork },
     { label: "Quality & SLA", href: "/quality", icon: BadgeCheck },
     { label: "KV-Cache", href: "/kvcache", icon: Database },
     { label: "CoT Reasoning", href: "/reasoning", icon: Cpu },

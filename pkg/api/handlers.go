@@ -33,6 +33,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/storage"
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
+	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
 )
 
@@ -61,6 +62,17 @@ type APIHandler struct {
 	reasoningManager   *reasoning.ReasoningManager
 	kvCacheManager     *kvcache.Manager
 	qualityManager     *quality.QualityManager
+	workflowManager    *workflow.WorkflowManager
+}
+
+// SetWorkflowManager attaches a workflow manager to the API handler
+func (h *APIHandler) SetWorkflowManager(wm *workflow.WorkflowManager) {
+	h.workflowManager = wm
+}
+
+// GetWorkflowManager returns the attached workflow manager
+func (h *APIHandler) GetWorkflowManager() *workflow.WorkflowManager {
+	return h.workflowManager
 }
 
 // SetReasoningManager attaches a reasoning manager to the API handler
@@ -2169,11 +2181,100 @@ func (h *APIHandler) SimulateQuality(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// ==========================================
+// Phase 27: Long-Running Agent DAG Workflow Billing & Checkpointing Handlers
+// ==========================================
 
+// GetWorkflowStats returns macro overview of workflow executions and ledger economics
+func (h *APIHandler) GetWorkflowStats(c *gin.Context) {
+	if h.workflowManager == nil {
+		c.JSON(http.StatusOK, domain.WorkflowStatsSummary{})
+		return
+	}
+	c.JSON(http.StatusOK, h.workflowManager.GetStats())
+}
 
+// GetWorkflowInstances returns all workflow instances with optional tenant filtering
+func (h *APIHandler) GetWorkflowInstances(c *gin.Context) {
+	if h.workflowManager == nil {
+		c.JSON(http.StatusOK, []domain.WorkflowInstance{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	c.JSON(http.StatusOK, h.workflowManager.GetInstances(tenantID))
+}
 
+// GetWorkflowInstance returns detailed DAG and step execution status for a single workflow
+func (h *APIHandler) GetWorkflowInstance(c *gin.Context) {
+	if h.workflowManager == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow manager not initialized"})
+		return
+	}
+	id := c.Param("id")
+	inst, ok := h.workflowManager.GetInstance(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow instance not found"})
+		return
+	}
+	c.JSON(http.StatusOK, inst)
+}
 
+// CreateWorkflowInstance registers and begins orchestrating a new DAG workflow
+func (h *APIHandler) CreateWorkflowInstance(c *gin.Context) {
+	if h.workflowManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow manager not initialized"})
+		return
+	}
+	var inst domain.WorkflowInstance
+	if err := c.ShouldBindJSON(&inst); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	created, err := h.workflowManager.CreateInstance(inst)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, created)
+}
 
+// ResumeWorkflow recovers a failed or suspended workflow from its latest checkpoint
+func (h *APIHandler) ResumeWorkflow(c *gin.Context) {
+	if h.workflowManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow manager not initialized"})
+		return
+	}
+	var req domain.WorkflowResumeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.WorkflowID = c.Param("id")
+	}
+	if req.WorkflowID == "" {
+		req.WorkflowID = c.Param("id")
+	}
+	if req.WorkflowID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow_id is required"})
+		return
+	}
 
+	resp, err := h.workflowManager.ResumeWorkflow(req)
+	if err != nil {
+		c.JSON(http.StatusConflict, resp)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
 
-
+// SimulateWorkflow runs multi-scenario DAG simulation comparing naive restart vs checkpoint resumption
+func (h *APIHandler) SimulateWorkflow(c *gin.Context) {
+	if h.workflowManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow manager not initialized"})
+		return
+	}
+	var req domain.WorkflowSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.workflowManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
