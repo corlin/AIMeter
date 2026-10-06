@@ -39,6 +39,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "AI WAF", href: "/waf", icon: ShieldAlert },
     { label: "Fine-Tuning & LoRA", href: "/finetuning", icon: Boxes },
     { label: "Federation", href: "/federation", icon: Coins },
     { label: "Org Hierarchy", href: "/hierarchy", icon: Building2 },

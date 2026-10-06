@@ -38,6 +38,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/hierarchy"
 	"github.com/corlin/AIMeter/pkg/federation"
 	"github.com/corlin/AIMeter/pkg/finetuning"
+	"github.com/corlin/AIMeter/pkg/waf"
 	"github.com/gin-gonic/gin"
 )
 
@@ -71,6 +72,17 @@ type APIHandler struct {
 	hierarchyManager   *hierarchy.HierarchyManager
 	federationManager  *federation.FederationManager
 	finetuningManager  *finetuning.Manager
+	wafManager         *waf.Manager
+}
+
+// SetWAFManager attaches a WAF manager to the API handler
+func (h *APIHandler) SetWAFManager(wm *waf.Manager) {
+	h.wafManager = wm
+}
+
+// GetWAFManager returns the attached WAF manager
+func (h *APIHandler) GetWAFManager() *waf.Manager {
+	return h.wafManager
 }
 
 // SetFineTuningManager attaches a fine-tuning manager to the API handler
@@ -2740,6 +2752,126 @@ func (h *APIHandler) SimulateFineTuningFlywheel(c *gin.Context) {
 	resp := h.finetuningManager.SimulateFlywheel(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// GetWAFStats returns macro statistics for WAF defenses and avoided financial loss
+func (h *APIHandler) GetWAFStats(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	stats := h.wafManager.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetWAFEvents returns recent threat interception audit events
+func (h *APIHandler) GetWAFEvents(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 50
+	}
+	events := h.wafManager.ListEvents(limit)
+	c.JSON(http.StatusOK, gin.H{"events": events, "total": len(events)})
+}
+
+// GetWAFRules returns all configured WAF detection rules
+func (h *APIHandler) GetWAFRules(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	rules := h.wafManager.ListRules()
+	c.JSON(http.StatusOK, gin.H{"rules": rules, "total": len(rules)})
+}
+
+// UpsertWAFRule registers or updates a WAF detection rule
+func (h *APIHandler) UpsertWAFRule(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	var req domain.WAFRuleUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	rule := h.wafManager.UpsertRule(req)
+	c.JSON(http.StatusOK, rule)
+}
+
+// GetWAFBannedSources returns actively blacklisted IP addresses and user IDs
+func (h *APIHandler) GetWAFBannedSources(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	banned := h.wafManager.ListBannedSources()
+	c.JSON(http.StatusOK, gin.H{"banned_sources": banned, "total": len(banned)})
+}
+
+// UnbanWAFSource lifts dynamic blacklist penalty for a key
+func (h *APIHandler) UnbanWAFSource(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	var req struct {
+		Key string `json:"key" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	success := h.wafManager.UnbanSource(req.Key)
+	c.JSON(http.StatusOK, gin.H{"key": req.Key, "unbanned": success})
+}
+
+// InspectWAFPrompt performs pre-flight threat evaluation and sanitization on arbitrary prompts
+func (h *APIHandler) InspectWAFPrompt(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	var req domain.WAFInspectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, _, err := h.wafManager.InspectAndDecide(
+		c.Request.Context(),
+		req.TenantID,
+		req.SourceIP,
+		req.UserID,
+		req.SessionID,
+		req.Model,
+		req.Prompt,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// SimulateWAF runs What-If red-team adversarial attacks and denial-of-wallet simulation
+func (h *APIHandler) SimulateWAF(c *gin.Context) {
+	if h.wafManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "WAF manager not initialized"})
+		return
+	}
+	var req domain.WAFSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.wafManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

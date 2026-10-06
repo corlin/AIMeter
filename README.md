@@ -294,6 +294,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理双向协同与全息响应头审计**：网关嗅探 `X-AIMeter-Adapter-ID` 与 `X-AIMeter-Benchmark-Model`；出站自动测算与基准旗舰模型的单次节省差额，原子累加至 LoRA 资产回收池并透传全息响应头 `X-AIMeter-Adapter-ID`、`X-AIMeter-Adapter-ROI`、`X-AIMeter-Break-Even-Status`、`X-AIMeter-Inference-Saved-USD`。
 * **全生命周期微调资产看板与沙箱**：全新一级看板 `/finetuning`（4 维宏观 KPI、LoRA 适配器资产矩阵与盈亏平衡进度条、微调与蒸馏任务流水表、推训一体化 ROI 飞轮推演沙箱与新建任务/注册资产弹窗）。
 
+### 33. 提示词注入/越狱攻防对抗、AI 安全防火墙 (LLM WAF) 与恶意算力盗刷/拒绝钱包 (Denial-of-Wallet) 熔断防御引擎 (Phase 32)
+* **纯 Go 微秒级混合威胁检测器**：纳秒级预编译正则匹配与启发式异常分析（词长异常膨胀、紧邻重复单词循环陷阱检测），输出综合威胁评分 $S \in [0, 100]$，精准测算规避资损金额（`EstimatedLossUSD`），单次检测耗时 `< 0.08ms`。
+* **自适应滑动窗口与动态黑名单封禁池 (Dynamic Banlist)**：5 分钟滑动窗口统计单一源（IP/User）攻击频次，当高频达到 2~3 次 Critical 高危判定时，自动触发 10 分钟动态封禁，支持 TTL 惰性过期与管理员手动一键解封。
+* **网关入站临界阻断与零算力损耗**：入站前置安全嗅探，若命中黑名单或 Critical 威胁，立即返回标准 HTTP 403 Forbidden 与 `waf_threat_blocked` 结构化诊断 JSON，从根源掐断上游 GPU 显存与 Token 消耗。
+* **全息透传指标与双向协同**：响应头注入 `X-AIMeter-WAF-Action`、`X-AIMeter-WAF-Score`、`X-AIMeter-WAF-Threat`、`X-AIMeter-Avoided-Loss-USD`、`X-AIMeter-WAF-Rule-Triggered`；支持 `X-AIMeter-WAF-Bypass: true` 白名单旁路。
+* **全生命周期安全防火墙看板与攻防沙箱**：全新一级看板 `/waf`（4 维核心宏观 KPI、实时威胁拦截流水、动态黑名单治理面板、防护特征规则库管理、红蓝对抗推演与单次 Prompt 脆弱性即时探针沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -301,6 +308,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/waf` | **AI WAF 提示词防火墙与拒绝钱包防御中心** | 4 维宏观 KPI（入站前置安全预检量、成功阻断恶意刺探数、规避算力盗刷资损金额、自适应黑名单封禁数）、实时威胁拦截审计表（带样本审查抽屉）、动态黑名单治理与一键解封、防护规则库卡片管理（含新建特征规则弹窗）、多轮红蓝攻防推演与单次 Prompt 脆弱性即时探针沙箱 |
 | `/finetuning` | **模型微调、知识蒸馏与 LoRA 资产记账中心** | 4 维宏观 KPI（总 CapEx 投入、纳管 LoRA 数、累计推理净省、综合 ROI）、LoRA 资产矩阵与回收进度条、微调任务流水表、推训一体化 ROI 飞轮推演沙箱与新建任务/注册资产弹窗 |
 | `/federation` | **多智能体跨域协作与代币清算所看板** | 4 维宏观 KPI（总清算代币规模、托管中保障金、平台清算手续费收入、已决算凭证数）、工作区代币账本矩阵（余额/冻结额/信用分/充值入口）、跨域悬赏任务大厅与加密托管凭证抽屉（SHA-256证明/2PC决算）、What-If 竞标撮合与 2PC 清算沙箱及任务发布/竞标/充值弹窗 |
 | `/hierarchy` | **企业组织架构预算树与双轨配额管控中心** | 4 维宏观 KPI（中央总预算池、组织节点数与架构深度、预警与熔断管控、P0核心业务保障）、交互式可折叠组织拓扑树、配额利用率进度条、快速配额探测器、What-If 级联冲击仿真沙箱与节点配置抽屉 |

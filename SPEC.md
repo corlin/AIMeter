@@ -1079,6 +1079,42 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（32/32 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 32: 提示词注入/越狱攻防对抗、AI 安全防火墙 (LLM WAF) 与恶意算力盗刷/拒绝钱包 (Denial-of-Wallet) 熔断防御引擎 (LLM Jailbreak & Prompt Injection WAF, Token Drain Defense & Denial-of-Wallet Mitigation Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/waf_seed.json`）**：
+  * 定义核心数据结构：`WAFThreatCategory`（`prompt_injection`, `jailbreak_dan`, `denial_of_wallet`, `system_prompt_leak`）、`WAFAction`（`allow`, `sanitize`, `block`, `banned`）、`WAFRuleSeverity`（`low`, `medium`, `high`, `critical`）、`WAFRule`（规则 ID、名称、分类、告警等级、预编译正则模式列表、威胁分权重、描述、启用状态）、`WAFBannedSource`（封禁标识 IP/User、封禁原因、近 5 分钟攻击频次、封禁时间戳、过期时间戳、剩余秒数）、`WAFEvent`（拦截事件 ID、租户、来源 IP、用户、会话、威胁分类、综合评分、命中规则列表、处置动作、规避资损金额、输入样本摘要、时间戳）、`WAFStatsSummary`、`WAFInspectRequest`、`WAFInspectResponse`、`WAFRuleUpsertRequest`、`WAFSimulateTurn`、`WAFSimulateRequest` 与 `WAFSimulateResponse`；
+  * 预置种子配置：`configs/waf_seed.json` 包含 6 大经典对抗防护特征规则（DAN 角色扮演越狱、直接指令覆盖注入、拒绝钱包递归 Token 消耗死循环、系统提示词窥探窃取、Base64/Hex 编码混淆规避、对抗性高熵字符乱码），预置 2 个恶意攻击源封禁记录与 5 条典型拦截审计流水。
+* [x] **纯 Go 高性能微秒级威胁检测与自适应熔断核心引擎（`pkg/waf/`）**：
+  * **正则与启发式混合威胁检测器（`detector.go`）**：纳秒级预编译正则匹配与启发式异常分析（词长异常膨胀、紧邻重复单词循环陷阱检测），输出综合威胁评分 $S \in [0, 100]$，精准测算规避资损金额（`EstimatedLossUSD`）；
+  * **并发安全规则特征库（`rules.go`）**：支持运行时并发安全增删改查规则，自动归类并判定主导威胁分类；
+  * **自适应滑动窗口与动态黑名单封禁池（`banlist.go`）**：5 分钟滑动窗口统计单一源（IP/User）攻击频次，当高频达到 2~3 次 Critical 高危判定时，自动触发 10 分钟动态封禁，支持 TTL 惰性过期与管理员手动一键解封；
+  * **网关入站快速前置拦截与推演沙箱（`manager.go`）**：提供微秒级前置判定（`InspectAndDecide`）、环形审计事件缓冲池（200 条）与多轮红蓝攻防对抗仿真推演沙箱（`Simulate`）。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 8 大 REST 控制端点：
+    * `GET /api/v1/waf/stats`（宏观防护量、拦截率、规避资损与活跃封禁数大盘）
+    * `GET /api/v1/waf/events`（实时威胁拦截审计流水列表）
+    * `GET /api/v1/waf/rules`（防护规则库列表）
+    * `POST /api/v1/waf/rules`（新增或修改自定义特征规则）
+    * `GET /api/v1/waf/banned`（动态黑名单活跃封禁池）
+    * `POST /api/v1/waf/banned/unban`（一键解除封禁限制）
+    * `POST /api/v1/waf/inspect`（单次 Prompt 微秒级脆弱性预检探针）
+    * `POST /api/v1/waf/simulate`（红蓝攻防对抗与拒绝钱包恶意循环推演沙箱）
+  * 反向代理网关零损耗拦截与全息响应头协同：
+    * **入站前置安全嗅探**：提取请求体 messages / prompt，在转发前执行判定。若命中黑名单或 Critical 威胁，立即返回标准 HTTP 403 Forbidden 与 `waf_threat_blocked` 结构化诊断 JSON，从根源掐断上游 GPU 与 Token 消耗；
+    * **支持旁路标头**：支持 `X-AIMeter-WAF-Bypass: true` 进行特定测试穿透；
+    * **全息透传指标**：响应头注入 `X-AIMeter-WAF-Action`、`X-AIMeter-WAF-Score`、`X-AIMeter-WAF-Threat`、`X-AIMeter-Avoided-Loss-USD`、`X-AIMeter-WAF-Rule-Triggered`。
+* [x] **Web 控制台全新一级看板 `/waf`（`web/src/app/waf/`）**：
+  * **4 维宏观核心 KPI 卡片**：入站前置安全预检量与拦截率、成功阻断恶意刺探数与安全净化数、已规避算力盗刷资损金额（Avoided Loss USD）、自适应黑名单封禁实体数；
+  * **实时拦截流水审计表 (Live Audit)**：展示事件 ID、时间戳、来源 IP/用户、威胁分类徽标、威胁评分进度条、命中规则、处置动作、规避资损与攻击样本抽屉详情；
+  * **动态黑名单治理看板 (Banlist Management)**：展示被封禁 IP/User、封禁原因、攻击频次、剩余时长倒计时与“立即解封”交互；
+  * **防护规则库管理卡片网格 (Rule Registry)**：卡片化展示规则详情、正则模式、权重分与启用开关，并提供“新建防护规则”弹窗；
+  * **红蓝攻防推演与即时探针沙箱 (Playground)**：
+    * 多轮红蓝对抗推演：配置攻击强度、拒绝钱包循环与推演轮数，呈现推演轮次演进轨迹、综合防御率、累计止损与 FinOps 策略建议；
+    * 单次 Prompt 即时探针：输入待测提示词，微秒级输出判定动作、威胁分表盘、阻断原因与净化文本预览。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（33/33 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 

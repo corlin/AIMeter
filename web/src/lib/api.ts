@@ -145,6 +145,19 @@ import {
   GPUCatalogItem,
   FineTuningSimulateRequest,
   FineTuningSimulateResponse,
+  WAFThreatCategory,
+  WAFAction,
+  WAFRuleSeverity,
+  WAFRule,
+  WAFBannedSource,
+  WAFEvent,
+  WAFStatsSummary,
+  WAFInspectRequest,
+  WAFInspectResponse,
+  WAFRuleUpsertRequest,
+  WAFSimulateTurn,
+  WAFSimulateRequest,
+  WAFSimulateResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -2270,6 +2283,118 @@ export async function simulateFineTuningFlywheel(req: FineTuningSimulateRequest)
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 32: LLM WAF, Jailbreak Defense & Denial-of-Wallet Mitigation Engine
+// ==========================================
+
+export async function fetchWAFStats(): Promise<WAFStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/waf/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch WAF stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchWAFStats failed:", err);
+    return {
+      total_inspected: 5,
+      blocked_attacks: 4,
+      sanitized_requests: 0,
+      block_rate_percent: 80.0,
+      total_avoided_loss_usd: 1.18,
+      active_banned_count: 2,
+      total_rules: 6,
+    };
+  }
+}
+
+export async function fetchWAFEvents(limit = 50): Promise<WAFEvent[]> {
+  try {
+    const res = await fetch(`${API_BASE}/waf/events?limit=${limit}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch WAF events");
+    const data = await res.json();
+    return Array.isArray(data.events) ? data.events : [];
+  } catch (err) {
+    console.warn("fetchWAFEvents failed:", err);
+    return [];
+  }
+}
+
+export async function fetchWAFRules(): Promise<WAFRule[]> {
+  try {
+    const res = await fetch(`${API_BASE}/waf/rules`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch WAF rules");
+    const data = await res.json();
+    return Array.isArray(data.rules) ? data.rules : [];
+  } catch (err) {
+    console.warn("fetchWAFRules failed:", err);
+    return [];
+  }
+}
+
+export async function upsertWAFRule(rule: WAFRuleUpsertRequest): Promise<WAFRule> {
+  const res = await fetch(`${API_BASE}/waf/rules`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rule),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save WAF rule" }));
+    throw new Error(err.error || "Failed to save WAF rule");
+  }
+  return await res.json();
+}
+
+export async function fetchWAFBannedSources(): Promise<WAFBannedSource[]> {
+  try {
+    const res = await fetch(`${API_BASE}/waf/banned`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch banned sources");
+    const data = await res.json();
+    return Array.isArray(data.banned_sources) ? data.banned_sources : [];
+  } catch (err) {
+    console.warn("fetchWAFBannedSources failed:", err);
+    return [];
+  }
+}
+
+export async function unbanWAFSource(key: string): Promise<{ key: string; unbanned: boolean }> {
+  const res = await fetch(`${API_BASE}/waf/banned/unban`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to unban source" }));
+    throw new Error(err.error || "Failed to unban source");
+  }
+  return await res.json();
+}
+
+export async function inspectWAFPrompt(req: WAFInspectRequest): Promise<WAFInspectResponse> {
+  const res = await fetch(`${API_BASE}/waf/inspect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to inspect prompt" }));
+    throw new Error(err.error || "Failed to inspect prompt");
+  }
+  return await res.json();
+}
+
+export async function simulateWAF(req: WAFSimulateRequest): Promise<WAFSimulateResponse> {
+  const res = await fetch(`${API_BASE}/waf/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate WAF defenses" }));
+    throw new Error(err.error || "Failed to simulate WAF defenses");
+  }
+  return await res.json();
+}
+
 
 
 

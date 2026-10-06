@@ -2171,6 +2171,124 @@ export interface FineTuningSimulateResponse {
   finops_recommendations: string[];
 }
 
+// ==========================================
+// Phase 32: LLM WAF, Jailbreak Defense & Denial-of-Wallet Mitigation Engine
+// ==========================================
+
+export type WAFThreatCategory =
+  | "prompt_injection"
+  | "jailbreak_dan"
+  | "denial_of_wallet"
+  | "system_prompt_leak";
+
+export type WAFAction = "allow" | "sanitize" | "block" | "banned";
+
+export type WAFRuleSeverity = "low" | "medium" | "high" | "critical";
+
+export interface WAFRule {
+  id: string;
+  name: string;
+  category: WAFThreatCategory;
+  severity: WAFRuleSeverity;
+  patterns: string[];
+  threat_score: number;
+  description: string;
+  enabled: boolean;
+}
+
+export interface WAFBannedSource {
+  key: string;
+  reason: string;
+  attack_count: number;
+  banned_at: string;
+  expires_at: string;
+  remaining_sec: number;
+}
+
+export interface WAFEvent {
+  id: string;
+  tenant_id: string;
+  source_ip: string;
+  user_id?: string;
+  session_id?: string;
+  threat_category: WAFThreatCategory;
+  threat_score: number;
+  triggered_rules: string[];
+  action: WAFAction;
+  avoided_loss_usd: number;
+  prompt_preview: string;
+  timestamp: string;
+}
+
+export interface WAFStatsSummary {
+  total_inspected: number;
+  blocked_attacks: number;
+  sanitized_requests: number;
+  block_rate_percent: number;
+  total_avoided_loss_usd: number;
+  active_banned_count: number;
+  total_rules: number;
+}
+
+export interface WAFInspectRequest {
+  prompt: string;
+  source_ip?: string;
+  user_id?: string;
+  tenant_id?: string;
+  session_id?: string;
+  model?: string;
+}
+
+export interface WAFInspectResponse {
+  action: WAFAction;
+  threat_score: number;
+  threat_category: WAFThreatCategory;
+  triggered_rules: string[];
+  sanitized_prompt?: string;
+  estimated_loss_usd: number;
+  block_reason?: string;
+}
+
+export interface WAFRuleUpsertRequest {
+  id?: string;
+  name: string;
+  category: WAFThreatCategory;
+  severity: WAFRuleSeverity;
+  patterns: string[];
+  threat_score: number;
+  description: string;
+  enabled: boolean;
+}
+
+export interface WAFSimulateTurn {
+  step_index: number;
+  attack_type: WAFThreatCategory;
+  prompt_sample: string;
+  threat_score: number;
+  action: WAFAction;
+  avoided_loss_usd: number;
+  ban_triggered: boolean;
+  detail: string;
+}
+
+export interface WAFSimulateRequest {
+  attack_intensity: string;
+  include_denial_of_wallet: boolean;
+  concurrency?: number;
+  simulated_rounds: number;
+}
+
+export interface WAFSimulateResponse {
+  total_simulated: number;
+  total_blocked: number;
+  total_banned: number;
+  cumulative_avoided_loss_usd: number;
+  defense_rate_percent: number;
+  scenarios: WAFSimulateTurn[];
+  strategic_recommendations: string[];
+}
+
+
 
 
 

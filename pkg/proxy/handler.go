@@ -36,6 +36,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/hierarchy"
 	"github.com/corlin/AIMeter/pkg/federation"
 	"github.com/corlin/AIMeter/pkg/finetuning"
+	"github.com/corlin/AIMeter/pkg/waf"
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
@@ -113,6 +114,17 @@ type ProxyHandler struct {
 	hierarchyManager   *hierarchy.HierarchyManager
 	federationManager  *federation.FederationManager
 	finetuningManager  *finetuning.Manager
+	wafManager         *waf.Manager
+}
+
+// SetWAFManager attaches a WAF manager
+func (h *ProxyHandler) SetWAFManager(wm *waf.Manager) {
+	h.wafManager = wm
+}
+
+// GetWAFManager returns the attached WAF manager
+func (h *ProxyHandler) GetWAFManager() *waf.Manager {
+	return h.wafManager
 }
 
 // SetFineTuningManager attaches a fine-tuning manager
@@ -527,6 +539,13 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	if traceID == "" {
 		traceID = uuid.New().String()
 	}
+	sessionID := c.GetHeader("X-AIMeter-Session-Id")
+	if sessionID == "" {
+		sessionID = c.GetHeader("X-Session-ID")
+	}
+	if sessionID == "" {
+		sessionID = traceID
+	}
 
 	// Phase 27: Microsecond Checkpoint Replay on Idempotency Key Hit
 	if idempKey != "" && h.workflowManager != nil {
@@ -618,6 +637,80 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		}
 	}
 
+	// 4.25 Evaluate AI WAF, Prompt Injection & Denial-of-Wallet Defense (Phase 32)
+	wafBypass := strings.EqualFold(c.GetHeader("X-AIMeter-WAF-Bypass"), "true")
+	if h.wafManager != nil && !wafBypass {
+		promptForWAF := ""
+		if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+			for _, item := range rawMsgs {
+				if m, ok := item.(map[string]interface{}); ok {
+					if cText, ok := m["content"].(string); ok {
+						if promptForWAF != "" {
+							promptForWAF += "\n"
+						}
+						promptForWAF += cText
+					}
+				}
+			}
+		} else if pStr, ok := payload["prompt"].(string); ok {
+			promptForWAF = pStr
+		}
+
+		sourceIP := c.ClientIP()
+		userID := c.GetHeader("X-AIMeter-User-Id")
+		if userID == "" {
+			userID = c.GetHeader("X-User-ID")
+		}
+
+		wafResp, _, wErr := h.wafManager.InspectAndDecide(c.Request.Context(), tenantID, sourceIP, userID, sessionID, actualModel, promptForWAF)
+		if wErr == nil && wafResp != nil {
+			c.Header("X-AIMeter-WAF-Action", string(wafResp.Action))
+			c.Header("X-AIMeter-WAF-Score", fmt.Sprintf("%.1f", wafResp.ThreatScore))
+			c.Header("X-AIMeter-WAF-Threat", string(wafResp.ThreatCategory))
+			if wafResp.EstimatedLossUSD > 0 {
+				c.Header("X-AIMeter-Avoided-Loss-USD", fmt.Sprintf("%.4f", wafResp.EstimatedLossUSD))
+			}
+			if len(wafResp.TriggeredRules) > 0 {
+				c.Header("X-AIMeter-WAF-Rule-Triggered", strings.Join(wafResp.TriggeredRules, ","))
+			}
+
+			if wafResp.Action == domain.WAFActionBlock || wafResp.Action == domain.WAFActionBanned {
+				metrics.RecordProxyRequest(provider, actualModel, "403", false, time.Since(startTime))
+				c.JSON(http.StatusForbidden, gin.H{
+					"error": gin.H{
+						"message":          fmt.Sprintf("Request blocked by AI Meter WAF: %s", wafResp.BlockReason),
+						"type":             "waf_threat_blocked",
+						"code":             "waf_threat_detected",
+						"action":           wafResp.Action,
+						"threat_category":  wafResp.ThreatCategory,
+						"threat_score":     wafResp.ThreatScore,
+						"avoided_loss_usd": wafResp.EstimatedLossUSD,
+					},
+				})
+				return
+			}
+
+			if wafResp.Action == domain.WAFActionSanitize && wafResp.SanitizedPrompt != "" {
+				if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+					var chatMsgs []domain.ChatMessage
+					msgBytes, mErr := json.Marshal(rawMsgs)
+					if mErr == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
+						for i := len(chatMsgs) - 1; i >= 0; i-- {
+							if chatMsgs[i].Role == "user" {
+								chatMsgs[i].Content = wafResp.SanitizedPrompt
+								break
+							}
+						}
+						payload["messages"] = chatMsgs
+						if modBytes, err := json.Marshal(payload); err == nil {
+							bodyBytes = modBytes
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// 4.3 Evaluate AI Data Privacy, PII Masking & DLP Guard Engine (Phase 21)
 	var dlpVault map[string]string
 	enableUnmasking := false
@@ -666,13 +759,6 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	// 4.4 Multi-Agent Swarm Topology & Deadlock Guard (Phase 22)
 	agentName := c.GetHeader("X-AIMeter-Agent-Name")
 	parentAgent := c.GetHeader("X-AIMeter-Parent-Agent")
-	sessionID := c.GetHeader("X-AIMeter-Session-Id")
-	if sessionID == "" {
-		sessionID = c.GetHeader("X-Session-ID")
-	}
-	if sessionID == "" {
-		sessionID = traceID
-	}
 	if agentName == "" && parentAgent != "" {
 		agentName = "Agent"
 	}

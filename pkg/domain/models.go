@@ -2710,5 +2710,153 @@ type FineTuningSimulateResponse struct {
 	FinOpsRecommendations []string                 `json:"finops_recommendations"`
 }
 
+// ==========================================
+// Phase 32: LLM WAF, Jailbreak Defense & Denial-of-Wallet Mitigation Engine
+// ==========================================
+
+// WAFThreatCategory categorizes adversarial attack vectors
+type WAFThreatCategory string
+
+const (
+	WAFThreatPromptInjection  WAFThreatCategory = "prompt_injection"   // Direct or indirect instruction override
+	WAFThreatJailbreakDAN     WAFThreatCategory = "jailbreak_dan"      // DAN roleplay, hypothetical bypass, cipher encodings
+	WAFThreatDenialOfWallet   WAFThreatCategory = "denial_of_wallet"   // Adversarial token drain, infinite recursion, runaway thinking
+	WAFThreatSystemPromptLeak WAFThreatCategory = "system_prompt_leak" // System prompt sniffing & reverse engineering
+)
+
+// WAFAction defines the mitigation intervention decided by the firewall
+type WAFAction string
+
+const (
+	WAFActionAllow    WAFAction = "allow"    // Clean, normal forward
+	WAFActionSanitize WAFAction = "sanitize" // Strip adversarial injection prefix & pass
+	WAFActionBlock    WAFAction = "block"    // Fast fail with HTTP 403, 0 compute token cost
+	WAFActionBanned   WAFAction = "banned"   // Source is actively banned in dynamic blacklist
+)
+
+// WAFRuleSeverity denotes severity level
+type WAFRuleSeverity string
+
+const (
+	WAFSeverityCritical WAFRuleSeverity = "critical" // Score >= 70, triggers immediate 403
+	WAFSeverityHigh     WAFRuleSeverity = "high"     // Score 50~69
+	WAFSeverityMedium   WAFRuleSeverity = "medium"   // Score 30~49
+	WAFSeverityLow      WAFRuleSeverity = "low"      // Score < 30
+)
+
+// WAFRule represents a regex/pattern detection rule in the firewall engine
+type WAFRule struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Category    WAFThreatCategory `json:"category"`
+	Severity    WAFRuleSeverity   `json:"severity"`
+	Patterns    []string          `json:"patterns"`
+	ThreatScore int               `json:"threat_score"` // Weight added when matched (10-100)
+	Description string            `json:"description"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// WAFBannedSource actively blacklisted source IP or user
+type WAFBannedSource struct {
+	Key          string    `json:"key"`           // IP address, User-ID, or Tenant-ID
+	Reason       string    `json:"reason"`        // e.g. "Repeated denial-of-wallet token drain probes"
+	AttackCount  int       `json:"attack_count"`  // Number of attacks before ban
+	BannedAt     time.Time `json:"banned_at"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	RemainingSec int64     `json:"remaining_sec"` // Computed countdown seconds
+}
+
+// WAFEvent audited security incident
+type WAFEvent struct {
+	ID             string            `json:"id"`
+	TenantID       string            `json:"tenant_id"`
+	SourceIP       string            `json:"source_ip"`
+	UserID         string            `json:"user_id,omitempty"`
+	SessionID      string            `json:"session_id,omitempty"`
+	ThreatCategory WAFThreatCategory `json:"threat_category"`
+	ThreatScore    float64           `json:"threat_score"` // 0.0 - 100.0
+	TriggeredRules []string          `json:"triggered_rules"`
+	Action         WAFAction         `json:"action"`
+	AvoidedLossUSD float64           `json:"avoided_loss_usd"` // Financial spend prevented by early block
+	PromptPreview  string            `json:"prompt_preview"`
+	Timestamp      time.Time         `json:"timestamp"`
+}
+
+// WAFStatsSummary macro dashboard metrics for the WAF
+type WAFStatsSummary struct {
+	TotalInspected      int64   `json:"total_inspected"`
+	BlockedAttacks      int64   `json:"blocked_attacks"`
+	SanitizedRequests   int64   `json:"sanitized_requests"`
+	BlockRatePercent    float64 `json:"block_rate_percent"`
+	TotalAvoidedLossUSD float64 `json:"total_avoided_loss_usd"`
+	ActiveBannedCount   int     `json:"active_banned_count"`
+	TotalRules          int     `json:"total_rules"`
+}
+
+// WAFInspectRequest payload for ad-hoc prompt vulnerability check
+type WAFInspectRequest struct {
+	Prompt    string `json:"prompt"`
+	SourceIP  string `json:"source_ip,omitempty"`
+	UserID    string `json:"user_id,omitempty"`
+	TenantID  string `json:"tenant_id,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+	Model     string `json:"model,omitempty"`
+}
+
+// WAFInspectResponse verdict returned from inspection
+type WAFInspectResponse struct {
+	Action           WAFAction         `json:"action"`
+	ThreatScore      float64           `json:"threat_score"`
+	ThreatCategory   WAFThreatCategory `json:"threat_category"`
+	TriggeredRules   []string          `json:"triggered_rules"`
+	SanitizedPrompt  string            `json:"sanitized_prompt,omitempty"`
+	EstimatedLossUSD float64           `json:"estimated_loss_usd"`
+	BlockReason      string            `json:"block_reason,omitempty"`
+}
+
+// WAFRuleUpsertRequest payload to add/update rules
+type WAFRuleUpsertRequest struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Category    WAFThreatCategory `json:"category"`
+	Severity    WAFRuleSeverity   `json:"severity"`
+	Patterns    []string          `json:"patterns"`
+	ThreatScore int               `json:"threat_score"`
+	Description string            `json:"description"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// WAFSimulateTurn simulation step
+type WAFSimulateTurn struct {
+	StepIndex      int               `json:"step_index"`
+	AttackType     WAFThreatCategory `json:"attack_type"`
+	PromptSample   string            `json:"prompt_sample"`
+	ThreatScore    float64           `json:"threat_score"`
+	Action         WAFAction         `json:"action"`
+	AvoidedLossUSD float64           `json:"avoided_loss_usd"`
+	BanTriggered   bool              `json:"ban_triggered"`
+	Detail         string            `json:"detail"`
+}
+
+// WAFSimulateRequest playground simulation inputs
+type WAFSimulateRequest struct {
+	AttackIntensity       string `json:"attack_intensity"` // "moderate", "aggressive", "extreme"
+	IncludeDenialOfWallet bool   `json:"include_denial_of_wallet"`
+	Concurrency           int    `json:"concurrency"`
+	SimulatedRounds       int    `json:"simulated_rounds"`
+}
+
+// WAFSimulateResponse playground simulation outputs
+type WAFSimulateResponse struct {
+	TotalSimulated          int               `json:"total_simulated"`
+	TotalBlocked            int               `json:"total_blocked"`
+	TotalBanned             int               `json:"total_banned"`
+	CumulativeAvoidedLossUSD float64          `json:"cumulative_avoided_loss_usd"`
+	DefenseRatePercent      float64           `json:"defense_rate_percent"`
+	Scenarios               []WAFSimulateTurn `json:"scenarios"`
+	StrategicRecommendations []string         `json:"strategic_recommendations"`
+}
+
+
 
 
