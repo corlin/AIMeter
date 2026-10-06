@@ -1526,6 +1526,109 @@ func TestSandboxEndpoints(t *testing.T) {
 	}
 }
 
+func TestHierarchyEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/hierarchy/tree
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/hierarchy/tree", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/hierarchy/tree, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "node-corp") || !strings.Contains(w.Body.String(), "corp") {
+		t.Errorf("Expected hierarchy tree containing corp, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/hierarchy/stats
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/hierarchy/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/hierarchy/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_nodes") || !strings.Contains(w.Body.String(), "total_allocated_usd") {
+		t.Errorf("Expected hierarchy stats, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/hierarchy/nodes (Upsert Node)
+	createJSON := `{
+		"name": "自动化测试组",
+		"path": "corp/tech/ai-lab/qa-autotest",
+		"node_type": "team",
+		"allocated_budget_usd": 1500.0,
+		"soft_warning_pct": 0.8,
+		"priority": "P2",
+		"enable_overdraft": true,
+		"overdraft_limit_usd": 300.0
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hierarchy/nodes", strings.NewReader(createJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hierarchy/nodes, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "corp/tech/ai-lab/qa-autotest") {
+		t.Errorf("Expected created node path in response, got: %s", w.Body.String())
+	}
+
+	// Extract created node ID to test deletion
+	var createdNode map[string]interface{}
+	_ = json.Unmarshal(w.Body.Bytes(), &createdNode)
+	nodeID, _ := createdNode["id"].(string)
+
+	// 4. POST /api/v1/hierarchy/check (Check budget)
+	checkJSON := `{
+		"target_path": "corp/tech/ai-lab/qa-autotest",
+		"requested_cost_usd": 10.0,
+		"priority": "P2"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hierarchy/check", strings.NewReader(checkJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hierarchy/check, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"allowed":true`) {
+		t.Errorf("Expected allowed:true in check, got: %s", w.Body.String())
+	}
+
+	// 5. POST /api/v1/hierarchy/simulate (What-if scenario playground)
+	simJSON := `{
+		"target_path": "corp/tech/ai-lab/nlp",
+		"request_cost_usd": 200.0,
+		"request_count": 5,
+		"priority": "P1",
+		"enable_overdraft": true
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hierarchy/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hierarchy/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "scenarios") || !strings.Contains(w.Body.String(), "recommendations") {
+		t.Errorf("Expected simulation response with scenarios and recommendations, got: %s", w.Body.String())
+	}
+
+	// 6. DELETE /api/v1/hierarchy/nodes/:id
+	if nodeID != "" {
+		w = httptest.NewRecorder()
+		req, _ = http.NewRequest("DELETE", "/api/v1/hierarchy/nodes/"+nodeID, nil)
+		server.GetRouter().ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200 for DELETE /api/v1/hierarchy/nodes/%s, got %d: %s", nodeID, w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"status":"deleted"`) {
+			t.Errorf("Expected deleted confirmation, got: %s", w.Body.String())
+		}
+	}
+}
+
 
 
 

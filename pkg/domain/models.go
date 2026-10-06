@@ -2229,3 +2229,146 @@ type SandboxSimulateResponse struct {
 	Scenarios          []SandboxScenarioTurn `json:"scenarios"`
 	Recommendations    []string              `json:"recommendations"`
 }
+
+// ==========================================
+// Phase 29: Hierarchical Team Budget Cascading Models
+// ==========================================
+
+// OrgNodeType classifies the level in enterprise structure
+type OrgNodeType string
+
+const (
+	OrgNodeEnterprise OrgNodeType = "enterprise"
+	OrgNodeDivision   OrgNodeType = "division"
+	OrgNodeDepartment OrgNodeType = "department"
+	OrgNodeTeam       OrgNodeType = "team"
+	OrgNodeProject    OrgNodeType = "project"
+	OrgNodeAgent      OrgNodeType = "agent"
+)
+
+// OrgPriority defines priority ranking for budget claims
+type OrgPriority string
+
+const (
+	OrgPriorityP0 OrgPriority = "P0" // Mission-critical, protected with overdraft
+	OrgPriorityP1 OrgPriority = "P1" // Standard production, soft-warning
+	OrgPriorityP2 OrgPriority = "P2" // Batch/experimental, elastic downgrade on soft-warning
+)
+
+// OrgBudgetStatus represents current financial health of an org unit
+type OrgBudgetStatus string
+
+const (
+	OrgBudgetHealthy         OrgBudgetStatus = "healthy"
+	OrgBudgetSoftWarning     OrgBudgetStatus = "soft_warning"
+	OrgBudgetHardCapped      OrgBudgetStatus = "hard_capped"
+	OrgBudgetOverdraftActive OrgBudgetStatus = "overdraft_active"
+)
+
+// OrgAction represents gateway enforcement decision
+type OrgAction string
+
+const (
+	OrgActionAllow           OrgAction = "allow"
+	OrgActionWarnPass        OrgAction = "warn_pass"
+	OrgActionDegradeCompress OrgAction = "degrade_compress"
+	OrgActionHardBlock       OrgAction = "hard_block"
+)
+
+// OrgNode represents an entity in the materialized path hierarchy tree
+type OrgNode struct {
+	ID                 string          `json:"id"`
+	TenantID           string          `json:"tenant_id"`
+	Name               string          `json:"name"`
+	Path               string          `json:"path"` // Materialized path, e.g. "corp/tech/ai-lab/nlp"
+	ParentID           string          `json:"parent_id,omitempty"`
+	NodeType           OrgNodeType     `json:"node_type"`
+	AllocatedBudgetUSD float64         `json:"allocated_budget_usd"`
+	CurrentSpendUSD    float64         `json:"current_spend_usd"`
+	SoftWarningPct     float64         `json:"soft_warning_pct"` // default 0.8 (80%)
+	Priority           OrgPriority     `json:"priority"`
+	EnableOverdraft    bool            `json:"enable_overdraft"`
+	OverdraftLimitUSD  float64         `json:"overdraft_limit_usd"`
+	Status             OrgBudgetStatus `json:"status"`
+	Children           []*OrgNode      `json:"children,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+}
+
+// OrgBudgetCheckResult carries bottom-up evaluation decision
+type OrgBudgetCheckResult struct {
+	Allowed              bool        `json:"allowed"`
+	Action               OrgAction   `json:"action"`
+	BreachedNodePath     string      `json:"breached_node_path,omitempty"`
+	BreachedNodeName     string      `json:"breached_node_name,omitempty"`
+	RemainingQuotaUSD    float64     `json:"remaining_quota_usd"`
+	ParentRemainingUSD   float64     `json:"parent_remaining_usd"`
+	Reason               string      `json:"reason,omitempty"`
+	AppliedPriority      OrgPriority `json:"applied_priority"`
+	Downgraded           bool        `json:"downgraded"`
+}
+
+// OrgStatsSummary provides macro metrics for hierarchical budget governance
+type OrgStatsSummary struct {
+	TotalNodes          int     `json:"total_nodes"`
+	TotalAllocatedUSD   float64 `json:"total_allocated_usd"`
+	TotalSpendUSD       float64 `json:"total_spend_usd"`
+	UtilizationPct      float64 `json:"utilization_pct"`
+	BreachedNodesCount  int     `json:"breached_nodes_count"`
+	WarningNodesCount   int     `json:"warning_nodes_count"`
+	P0ProtectedCount    int     `json:"p0_protected_count"`
+	MaxDepth            int     `json:"max_depth"`
+}
+
+// OrgNodeUpsertRequest payload to create or edit an org node
+type OrgNodeUpsertRequest struct {
+	ID                 string      `json:"id,omitempty"`
+	TenantID           string      `json:"tenant_id"`
+	Name               string      `json:"name"`
+	Path               string      `json:"path"`
+	ParentID           string      `json:"parent_id,omitempty"`
+	NodeType           OrgNodeType `json:"node_type"`
+	AllocatedBudgetUSD float64     `json:"allocated_budget_usd"`
+	SoftWarningPct     float64     `json:"soft_warning_pct,omitempty"`
+	Priority           OrgPriority `json:"priority,omitempty"`
+	EnableOverdraft    bool        `json:"enable_overdraft"`
+	OverdraftLimitUSD  float64     `json:"overdraft_limit_usd,omitempty"`
+}
+
+// OrgScenarioTurn records turn in what-if simulation
+type OrgScenarioTurn struct {
+	ScenarioName      string      `json:"scenario_name"`
+	Description       string      `json:"description"`
+	TargetPath        string      `json:"target_path"`
+	Priority          OrgPriority `json:"priority"`
+	RequestedCostUSD  float64     `json:"requested_cost_usd"`
+	Allowed           bool        `json:"allowed"`
+	Action            OrgAction   `json:"action"`
+	BreachedNode      string      `json:"breached_node,omitempty"`
+	Reason            string      `json:"reason"`
+}
+
+// OrgSimulateRequest payload for interactive what-if playground
+type OrgSimulateRequest struct {
+	TargetPath      string      `json:"target_path"`
+	RequestCostUSD  float64     `json:"request_cost_usd"`
+	RequestCount    int         `json:"request_count"`
+	Priority        OrgPriority `json:"priority"`
+	EnableOverdraft bool        `json:"enable_overdraft"`
+}
+
+// OrgSimulateResponse output of interactive what-if playground
+type OrgSimulateResponse struct {
+	TargetPath          string            `json:"target_path"`
+	NodeName            string            `json:"node_name"`
+	TotalRequestCostUSD float64           `json:"total_request_cost_usd"`
+	CurrentSpendUSD     float64           `json:"current_spend_usd"`
+	BudgetLimitUSD      float64           `json:"budget_limit_usd"`
+	UtilizationPct      float64           `json:"utilization_pct"`
+	FinalStatus         OrgBudgetStatus   `json:"final_status"`
+	ActionTaken         OrgAction         `json:"action_taken"`
+	AffectedNodes       []string          `json:"affected_nodes"`
+	Scenarios           []OrgScenarioTurn `json:"scenarios"`
+	Recommendations     []string          `json:"recommendations"`
+}
+

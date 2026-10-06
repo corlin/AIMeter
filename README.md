@@ -276,7 +276,12 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **预置外部工具微事务费率字典 (`pkg/sandbox/clearing.go`)**：并发安全纳管 `code_interpreter`, `web_search`, `browser_automation`, `financial_data`, `sql_sandbox` 等高频外部付费工具单价字典，支持动态单价解析与按次结算。
 * **三合一全口径综合账本与会话级防失控熔断状态机 (`pkg/sandbox/manager.go`)**：打通 $\text{TripartiteTotal} = \text{ComputeCost} + \text{ToolCost} + \text{LLMCost}$，实时追踪会话累计支出；当单会话超出 `SessionCapUSD` 硬预算时网关直接返回 HTTP 429 斩断 Agent 失控死循环资损。
 * **反向代理双向协同与全息响应头审计**：透传 `X-AIMeter-Sandbox-Cost`, `X-AIMeter-Tool-Cost`, `X-AIMeter-Tripartite-Total-Cost`, `X-AIMeter-Sandbox-Status` 与 `X-AIMeter-Sandbox-Execution-ID`，实时记录沙箱审计流水。
-* **全生命周期沙箱控制中心与推演沙箱**：全新一级看板 `/sandboxes`（4 维宏观 KPI、三合一成本解耦瀑布与审计流水抽屉、工具微事务字典管理面板与交互式在线算力推演沙箱）。
+### 30. 企业级组织架构预算树、级联继承与软硬双轨配额管控引擎 (Hierarchical Team Budget Cascading & Dual-Quota Enforcement Engine - Phase 29)
+* **加权物化路径树与微秒级祖先检索 (`pkg/hierarchy/tree.go`)**：基于物化路径（如 `corp/tech/ai-lab/nlp`）实现微秒级（`< 0.02ms`）祖先链检索、节点增删改查、前缀子树查找与前端可折叠 Forest 多叉树构建。
+* **链式自底向上递归预检与双轨阈值熔断 (`pkg/hierarchy/checker.go`)**：逐级向上遍历所有祖先节点，当达到 80% 软阈值时自动发出软预警或触发 P2 优先级自动降配标记（`degrade_compress`）；当达到 100% 硬顶时判定是否具备 P0 核心保障与 `enable_overdraft` 透支缓冲借调，否则网关直接 429 熔断阻断。
+* **节点健康状态机与原子级联记账 (`pkg/hierarchy/manager.go`)**：动态评估 `healthy`, `soft_warning`, `overdraft_active`, `hard_capped` 四态；请求成功后原子化自底向上累加该团队及其所有上级祖先的实际消耗金额（`RecordSpend`）。
+* **反向代理双向协同与全息响应头审计**：透传 `X-AIMeter-Org-Path`、`X-AIMeter-Org-Action`、`X-AIMeter-Org-Remaining-USD`、`X-AIMeter-Org-Breach-Node` 与 `X-AIMeter-Org-Downgraded`。
+* **全生命周期组织配额控制中心与沙箱**：全新一级看板 `/hierarchy`（4 维宏观 KPI、交互式可折叠组织层级树图谱、快速配额预检探测器与 What-If 级联配额冲击仿真推演沙箱）。
 
 ---
 
@@ -285,6 +290,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/hierarchy` | **企业组织架构预算树与双轨配额管控中心** | 4 维宏观 KPI（中央总预算池、组织节点数与架构深度、预警与熔断管控、P0核心业务保障）、交互式可折叠组织拓扑树、配额利用率进度条、快速配额探测器、What-If 级联冲击仿真沙箱与节点配置抽屉 |
 | `/sandboxes` | **Agent 沙箱代码解释器与工具微事务清算中心** | 4 维宏观 KPI（三合一总账本、沙箱算力累计、工具微事务累计、超时截断与预算阻断）、三合一全口径成本解耦瀑布、审计流水抽屉、预置工具单价字典在线编辑与交互式算力推演沙箱 |
 | `/workflows` | **长程 Agent DAG 工作流编排计费与检查点控制中心** | 4 维宏观 KPI（累计发生、有效成本、续算规避浪费、失败沉没成本）、交互式 DAG 拓扑流程时序流、增量快照 Payload 预览抽屉、一键断点续算触发器、全量重跑 vs 断点续算经济学对比沙箱与实例审计表 |
 | `/quality` | **质量漂移检测与幻觉惩罚经济学大盘** | 4 维宏观 KPI（评估请求数、自愈成功率、幻觉拦截数、SLA 惩罚与坏账冲销金额）、供应商可信度排行榜 (0~100)、在线自愈与损失推演沙箱（带自愈前后 Diff 与阶梯扣减拆解）、坏账审计流水表与策略配置面板 |

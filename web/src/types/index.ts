@@ -1801,3 +1801,103 @@ export interface SandboxSimulateResponse {
   recommendations: string[];
 }
 
+// ==========================================
+// Phase 29: Hierarchical Team Budget Cascading
+// ==========================================
+
+export type OrgNodeType = 'enterprise' | 'division' | 'department' | 'team';
+export type OrgPriority = 'P0' | 'P1' | 'P2';
+export type OrgBudgetStatus = 'healthy' | 'soft_warning' | 'hard_capped' | 'overdraft_active';
+export type OrgAction = 'allow' | 'warn_pass' | 'degrade_compress' | 'hard_block';
+
+export interface OrgNode {
+  id: string;
+  tenant_id: string;
+  name: string;
+  path: string;
+  parent_id?: string;
+  node_type: OrgNodeType;
+  allocated_budget_usd: number;
+  current_spend_usd: number;
+  soft_warning_pct: number;
+  priority: OrgPriority;
+  enable_overdraft: boolean;
+  overdraft_limit_usd: number;
+  status: OrgBudgetStatus;
+  children?: OrgNode[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrgBudgetCheckResult {
+  allowed: boolean;
+  action: OrgAction;
+  breached_node_path?: string;
+  breached_node_name?: string;
+  remaining_quota_usd: number;
+  parent_remaining_usd: number;
+  reason?: string;
+  applied_priority: OrgPriority;
+  downgraded: boolean;
+}
+
+export interface OrgStatsSummary {
+  total_nodes: number;
+  total_allocated_usd: number;
+  total_spend_usd: number;
+  utilization_pct: number;
+  breached_nodes_count: number;
+  warning_nodes_count: number;
+  p0_protected_count: number;
+  max_depth: number;
+}
+
+export interface OrgNodeUpsertRequest {
+  id?: string;
+  tenant_id?: string;
+  name: string;
+  path: string;
+  parent_id?: string;
+  node_type: OrgNodeType;
+  allocated_budget_usd: number;
+  soft_warning_pct?: number;
+  priority?: OrgPriority;
+  enable_overdraft: boolean;
+  overdraft_limit_usd?: number;
+}
+
+export interface OrgScenarioTurn {
+  scenario_name: string;
+  description: string;
+  target_path: string;
+  priority: OrgPriority;
+  requested_cost_usd: number;
+  allowed: boolean;
+  action: OrgAction;
+  breached_node?: string;
+  reason: string;
+}
+
+export interface OrgSimulateRequest {
+  target_path: string;
+  request_cost_usd: number;
+  request_count: number;
+  priority: OrgPriority;
+  enable_overdraft: boolean;
+}
+
+export interface OrgSimulateResponse {
+  target_path: string;
+  node_name: string;
+  total_request_cost_usd: number;
+  current_spend_usd: number;
+  budget_limit_usd: number;
+  utilization_pct: number;
+  final_status: OrgBudgetStatus;
+  action_taken: OrgAction;
+  affected_nodes: string[];
+  scenarios: OrgScenarioTurn[];
+  recommendations: string[];
+}
+
+

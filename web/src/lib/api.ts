@@ -117,6 +117,16 @@ import {
   SandboxExecuteResponse,
   SandboxSimulateRequest,
   SandboxSimulateResponse,
+  OrgNode,
+  OrgNodeType,
+  OrgPriority,
+  OrgBudgetStatus,
+  OrgAction,
+  OrgBudgetCheckResult,
+  OrgStatsSummary,
+  OrgNodeUpsertRequest,
+  OrgSimulateRequest,
+  OrgSimulateResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1929,4 +1939,99 @@ export async function simulateSandbox(req: SandboxSimulateRequest): Promise<Sand
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 29: Hierarchical Team Budget Cascading
+// ==========================================
+
+export async function fetchHierarchyTree(): Promise<OrgNode[]> {
+  try {
+    const res = await fetch(`${API_BASE}/hierarchy/tree`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch hierarchy tree");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("fetchHierarchyTree failed:", err);
+    return [];
+  }
+}
+
+export async function fetchHierarchyStats(): Promise<OrgStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/hierarchy/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch hierarchy stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchHierarchyStats failed:", err);
+    return {
+      total_nodes: 0,
+      total_allocated_usd: 0,
+      total_spend_usd: 0,
+      utilization_pct: 0,
+      breached_nodes_count: 0,
+      warning_nodes_count: 0,
+      p0_protected_count: 0,
+      max_depth: 0,
+    };
+  }
+}
+
+export async function upsertHierarchyNode(node: OrgNodeUpsertRequest): Promise<OrgNode> {
+  const res = await fetch(`${API_BASE}/hierarchy/nodes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(node),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to upsert hierarchy node" }));
+    throw new Error(err.error || "Failed to upsert hierarchy node");
+  }
+  return await res.json();
+}
+
+export async function deleteHierarchyNode(id: string): Promise<{ id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/hierarchy/nodes/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to delete hierarchy node" }));
+    throw new Error(err.error || "Failed to delete hierarchy node");
+  }
+  return await res.json();
+}
+
+export async function checkHierarchyBudget(
+  targetPath: string,
+  costUSD = 0.005,
+  priority: OrgPriority = "P1"
+): Promise<OrgBudgetCheckResult> {
+  const res = await fetch(`${API_BASE}/hierarchy/check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      target_path: targetPath,
+      requested_cost_usd: costUSD,
+      priority,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to check hierarchy budget" }));
+    throw new Error(err.error || "Failed to check hierarchy budget");
+  }
+  return await res.json();
+}
+
+export async function simulateHierarchy(req: OrgSimulateRequest): Promise<OrgSimulateResponse> {
+  const res = await fetch(`${API_BASE}/hierarchy/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate hierarchy budget" }));
+    throw new Error(err.error || "Failed to simulate hierarchy budget");
+  }
+  return await res.json();
+}
+
 

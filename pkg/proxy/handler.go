@@ -33,8 +33,9 @@ import (
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
-	"github.com/corlin/AIMeter/pkg/workflow"
+	"github.com/corlin/AIMeter/pkg/hierarchy"
 	"github.com/corlin/AIMeter/pkg/sandbox"
+	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -107,6 +108,17 @@ type ProxyHandler struct {
 	qualityManager     *quality.QualityManager
 	workflowManager    *workflow.WorkflowManager
 	sandboxManager     *sandbox.SandboxManager
+	hierarchyManager   *hierarchy.HierarchyManager
+}
+
+// SetHierarchyManager attaches an enterprise hierarchy manager
+func (h *ProxyHandler) SetHierarchyManager(hm *hierarchy.HierarchyManager) {
+	h.hierarchyManager = hm
+}
+
+// GetHierarchyManager returns the attached hierarchy manager
+func (h *ProxyHandler) GetHierarchyManager() *hierarchy.HierarchyManager {
+	return h.hierarchyManager
 }
 
 // SetSandboxManager attaches a sandbox manager
@@ -777,6 +789,50 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 				})
 				return
 			}
+		}
+	}
+
+	// 4.10 Evaluate Enterprise Hierarchical Team Budget Cascading & Quota Breaker (Phase 29)
+	orgPath := c.GetHeader("X-AIMeter-Org-Path")
+	if orgPath == "" {
+		orgPath = c.GetHeader("X-Org-Path")
+	}
+	orgPriority := domain.OrgPriority(c.GetHeader("X-AIMeter-Org-Priority"))
+	if orgPriority == "" {
+		orgPriority = domain.OrgPriority(c.GetHeader("X-Org-Priority"))
+	}
+	if orgPriority == "" {
+		orgPriority = domain.OrgPriorityP1
+	}
+
+	if orgPath != "" && h.hierarchyManager != nil {
+		checkRes := h.hierarchyManager.CheckBudget(orgPath, 0.005, orgPriority)
+		c.Header("X-AIMeter-Org-Path", orgPath)
+		c.Header("X-AIMeter-Org-Action", string(checkRes.Action))
+		c.Header("X-AIMeter-Org-Remaining-USD", fmt.Sprintf("%.4f", checkRes.RemainingQuotaUSD))
+		if checkRes.BreachedNodePath != "" {
+			c.Header("X-AIMeter-Org-Breach-Node", checkRes.BreachedNodePath)
+		}
+
+		if !checkRes.Allowed {
+			metrics.RecordProxyRequest(provider, actualModel, "429", false, time.Since(startTime))
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error": gin.H{
+					"message":            fmt.Sprintf("AI Meter: Request blocked by Org Hierarchy quota enforcement. %s", checkRes.Reason),
+					"type":               "hierarchy_budget_exceeded_error",
+					"code":               "hierarchy_budget_exceeded",
+					"org_path":           orgPath,
+					"breached_node_path": checkRes.BreachedNodePath,
+					"breached_node_name": checkRes.BreachedNodeName,
+					"action":             checkRes.Action,
+					"remaining_usd":      checkRes.RemainingQuotaUSD,
+				},
+			})
+			return
+		}
+
+		if checkRes.Action == domain.OrgActionDegradeCompress || checkRes.Downgraded {
+			c.Header("X-AIMeter-Org-Downgraded", "true")
 		}
 	}
 
@@ -1588,6 +1644,17 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				}
 			}
 
+			// Phase 29: Hierarchy Org Tree Cascading Accounting
+			if h.hierarchyManager != nil {
+				orgPath := c.GetHeader("X-AIMeter-Org-Path")
+				if orgPath == "" {
+					orgPath = c.GetHeader("X-Org-Path")
+				}
+				if orgPath != "" && costUSD > 0 {
+					h.hierarchyManager.RecordSpend(orgPath, costUSD)
+				}
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1861,6 +1928,17 @@ func (h *ProxyHandler) handleStreamingResponse(
 				costUSD,
 				totalDuration.Milliseconds(),
 			)
+		}
+
+		// Phase 29: Hierarchy Org Tree Cascading Accounting
+		if h.hierarchyManager != nil {
+			orgPath := c.GetHeader("X-AIMeter-Org-Path")
+			if orgPath == "" {
+				orgPath = c.GetHeader("X-Org-Path")
+			}
+			if orgPath != "" && costUSD > 0 {
+				h.hierarchyManager.RecordSpend(orgPath, costUSD)
+			}
 		}
 
 		go h.recordUsage(

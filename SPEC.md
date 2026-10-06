@@ -983,6 +983,37 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（29/29 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 29: 企业级组织架构预算树、级联继承与软硬双轨配额管控引擎 (Hierarchical Team Budget Cascading & Dual-Quota Enforcement Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/hierarchy_seed.json`）**：
+  * 定义核心数据结构：`OrgNodeType`（enterprise, division, department, team）、`OrgPriority`（P0, P1, P2）、`OrgBudgetStatus`（healthy, soft_warning, hard_capped, overdraft_active）、`OrgAction`（allow, warn_pass, degrade_compress, hard_block）、`OrgNode`（物化路径 `Path`、预算上限、实际消耗、软阈值比例、优先级、透支开关与缓冲额、子节点数组）、`OrgBudgetCheckResult`、`OrgStatsSummary`、`OrgNodeUpsertRequest`、`OrgScenarioTurn`、`OrgSimulateRequest` 与 `OrgSimulateResponse`；
+  * 预置种子配置：`configs/hierarchy_seed.json` 包含集团控股（`corp`）、前沿科技事业群（`corp/tech`）、AI实验室（`corp/tech/ai-lab`）、Agent沙箱组（`corp/tech/ai-lab/sandbox`）、NLP组（`corp/tech/ai-lab/nlp`）、云原生基建部（`corp/tech/infra`）、金融业务群（`corp/fintech`）与量化交易组（`corp/fintech/trading`）等 4 级典型组织树结构与预算消耗数据。
+* [x] **纯 Go 高性能物化路径树、链式自底向上预检与记账仲裁引擎（`pkg/hierarchy/`）**：
+  * **物化路径组织树（`tree.go`）**：基于加权路径（如 `corp/tech/ai-lab/nlp`）实现微秒级（`< 0.02ms`）祖先链检索、节点增删改查、前缀子树查找与前端可折叠 Forest 多叉树构建；
+  * **链式自底向上递归校验器（`checker.go`）**：逐级向上遍历所有祖先节点，精准判定各级是否超限。当达到 80% 软阈值时判定为 `warn_pass` 或触发 P2 优先级自动降配标记（`degrade_compress`）；当达到 100% 硬顶时判定是否具备 P0 优先级与 `enable_overdraft` 透支缓冲借调，否则立即判定为 `hard_block`；
+  * **节点状态机与 FinOps 策略仲裁器（`arbiter.go`）**：动态计算节点健康状态（healthy / soft_warning / overdraft_active / hard_capped），智能生成各级配额扩缩容与自适应压缩优化建议；
+  * **全景生命周期与多场景推演仿真器（`manager.go`）**：原子化自底向上级联扣除各级实际发生额（`RecordSpend`），提供支持多并发请求的 What-If 级联配额冲击仿真推演。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 6 大 REST 控制端点：
+    * `GET /api/v1/hierarchy/tree`（获取完整多叉树拓扑）
+    * `GET /api/v1/hierarchy/stats`（集团宏观预算分配与利用率统计）
+    * `POST /api/v1/hierarchy/nodes`（新增或修改组织架构节点配额）
+    * `DELETE /api/v1/hierarchy/nodes/:id`（删除组织架构节点）
+    * `POST /api/v1/hierarchy/check`（自底向上多级链式配额预检探测）
+    * `POST /api/v1/hierarchy/simulate`（在线 What-If 级联冲击仿真推演）
+  * 反向代理网关双向协同与全息响应头：
+    * **入站组织路径与优先级感知**：网关自动提取 `X-AIMeter-Org-Path` 与 `X-AIMeter-Org-Priority`，调用 `CheckBudget` 自底向上穿透各级祖先节点；超额时直接阻断返回 HTTP 429 与 `hierarchy_budget_exceeded` 错误；
+    * **响应头全息透传与自适应降级**：透传 `X-AIMeter-Org-Path`、`X-AIMeter-Org-Action`、`X-AIMeter-Org-Remaining-USD`、`X-AIMeter-Org-Breach-Node` 与 `X-AIMeter-Org-Downgraded`；
+    * **出站原子级联扣除记账**：响应完成后调用 `RecordSpend` 级联累加该团队及其所有上级祖先的实际消耗金额。
+* [x] **Web 控制台全新一级看板 `/hierarchy`（`web/src/app/hierarchy/`）**：
+  * **4 维宏观核心 KPI 卡片**：中央总预算分配池与实际消耗利用率、组织节点数与最大架构层级深度、预警与熔断管控节点数、P0 核心业务保障节点数；
+  * **交互式可折叠组织层级树图谱 (Hierarchy Tree Graph)**：树形展现 4 级组织拓扑、节点状态徽标、额度利用率进度条、优先级标记、快捷添加子部门/团队、编辑配额抽屉与删除操作；
+  * **实时自底向上配额预检探测器 (Quick Quota Checker)**：输入路径、单次费用与优先级，实时展示链式判定动作、剩余配额、上级父节点余量与熔断归因节点；
+  * **What-If 弹性熔断推演沙箱 (Simulation Playground)**：支持多并发请求冲击推演，时序展现各轮次判定演化、最终态综合评估与智能 FinOps 组织配额策略建议。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（30/30 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 

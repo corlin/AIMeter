@@ -28,7 +28,8 @@ import {
   Database,
   BadgeCheck,
   GitFork,
-  Terminal
+  Terminal,
+  Building2
 } from "lucide-react";
 
 export function Navbar() {
@@ -36,6 +37,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Org Hierarchy", href: "/hierarchy", icon: Building2 },
     { label: "Sandboxes", href: "/sandboxes", icon: Terminal },
     { label: "Workflows", href: "/workflows", icon: GitFork },
     { label: "Quality & SLA", href: "/quality", icon: BadgeCheck },

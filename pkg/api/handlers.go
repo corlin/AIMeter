@@ -35,6 +35,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/corlin/AIMeter/pkg/sandbox"
+	"github.com/corlin/AIMeter/pkg/hierarchy"
 	"github.com/gin-gonic/gin"
 )
 
@@ -65,6 +66,17 @@ type APIHandler struct {
 	qualityManager     *quality.QualityManager
 	workflowManager    *workflow.WorkflowManager
 	sandboxManager     *sandbox.SandboxManager
+	hierarchyManager   *hierarchy.HierarchyManager
+}
+
+// SetHierarchyManager attaches a hierarchy manager to the API handler
+func (h *APIHandler) SetHierarchyManager(hm *hierarchy.HierarchyManager) {
+	h.hierarchyManager = hm
+}
+
+// GetHierarchyManager returns the attached hierarchy manager
+func (h *APIHandler) GetHierarchyManager() *hierarchy.HierarchyManager {
+	return h.hierarchyManager
 }
 
 // SetSandboxManager attaches a sandbox manager to the API handler
@@ -2377,4 +2389,100 @@ func (h *APIHandler) SimulateSandbox(c *gin.Context) {
 	resp := h.sandboxManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 29: Hierarchical Team Budget Cascading APIs
+// ==========================================
+
+// GetHierarchyTree returns forest structure of organization budget nodes
+func (h *APIHandler) GetHierarchyTree(c *gin.Context) {
+	if h.hierarchyManager == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+	forest := h.hierarchyManager.GetTree()
+	c.JSON(http.StatusOK, forest)
+}
+
+// GetHierarchyStats returns macro statistics for organization budgets
+func (h *APIHandler) GetHierarchyStats(c *gin.Context) {
+	if h.hierarchyManager == nil {
+		c.JSON(http.StatusOK, domain.OrgStatsSummary{})
+		return
+	}
+	stats := h.hierarchyManager.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// UpsertHierarchyNode creates or updates an org node in the tree
+func (h *APIHandler) UpsertHierarchyNode(c *gin.Context) {
+	if h.hierarchyManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "hierarchy manager not initialized"})
+		return
+	}
+	var req domain.OrgNodeUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	node, err := h.hierarchyManager.UpsertNode(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, node)
+}
+
+// DeleteHierarchyNode removes an org node
+func (h *APIHandler) DeleteHierarchyNode(c *gin.Context) {
+	if h.hierarchyManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "hierarchy manager not initialized"})
+		return
+	}
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})
+		return
+	}
+	if err := h.hierarchyManager.DeleteNode(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "deleted", "id": id})
+}
+
+// CheckHierarchyBudget performs online precheck along the path
+func (h *APIHandler) CheckHierarchyBudget(c *gin.Context) {
+	if h.hierarchyManager == nil {
+		c.JSON(http.StatusOK, domain.OrgBudgetCheckResult{Allowed: true, Action: domain.OrgActionAllow})
+		return
+	}
+	var req struct {
+		Path     string             `json:"path"`
+		CostUSD  float64            `json:"cost_usd"`
+		Priority domain.OrgPriority `json:"priority"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	result := h.hierarchyManager.CheckBudget(req.Path, req.CostUSD, req.Priority)
+	c.JSON(http.StatusOK, result)
+}
+
+// SimulateHierarchy runs interactive what-if simulation on hierarchical budget
+func (h *APIHandler) SimulateHierarchy(c *gin.Context) {
+	if h.hierarchyManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "hierarchy manager not initialized"})
+		return
+	}
+	var req domain.OrgSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.hierarchyManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
