@@ -2857,6 +2857,181 @@ type WAFSimulateResponse struct {
 	StrategicRecommendations []string         `json:"strategic_recommendations"`
 }
 
+// =========================================================================
+// Phase 33: Heterogeneous Multi-Cloud AI Compute, KV-Cache VRAM Virtualization
+// & Disaggregated Prefill/Decode Cost Engine
+// =========================================================================
+
+// HeteroNodeType defines the execution runtime environment
+type HeteroNodeType string
+
+const (
+	HeteroNodeBareMetal  HeteroNodeType = "bare_metal_gpu"
+	HeteroNodeK8sPod     HeteroNodeType = "k8s_vllm_pod"
+	HeteroNodeServerless HeteroNodeType = "cloud_serverless"
+	HeteroNodeEdge       HeteroNodeType = "edge_ollama"
+)
+
+// HeteroPhase defines inference workload stage
+type HeteroPhase string
+
+const (
+	HeteroPhasePrefill HeteroPhase = "prefill"
+	HeteroPhaseDecode  HeteroPhase = "decode"
+	HeteroPhaseHybrid  HeteroPhase = "hybrid"
+)
+
+// HeteroBurstStatus defines the scheduling dispatch destination
+type HeteroBurstStatus string
+
+const (
+	HeteroBurstLocal        HeteroBurstStatus = "local_scheduled"
+	HeteroBurstCloud        HeteroBurstStatus = "cloud_bursted"
+	HeteroBurstQueued       HeteroBurstStatus = "queued_waiting"
+	HeteroBurstRejectedOOM  HeteroBurstStatus = "rejected_oom"
+)
+
+// HeteroGPUNode represents an on-premise or cloud-attached physical/virtual GPU instance
+type HeteroGPUNode struct {
+	ID                   string         `json:"id"`
+	Hostname             string         `json:"hostname"`
+	GPUModel             string         `json:"gpu_model"` // e.g. "NVIDIA-H100-SXM", "NVIDIA-A100-80G-PCIe", "NVIDIA-L40S"
+	GPUCount             int            `json:"gpu_count"`
+	HourlyRateUSD        float64        `json:"hourly_rate_usd"`
+	TotalVRAMGB          float64        `json:"total_vram_gb"`
+	StaticWeightVRAMGB   float64        `json:"static_weight_vram_gb"`
+	DynamicKVCacheVRAMGB float64        `json:"dynamic_kv_cache_vram_gb"`
+	FreeVRAMGB           float64        `json:"free_vram_gb"`
+	VRAMUtilPercent      float64        `json:"vram_util_percent"`
+	NodeType             HeteroNodeType `json:"node_type"`
+	ActiveModel          string         `json:"active_model"`
+	MaxBatchConcurrency  int            `json:"max_batch_concurrency"`
+	CurrentConcurrency   int            `json:"current_concurrency"`
+	MFUScore             float64        `json:"mfu_score"` // Model FLOPs Utilization 0~100
+	MBUScore             float64        `json:"mbu_score"` // Memory Bandwidth Utilization 0~100
+	Status               string         `json:"status"`    // "online", "high_watermark", "draining", "offline"
+	UpdatedAt            time.Time      `json:"updated_at"`
+}
+
+// HeteroResourcePool aggregates heterogeneous nodes with high-watermark burst policies
+type HeteroResourcePool struct {
+	ID                                string   `json:"id"`
+	Name                              string   `json:"name"`
+	TargetModel                       string   `json:"target_model"`
+	NodeIDs                           []string `json:"node_ids"`
+	HighWatermarkPercent              float64  `json:"high_watermark_percent"` // default e.g. 85.0%
+	EnablePrefillDecodeDisaggregation bool     `json:"enable_prefill_decode_disaggregation"`
+	PrefillNodeIDs                    []string `json:"prefill_node_ids,omitempty"`
+	DecodeNodeIDs                     []string `json:"decode_node_ids,omitempty"`
+	CloudBurstProvider                string   `json:"cloud_burst_provider"` // "runpod", "modal", "aws_bedrock"
+	CloudBurstCostPer1MTokens         float64  `json:"cloud_burst_cost_per_1m_tokens"`
+	Enabled                           bool     `json:"enabled"`
+}
+
+// HeteroUsageTrace details a single heterogeneous inference execution and physical metering
+type HeteroUsageTrace struct {
+	ID                     string            `json:"id"`
+	TraceID                string            `json:"trace_id"`
+	TenantID               string            `json:"tenant_id"`
+	Model                  string            `json:"model"`
+	Phase                  HeteroPhase       `json:"phase"`
+	ScheduledNodeID        string            `json:"scheduled_node_id"`
+	NodeType               HeteroNodeType    `json:"node_type"`
+	BurstStatus            HeteroBurstStatus `json:"burst_status"`
+	PromptTokens           int               `json:"prompt_tokens"`
+	CompletionTokens       int               `json:"completion_tokens"`
+	DurationMs             int64             `json:"duration_ms"`
+	VRAMAllocationGB       float64           `json:"vram_allocation_gb"`
+	VRAMResidenceCostUSD   float64           `json:"vram_residence_cost_usd"`
+	PrefillComputeCostUSD  float64           `json:"prefill_compute_cost_usd"`
+	DecodeBandwidthCostUSD float64           `json:"decode_bandwidth_cost_usd"`
+	TotalCostUSD           float64           `json:"total_cost_usd"`
+	EquivalentCloudCostUSD float64           `json:"equivalent_cloud_cost_usd"`
+	HybridSavingsUSD       float64           `json:"hybrid_savings_usd"`
+	MFUScore               float64           `json:"mfu_score"`
+	MBUScore               float64           `json:"mbu_score"`
+	Timestamp              time.Time         `json:"timestamp"`
+}
+
+// HeteroStatsSummary provides global metrics on heterogeneous clusters and hybrid economics
+type HeteroStatsSummary struct {
+	TotalInvocations           int64   `json:"total_invocations"`
+	LocalScheduledCount        int64   `json:"local_scheduled_count"`
+	CloudBurstedCount          int64   `json:"cloud_bursted_count"`
+	BurstRatioPercent          float64 `json:"burst_ratio_percent"`
+	AvgVRAMUtilPercent         float64 `json:"avg_vram_util_percent"`
+	AvgMFUScore                float64 `json:"avg_mfu_score"`
+	AvgMBUScore                float64 `json:"avg_mbu_score"`
+	TotalCostUSD               float64 `json:"total_cost_usd"`
+	TotalEquivalentCloudCostUSD float64 `json:"total_equivalent_cloud_cost_usd"`
+	TotalHybridSavingsUSD      float64 `json:"total_hybrid_savings_usd"`
+	ActiveNodesCount           int     `json:"active_nodes_count"`
+	TotalPhysicalVRAMGB        float64 `json:"total_physical_vram_gb"`
+}
+
+// HeteroDispatchRequest simulates or evaluates request placement
+type HeteroDispatchRequest struct {
+	TenantID                  string      `json:"tenant_id,omitempty"`
+	Model                     string      `json:"model"`
+	Prompt                    string      `json:"prompt,omitempty"`
+	PromptTokens              int         `json:"prompt_tokens"`
+	EstimatedCompletionTokens int         `json:"estimated_completion_tokens"`
+	RequestedPhase            HeteroPhase `json:"requested_phase,omitempty"`
+}
+
+// HeteroDispatchResponse returns the scheduling decision and estimated physical costs
+type HeteroDispatchResponse struct {
+	ScheduledNodeID      string            `json:"scheduled_node_id"`
+	NodeType             HeteroNodeType    `json:"node_type"`
+	BurstStatus          HeteroBurstStatus `json:"burst_status"`
+	CurrentVRAMUtil      float64           `json:"current_vram_util"`
+	EstimatedCostUSD     float64           `json:"estimated_cost_usd"`
+	EquivalentCloudCostUSD float64         `json:"equivalent_cloud_cost_usd"`
+	PredictedSavingsUSD  float64           `json:"predicted_savings_usd"`
+	MFUScore             float64           `json:"mfu_score"`
+	MBUScore             float64           `json:"mbu_score"`
+	RoutingReason        string            `json:"routing_reason"`
+}
+
+// HeteroSimulateTurn records a step in multi-tenant concurrency simulation
+type HeteroSimulateTurn struct {
+	StepIndex          int               `json:"step_index"`
+	Concurrency        int               `json:"concurrency"`
+	PromptLength       int               `json:"prompt_length"`
+	ScheduledNodeID    string            `json:"scheduled_node_id"`
+	BurstStatus        HeteroBurstStatus `json:"burst_status"`
+	VRAMUtilPercent    float64           `json:"vram_util_percent"`
+	CostUSD            float64           `json:"cost_usd"`
+	EquivalentCloudUSD float64           `json:"equivalent_cloud_usd"`
+	SavingsUSD         float64           `json:"savings_usd"`
+	Detail             string            `json:"detail"`
+}
+
+// HeteroSimulateRequest configures a What-If concurrency spike simulation
+type HeteroSimulateRequest struct {
+	Concurrency            int  `json:"concurrency"`
+	AvgPromptTokens        int  `json:"avg_prompt_tokens"`
+	AvgCompletionTokens    int  `json:"avg_completion_tokens"`
+	EnablePDDisaggregation bool `json:"enable_pd_disaggregation"`
+	SimulatedRounds        int  `json:"simulated_rounds"`
+}
+
+// HeteroSimulateResponse outputs simulation results and cluster architecture advice
+type HeteroSimulateResponse struct {
+	TotalRequests               int                  `json:"total_requests"`
+	LocalHandled                int                  `json:"local_handled"`
+	CloudBursted                int                  `json:"cloud_bursted"`
+	CloudBurstPercent           float64              `json:"cloud_burst_percent"`
+	MaxVRAMPeakUtil             float64              `json:"max_vram_peak_util"`
+	TotalHybridCostUSD          float64              `json:"total_hybrid_cost_usd"`
+	PureCloudCostUSD            float64              `json:"pure_cloud_cost_usd"`
+	NetSavingsUSD               float64              `json:"net_savings_usd"`
+	SavingsPercent              float64              `json:"savings_percent"`
+	Timeline                    []HeteroSimulateTurn `json:"timeline"`
+	ArchitectureRecommendations []string             `json:"architecture_recommendations"`
+}
+
+
 
 
 

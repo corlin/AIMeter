@@ -2013,6 +2013,158 @@ func TestWAFEndpoints(t *testing.T) {
 	}
 }
 
+func TestHeteroEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/hetero/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/hetero/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/hetero/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_physical_vram_gb") {
+		t.Errorf("Expected total_physical_vram_gb in stats, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/hetero/nodes
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/hetero/nodes", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/hetero/nodes, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "nodes") {
+		t.Errorf("Expected nodes list, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/hetero/nodes
+	nodeJSON := `{
+		"id": "node-custom-test-01",
+		"hostname": "gpu-custom.prod.internal",
+		"gpu_model": "NVIDIA H200 141GB",
+		"gpu_count": 8,
+		"hourly_rate_usd": 32.0,
+		"total_vram_gb": 1128.0,
+		"static_weight_vram_gb": 140.0,
+		"dynamic_kv_cache_vram_gb": 200.0,
+		"node_type": "bare_metal_gpu",
+		"active_model": "deepseek-r1-671b-fp8",
+		"max_batch_concurrency": 256,
+		"current_concurrency": 16
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hetero/nodes", strings.NewReader(nodeJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hetero/nodes, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "node-custom-test-01") {
+		t.Errorf("Expected created node in response, got: %s", w.Body.String())
+	}
+
+	// 4. PUT /api/v1/hetero/nodes/:id/vram
+	vramJSON := `{
+		"static_weight_vram_gb": 140.0,
+		"dynamic_kv_cache_vram_gb": 350.0,
+		"current_concurrency": 48
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("PUT", "/api/v1/hetero/nodes/node-custom-test-01/vram", strings.NewReader(vramJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for PUT /api/v1/hetero/nodes/:id/vram, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "vram_util_percent") {
+		t.Errorf("Expected vram_util_percent in response, got: %s", w.Body.String())
+	}
+
+	// 5. GET /api/v1/hetero/pools
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/hetero/pools", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/hetero/pools, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "pools") {
+		t.Errorf("Expected pools list in response, got: %s", w.Body.String())
+	}
+
+	// 6. POST /api/v1/hetero/pools
+	poolJSON := `{
+		"id": "pool-test-custom",
+		"name": "Custom Test Pool",
+		"target_model": "deepseek-r1-671b-fp8",
+		"node_ids": ["node-custom-test-01"],
+		"high_watermark_percent": 88.0,
+		"enable_prefill_decode_disaggregation": true,
+		"cloud_burst_provider": "modal",
+		"cloud_burst_cost_per_1m_tokens": 3.2,
+		"enabled": true
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hetero/pools", strings.NewReader(poolJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hetero/pools, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Custom Test Pool") {
+		t.Errorf("Expected created pool in response, got: %s", w.Body.String())
+	}
+
+	// 7. GET /api/v1/hetero/traces
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/hetero/traces?limit=10", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/hetero/traces, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "traces") {
+		t.Errorf("Expected traces in response, got: %s", w.Body.String())
+	}
+
+	// 8. POST /api/v1/hetero/dispatch
+	dispatchJSON := `{
+		"model": "deepseek-r1-671b-fp8",
+		"prompt_tokens": 4096,
+		"estimated_completion_tokens": 1024,
+		"requested_phase": "prefill"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hetero/dispatch", strings.NewReader(dispatchJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hetero/dispatch, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "scheduled_node_id") || !strings.Contains(w.Body.String(), "burst_status") {
+		t.Errorf("Expected dispatch response fields, got: %s", w.Body.String())
+	}
+
+	// 9. POST /api/v1/hetero/simulate
+	simJSON := `{
+		"concurrency": 64,
+		"avg_prompt_tokens": 4096,
+		"avg_completion_tokens": 1024,
+		"enable_pd_disaggregation": true,
+		"simulated_rounds": 5
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/hetero/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/hetero/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "timeline") || !strings.Contains(w.Body.String(), "architecture_recommendations") {
+		t.Errorf("Expected simulation timeline and recommendations, got: %s", w.Body.String())
+	}
+}
+
 
 
 

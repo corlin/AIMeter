@@ -45,9 +45,9 @@ func NewManager(seedPath ...string) *Manager {
 		events:   make([]*domain.WAFEvent, 0, 200),
 	}
 
-	paths := []string{"configs/waf_seed.json", "../../configs/waf_seed.json"}
+	paths := []string{"configs/waf_seed.json", "../configs/waf_seed.json", "../../configs/waf_seed.json"}
 	if len(seedPath) > 0 && seedPath[0] != "" {
-		paths = []string{seedPath[0], "../../" + seedPath[0]}
+		paths = []string{seedPath[0], "../" + seedPath[0], "../../" + seedPath[0]}
 	}
 
 	loaded := false

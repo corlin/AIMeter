@@ -2288,6 +2288,147 @@ export interface WAFSimulateResponse {
   strategic_recommendations: string[];
 }
 
+// =========================================================================
+// Phase 33: Heterogeneous Multi-Cloud AI Compute, KV-Cache VRAM Virtualization
+// & Disaggregated Prefill/Decode Cost Engine
+// =========================================================================
+
+export type HeteroNodeType = 'bare_metal_gpu' | 'k8s_vllm_pod' | 'cloud_serverless' | 'edge_ollama';
+export type HeteroPhase = 'prefill' | 'decode' | 'hybrid';
+export type HeteroBurstStatus = 'local_scheduled' | 'cloud_bursted' | 'queued_waiting' | 'rejected_oom';
+
+export interface HeteroGPUNode {
+  id: string;
+  hostname: string;
+  gpu_model: string;
+  gpu_count: number;
+  hourly_rate_usd: number;
+  total_vram_gb: number;
+  static_weight_vram_gb: number;
+  dynamic_kv_cache_vram_gb: number;
+  free_vram_gb: number;
+  vram_util_percent: number;
+  node_type: HeteroNodeType;
+  active_model: string;
+  max_batch_concurrency: number;
+  current_concurrency: number;
+  mfu_score: number;
+  mbu_score: number;
+  status: 'online' | 'high_watermark' | 'draining' | 'offline';
+  updated_at: string;
+}
+
+export interface HeteroResourcePool {
+  id: string;
+  name: string;
+  target_model: string;
+  node_ids: string[];
+  high_watermark_percent: number;
+  enable_prefill_decode_disaggregation: boolean;
+  prefill_node_ids?: string[];
+  decode_node_ids?: string[];
+  cloud_burst_provider: string;
+  cloud_burst_cost_per_1m_tokens: number;
+  enabled: boolean;
+}
+
+export interface HeteroUsageTrace {
+  id: string;
+  trace_id: string;
+  tenant_id: string;
+  model: string;
+  phase: HeteroPhase;
+  scheduled_node_id: string;
+  node_type: HeteroNodeType;
+  burst_status: HeteroBurstStatus;
+  prompt_tokens: number;
+  completion_tokens: number;
+  duration_ms: number;
+  vram_allocation_gb: number;
+  vram_residence_cost_usd: number;
+  prefill_compute_cost_usd: number;
+  decode_bandwidth_cost_usd: number;
+  total_cost_usd: number;
+  equivalent_cloud_cost_usd: number;
+  hybrid_savings_usd: number;
+  mfu_score: number;
+  mbu_score: number;
+  timestamp: string;
+}
+
+export interface HeteroStatsSummary {
+  total_invocations: number;
+  local_scheduled_count: number;
+  cloud_bursted_count: number;
+  burst_ratio_percent: number;
+  avg_vram_util_percent: number;
+  avg_mfu_score: number;
+  avg_mbu_score: number;
+  total_cost_usd: number;
+  total_equivalent_cloud_cost_usd: number;
+  total_hybrid_savings_usd: number;
+  active_nodes_count: number;
+  total_physical_vram_gb: number;
+}
+
+export interface HeteroDispatchRequest {
+  tenant_id?: string;
+  model: string;
+  prompt?: string;
+  prompt_tokens: number;
+  estimated_completion_tokens: number;
+  requested_phase?: HeteroPhase;
+}
+
+export interface HeteroDispatchResponse {
+  scheduled_node_id: string;
+  node_type: HeteroNodeType;
+  burst_status: HeteroBurstStatus;
+  current_vram_util: number;
+  estimated_cost_usd: number;
+  equivalent_cloud_cost_usd: number;
+  predicted_savings_usd: number;
+  mfu_score: number;
+  mbu_score: number;
+  routing_reason: string;
+}
+
+export interface HeteroSimulateTurn {
+  step_index: number;
+  concurrency: number;
+  prompt_length: number;
+  scheduled_node_id: string;
+  burst_status: HeteroBurstStatus;
+  vram_util_percent: number;
+  cost_usd: number;
+  equivalent_cloud_usd: number;
+  savings_usd: number;
+  detail: string;
+}
+
+export interface HeteroSimulateRequest {
+  concurrency: number;
+  avg_prompt_tokens: number;
+  avg_completion_tokens: number;
+  enable_pd_disaggregation: boolean;
+  simulated_rounds: number;
+}
+
+export interface HeteroSimulateResponse {
+  total_requests: number;
+  local_handled: number;
+  cloud_bursted: number;
+  cloud_burst_percent: number;
+  max_vram_peak_util: number;
+  total_hybrid_cost_usd: number;
+  pure_cloud_cost_usd: number;
+  net_savings_usd: number;
+  savings_percent: number;
+  timeline: HeteroSimulateTurn[];
+  architecture_recommendations: string[];
+}
+
+
 
 
 

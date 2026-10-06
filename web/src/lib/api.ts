@@ -158,6 +158,14 @@ import {
   WAFSimulateTurn,
   WAFSimulateRequest,
   WAFSimulateResponse,
+  HeteroGPUNode,
+  HeteroResourcePool,
+  HeteroUsageTrace,
+  HeteroStatsSummary,
+  HeteroDispatchRequest,
+  HeteroDispatchResponse,
+  HeteroSimulateRequest,
+  HeteroSimulateResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -2394,6 +2402,146 @@ export async function simulateWAF(req: WAFSimulateRequest): Promise<WAFSimulateR
   }
   return await res.json();
 }
+
+// =========================================================================
+// Phase 33: Heterogeneous Multi-Cloud AI Compute, KV-Cache VRAM Virtualization
+// & Disaggregated Prefill/Decode Cost Engine
+// =========================================================================
+
+export async function fetchHeteroStats(): Promise<HeteroStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/hetero/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch hetero stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchHeteroStats failed:", err);
+    return {
+      total_invocations: 0,
+      local_scheduled_count: 0,
+      cloud_bursted_count: 0,
+      burst_ratio_percent: 0,
+      avg_vram_util_percent: 0,
+      avg_mfu_score: 0,
+      avg_mbu_score: 0,
+      total_cost_usd: 0,
+      total_equivalent_cloud_cost_usd: 0,
+      total_hybrid_savings_usd: 0,
+      active_nodes_count: 0,
+      total_physical_vram_gb: 0,
+    };
+  }
+}
+
+export async function fetchHeteroNodes(): Promise<HeteroGPUNode[]> {
+  try {
+    const res = await fetch(`${API_BASE}/hetero/nodes`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch hetero nodes");
+    const data = await res.json();
+    return Array.isArray(data.nodes) ? data.nodes : [];
+  } catch (err) {
+    console.warn("fetchHeteroNodes failed:", err);
+    return [];
+  }
+}
+
+export async function registerHeteroNode(node: Partial<HeteroGPUNode>): Promise<HeteroGPUNode> {
+  const res = await fetch(`${API_BASE}/hetero/nodes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(node),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to register GPU node" }));
+    throw new Error(err.error || "Failed to register GPU node");
+  }
+  return await res.json();
+}
+
+export async function updateHeteroNodeVRAM(
+  id: string,
+  staticWeightVRAMGB: number,
+  dynamicKVCacheVRAMGB: number,
+  currentConcurrency: number,
+): Promise<HeteroGPUNode> {
+  const res = await fetch(`${API_BASE}/hetero/nodes/${encodeURIComponent(id)}/vram`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      static_weight_vram_gb: staticWeightVRAMGB,
+      dynamic_kv_cache_vram_gb: dynamicKVCacheVRAMGB,
+      current_concurrency: currentConcurrency,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to update node VRAM" }));
+    throw new Error(err.error || "Failed to update node VRAM");
+  }
+  return await res.json();
+}
+
+export async function fetchHeteroPools(): Promise<HeteroResourcePool[]> {
+  try {
+    const res = await fetch(`${API_BASE}/hetero/pools`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch hetero pools");
+    const data = await res.json();
+    return Array.isArray(data.pools) ? data.pools : [];
+  } catch (err) {
+    console.warn("fetchHeteroPools failed:", err);
+    return [];
+  }
+}
+
+export async function updateHeteroPool(pool: HeteroResourcePool): Promise<HeteroResourcePool> {
+  const res = await fetch(`${API_BASE}/hetero/pools`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pool),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to update pool" }));
+    throw new Error(err.error || "Failed to update pool");
+  }
+  return await res.json();
+}
+
+export async function fetchHeteroTraces(limit = 50): Promise<HeteroUsageTrace[]> {
+  try {
+    const res = await fetch(`${API_BASE}/hetero/traces?limit=${limit}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch hetero traces");
+    const data = await res.json();
+    return Array.isArray(data.traces) ? data.traces : [];
+  } catch (err) {
+    console.warn("fetchHeteroTraces failed:", err);
+    return [];
+  }
+}
+
+export async function dispatchHeteroRequest(req: HeteroDispatchRequest): Promise<HeteroDispatchResponse> {
+  const res = await fetch(`${API_BASE}/hetero/dispatch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to evaluate placement" }));
+    throw new Error(err.error || "Failed to evaluate placement");
+  }
+  return await res.json();
+}
+
+export async function simulateHeteroSandbox(req: HeteroSimulateRequest): Promise<HeteroSimulateResponse> {
+  const res = await fetch(`${API_BASE}/hetero/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to run simulation" }));
+    throw new Error(err.error || "Failed to run simulation");
+  }
+  return await res.json();
+}
+
 
 
 

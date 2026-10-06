@@ -1115,6 +1115,40 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（33/33 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 33: 异构私有 GPU 算力集群混合推理、显存利用率虚拟化与预填充/解码分离成本引擎 (Heterogeneous Multi-Cloud AI Compute, KV-Cache VRAM Virtualization & Disaggregated Prefill/Decode Cost Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/hetero_seed.json`）**：
+  * 定义核心数据结构：`HeteroNodeType`（`bare_metal_gpu`, `k8s_vllm_pod`, `cloud_serverless`, `edge_ollama`）、`HeteroPhase`（`prefill`, `decode`, `hybrid`）、`HeteroBurstStatus`（`local_scheduled`, `cloud_bursted`, `queued_waiting`, `rejected_oom`）、`HeteroGPUNode`（节点 ID、主机名、GPU 型号/卡数、时租成本、总显存、静态权重显存、动态 KV-Cache 显存、空闲显存、显存利用率、运行模型、批处理并发数、MFU/MBU 得分、状态、更新时间）、`HeteroResourcePool`（调度池 ID、模型名称、关联节点列表、高水线警戒百分比、预填充/解码分离配置、云端弹性突发提供商与溢出费率）、`HeteroUsageTrace`（四轨物理计量审计流水：显存驻留费 + 首字 Prefill 算力费 + 解码显存带宽费 + 闲置沉没成本、公有云等效成本、净节省金额）、`HeteroStatsSummary`、`HeteroDispatchRequest`、`HeteroDispatchResponse`、`HeteroSimulateTurn`、`HeteroSimulateRequest` 与 `HeteroSimulateResponse`；
+  * 预置种子配置：`configs/hetero_seed.json` 包含 4 类典型自建 GPU 节点（8x H100 SXM, 4x A100 PCIe, 8x L40S, 4x RTX 4090）、2 个弹性调度策略池（DeepSeek-R1 Enterprise Pool, General Hybrid Pool）与 5 条基准四轨物理计量审计流水。
+* [x] **纯 Go 高性能显存虚拟化与调度核心引擎（`pkg/hetero/`）**：
+  * **显存虚拟化切片与效能评分器（`vram.go`）**：支持静态模型权重与动态 KV-Cache 占用分离跟踪（依据模型层数、注意力头与上下文长度估算），实时重算显存利用率与健康状态，并基于并发度计算 Model FLOPs Utilization (MFU) 与 Memory Bandwidth Utilization (MBU)；
+  * **自适应水线与预填充/解码分离仲裁器（`scheduler.go`）**：支持根据 Prefill 首字算力密集与 Decode 自回归解码显存带宽主导特性解耦路由至匹配节点；当节点利用率突破 85% 警戒水线时自动触发 Serverless 弹性溢出（Cloud Bursting），规避排队延迟与 CUDA OOM 资损；
+  * **四轨物理计量引擎（`meter.go`）**：实现显存 GB·时驻留摊销、Prefill 算力消耗、Decode 带宽开销与公有云等效基准对比，精准核算企业自建集群的混合推理净节省；
+  * **生命周期管理与推演沙箱（`manager.go`）**：统一纳管集群节点与资源池、维护 200 条环形审计流水，并提供 What-If 多租户流量冲击推演沙箱（`Simulate`）。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 9 大 REST 控制端点：
+    * `GET /api/v1/hetero/stats`（集群宏观活跃节点、总显存容量、平均利用率、MFU/MBU 与累计节省大盘）
+    * `GET /api/v1/hetero/nodes`（自建 GPU 计算节点拓扑列表）
+    * `POST /api/v1/hetero/nodes`（登记与接入全新 GPU 节点）
+    * `PUT /api/v1/hetero/nodes/:id/vram`（动态调节节点显存切片与并发参数）
+    * `GET /api/v1/hetero/pools`（调度池与自适应水线配置列表）
+    * `POST /api/v1/hetero/pools`（新增或修改调度池策略）
+    * `GET /api/v1/hetero/traces`（异构推理四轨物理计量审计流水列表）
+    * `POST /api/v1/hetero/dispatch`（在线调度放置决策与水线判定评估器）
+    * `POST /api/v1/hetero/simulate`（多租户高并发冲击推演沙箱）
+  * 反向代理网关零损耗全息响应头协同：
+    * 响应头注入：`X-AIMeter-Compute-Node`、`X-AIMeter-VRAM-Util`、`X-AIMeter-Burst-Status`、`X-AIMeter-MFU-Score`、`X-AIMeter-Hybrid-Saved-USD`；
+    * 异步记录四轨物理成本与公有云等效对比审计流水。
+* [x] **Web 控制台全新一级看板 `/hetero`（`web/src/app/hetero/`）**：
+  * **4 维宏观核心 KPI 卡片**：活跃物理 GPU 节点与总显存容量、平均显存利用率与 85% 警戒水位监控、综合算力效能 MFU/MBU 评分、累计公有云替代节省与云端弹性溢出率；
+  * **私有 GPU 节点拓扑与显存切片看板**：卡片式展示各型号 GPU 节点（H100/A100/L40S/RTX4090），可视化三段式显存切片（静态权重 vs KV-Cache vs 空闲），并支持在线调节动态显存；
+  * **自适应水线与预填充/解码分离策略池看板**：呈现调度池配置、Prefill/Decode 专职节点划分、85% 水线告警状态与 Serverless 突发提供商配置；
+  * **实时审计流水与在线调度决策评估器 (Playground)**：表格化展示四轨物理成本拆解（驻留费、首字费、解码费）与等效公有云净节省，支持在线输入模型与 Tokens 实时评估 placement 决策；
+  * **多租户突发流量冲击推演沙箱**：配置冲击并发与 Tokens，模拟流量波峰演进轨迹，渲染逐轮次时序流水、峰值显存、自建承载率与架构师智能优化建议。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（34/34 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 

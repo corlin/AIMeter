@@ -31,7 +31,8 @@ import {
   Terminal,
   Building2,
   Coins,
-  Boxes
+  Boxes,
+  Server
 } from "lucide-react";
 
 export function Navbar() {
@@ -39,6 +40,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Hetero GPU", href: "/hetero", icon: Server },
     { label: "AI WAF", href: "/waf", icon: ShieldAlert },
     { label: "Fine-Tuning & LoRA", href: "/finetuning", icon: Boxes },
     { label: "Federation", href: "/federation", icon: Coins },

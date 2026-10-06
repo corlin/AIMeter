@@ -38,9 +38,9 @@ func NewManager(seedPath ...string) *Manager {
 		jobManager:    jobMgr,
 	}
 
-	paths := []string{"configs/finetuning_seed.json", "../../configs/finetuning_seed.json"}
+	paths := []string{"configs/finetuning_seed.json", "../configs/finetuning_seed.json", "../../configs/finetuning_seed.json"}
 	if len(seedPath) > 0 && seedPath[0] != "" {
-		paths = []string{seedPath[0], "../../" + seedPath[0]}
+		paths = []string{seedPath[0], "../" + seedPath[0], "../../" + seedPath[0]}
 	}
 
 	loaded := false

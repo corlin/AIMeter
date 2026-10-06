@@ -301,6 +301,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **全息透传指标与双向协同**：响应头注入 `X-AIMeter-WAF-Action`、`X-AIMeter-WAF-Score`、`X-AIMeter-WAF-Threat`、`X-AIMeter-Avoided-Loss-USD`、`X-AIMeter-WAF-Rule-Triggered`；支持 `X-AIMeter-WAF-Bypass: true` 白名单旁路。
 * **全生命周期安全防火墙看板与攻防沙箱**：全新一级看板 `/waf`（4 维核心宏观 KPI、实时威胁拦截流水、动态黑名单治理面板、防护特征规则库管理、红蓝对抗推演与单次 Prompt 脆弱性即时探针沙箱）。
 
+### 34. 异构私有 GPU 算力集群混合推理、显存利用率虚拟化与预填充/解码分离成本引擎 (Phase 33)
+* **动态显存切片与虚拟化效能计量 (`pkg/hetero/vram.go`)**：并发安全解耦追踪 GPU 静态模型权重与动态 KV-Cache 内存占用；基于注意力头与上下文长度重算显存利用率；提供 Model FLOPs Utilization (MFU) 与 Memory Bandwidth Utilization (MBU) 物理效能评分。
+* **自适应水线与预填充/解码分离调度 (`pkg/hetero/scheduler.go`)**：依据 Prefill（算力密集）与 Decode（显存带宽受限）的物理差异实施解耦分发；当集群物理显存突破 85% 警戒水线时，自动无缝触发 Serverless 弹性溢出（Cloud Bursting），彻底消除排队卡死与 CUDA OOM 风险。
+* **四轨物理成本核算引擎 (`pkg/hetero/meter.go`)**：物理显存 GB·时驻留摊销开销 + 首字 Prefill 算力开销 + Decode 显存带宽开销 + 闲置沉没成本，实时对比公有云等效 API 支出，精准计算混合架构降本收益。
+* **反向代理网关零损耗全息响应头透传**：请求出站自动透传 `X-AIMeter-Compute-Node`、`X-AIMeter-VRAM-Util`、`X-AIMeter-Burst-Status`、`X-AIMeter-MFU-Score` 与 `X-AIMeter-Hybrid-Saved-USD`，异步记录审计流水。
+* **全生命周期异构算力看板与冲击沙箱**：全新一级看板 `/hetero`（4 维核心宏观 KPI、私有 GPU 节点拓扑与三段式显存切片、自适应水线与 PD 分离策略池、实时四轨物理成本审计流水表、在线调度试算器与多租户高并发冲击推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -308,6 +315,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/hetero` | **异构 GPU 算力集群与显存虚拟化控制中心** | 4 维宏观 KPI（活跃 GPU 节点与总显存容量、平均显存利用率与 85% 水线监控、综合算力效能 MFU/MBU 评分、公有云等效替代节省与弹性溢出率）、私有 GPU 节点拓扑卡片与三段式显存切片柱状图、自适应水线与预填充/解码分离策略池管理、实时四轨物理成本审计流水表（驻留/首字/解码）、在线调度决策试算器与多租户高并发冲击推演沙箱 |
 | `/waf` | **AI WAF 提示词防火墙与拒绝钱包防御中心** | 4 维宏观 KPI（入站前置安全预检量、成功阻断恶意刺探数、规避算力盗刷资损金额、自适应黑名单封禁数）、实时威胁拦截审计表（带样本审查抽屉）、动态黑名单治理与一键解封、防护规则库卡片管理（含新建特征规则弹窗）、多轮红蓝攻防推演与单次 Prompt 脆弱性即时探针沙箱 |
 | `/finetuning` | **模型微调、知识蒸馏与 LoRA 资产记账中心** | 4 维宏观 KPI（总 CapEx 投入、纳管 LoRA 数、累计推理净省、综合 ROI）、LoRA 资产矩阵与回收进度条、微调任务流水表、推训一体化 ROI 飞轮推演沙箱与新建任务/注册资产弹窗 |
 | `/federation` | **多智能体跨域协作与代币清算所看板** | 4 维宏观 KPI（总清算代币规模、托管中保障金、平台清算手续费收入、已决算凭证数）、工作区代币账本矩阵（余额/冻结额/信用分/充值入口）、跨域悬赏任务大厅与加密托管凭证抽屉（SHA-256证明/2PC决算）、What-If 竞标撮合与 2PC 清算沙箱及任务发布/竞标/充值弹窗 |

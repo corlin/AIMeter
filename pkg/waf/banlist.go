@@ -109,6 +109,10 @@ func (b *BanList) AddManualBan(item domain.WAFBannedSource) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	cleanKey := strings.ToLower(strings.TrimSpace(item.Key))
+	if item.ExpiresAt.IsZero() || item.ExpiresAt.Before(time.Now()) {
+		item.ExpiresAt = time.Now().Add(24 * time.Hour)
+		item.RemainingSec = 86400
+	}
 	b.banned[cleanKey] = &item
 }
 

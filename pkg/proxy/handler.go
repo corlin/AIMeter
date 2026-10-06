@@ -37,6 +37,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/federation"
 	"github.com/corlin/AIMeter/pkg/finetuning"
 	"github.com/corlin/AIMeter/pkg/waf"
+	"github.com/corlin/AIMeter/pkg/hetero"
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
@@ -115,6 +116,17 @@ type ProxyHandler struct {
 	federationManager  *federation.FederationManager
 	finetuningManager  *finetuning.Manager
 	wafManager         *waf.Manager
+	heteroManager      *hetero.Manager
+}
+
+// SetHeteroManager attaches a heterogeneous compute manager
+func (h *ProxyHandler) SetHeteroManager(hm *hetero.Manager) {
+	h.heteroManager = hm
+}
+
+// GetHeteroManager returns the attached heterogeneous compute manager
+func (h *ProxyHandler) GetHeteroManager() *hetero.Manager {
+	return h.heteroManager
 }
 
 // SetWAFManager attaches a WAF manager
@@ -1836,6 +1848,57 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 						c.Header("X-AIMeter-Break-Even-Status", string(adapter.Status))
 						c.Header("X-AIMeter-Inference-Saved-USD", fmt.Sprintf("%.4f", savedUSD))
 					}
+				}
+			}
+
+			// Phase 33: Heterogeneous Compute Cluster Scheduling, VRAM Virtualization & Economics
+			if h.heteroManager != nil {
+				requestedPhase := domain.HeteroPhase(c.GetHeader("X-AIMeter-Hetero-Phase"))
+				if requestedPhase == "" {
+					if respData.Usage.PromptTokens > 0 && respData.Usage.CompletionTokens == 0 {
+						requestedPhase = domain.HeteroPhasePrefill
+					} else if respData.Usage.PromptTokens == 0 && respData.Usage.CompletionTokens > 0 {
+						requestedPhase = domain.HeteroPhaseDecode
+					} else {
+						requestedPhase = domain.HeteroPhaseHybrid
+					}
+				}
+
+				hReq := &domain.HeteroDispatchRequest{
+					TenantID:                  tenantID,
+					Model:                     fbResult.ActualModel,
+					PromptTokens:              respData.Usage.PromptTokens,
+					EstimatedCompletionTokens: respData.Usage.CompletionTokens,
+					RequestedPhase:            requestedPhase,
+				}
+
+				hResp, hErr := h.heteroManager.Dispatch(c.Request.Context(), hReq)
+				if hErr == nil && hResp != nil {
+					c.Header("X-AIMeter-Compute-Node", hResp.ScheduledNodeID)
+					c.Header("X-AIMeter-VRAM-Util", fmt.Sprintf("%.1f%%", hResp.CurrentVRAMUtil))
+					c.Header("X-AIMeter-Burst-Status", string(hResp.BurstStatus))
+					c.Header("X-AIMeter-MFU-Score", fmt.Sprintf("%.1f%%", hResp.MFUScore))
+					c.Header("X-AIMeter-Hybrid-Saved-USD", fmt.Sprintf("%.6f", hResp.PredictedSavingsUSD))
+
+					h.heteroManager.RecordTrace(&domain.HeteroUsageTrace{
+						TraceID:                traceID,
+						TenantID:               tenantID,
+						Model:                  fbResult.ActualModel,
+						Phase:                  requestedPhase,
+						ScheduledNodeID:        hResp.ScheduledNodeID,
+						NodeType:               hResp.NodeType,
+						BurstStatus:            hResp.BurstStatus,
+						PromptTokens:           respData.Usage.PromptTokens,
+						CompletionTokens:       respData.Usage.CompletionTokens,
+						DurationMs:             duration.Milliseconds(),
+						VRAMAllocationGB:       0.0,
+						TotalCostUSD:           hResp.EstimatedCostUSD,
+						EquivalentCloudCostUSD: hResp.EquivalentCloudCostUSD,
+						HybridSavingsUSD:       hResp.PredictedSavingsUSD,
+						MFUScore:               hResp.MFUScore,
+						MBUScore:               hResp.MBUScore,
+						Timestamp:              time.Now().UTC(),
+					})
 				}
 			}
 
