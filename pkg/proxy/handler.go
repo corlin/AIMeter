@@ -34,6 +34,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/corlin/AIMeter/pkg/workflow"
+	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -105,6 +106,17 @@ type ProxyHandler struct {
 	kvCacheManager     *kvcache.Manager
 	qualityManager     *quality.QualityManager
 	workflowManager    *workflow.WorkflowManager
+	sandboxManager     *sandbox.SandboxManager
+}
+
+// SetSandboxManager attaches a sandbox manager
+func (h *ProxyHandler) SetSandboxManager(sm *sandbox.SandboxManager) {
+	h.sandboxManager = sm
+}
+
+// GetSandboxManager returns the attached sandbox manager
+func (h *ProxyHandler) GetSandboxManager() *sandbox.SandboxManager {
+	return h.sandboxManager
 }
 
 // SetWorkflowManager attaches a workflow manager
@@ -744,6 +756,30 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		}
 	}
 
+	// 4.9 Evaluate Agent Sandbox & Tool Session Budget Breaker (Phase 28)
+	sandboxBudgetStr := c.GetHeader("X-AIMeter-Sandbox-Budget")
+	if sandboxBudgetStr != "" && h.sandboxManager != nil && sessionID != "" {
+		if budgetCap, err := strconv.ParseFloat(sandboxBudgetStr, 64); err == nil && budgetCap > 0 {
+			currentSpend := h.sandboxManager.GetSessionSpend(sessionID)
+			if currentSpend >= budgetCap {
+				metrics.RecordProxyRequest(provider, actualModel, "429", false, time.Since(startTime))
+				c.Header("X-AIMeter-Sandbox-Status", string(domain.SandboxStatusBudgetBreached))
+				c.Header("X-AIMeter-Tripartite-Total-Cost", fmt.Sprintf("%.6f", currentSpend))
+				c.JSON(http.StatusTooManyRequests, gin.H{
+					"error": gin.H{
+						"message":       fmt.Sprintf("AI Meter: Request blocked by Sandbox & Tool session budget limit. Current spend $%.4f exceeds cap $%.4f", currentSpend, budgetCap),
+						"type":          "sandbox_budget_breached_error",
+						"code":          "sandbox_budget_breached",
+						"session_id":    sessionID,
+						"current_spend": currentSpend,
+						"budget_cap":    budgetCap,
+					},
+				})
+				return
+			}
+		}
+	}
+
 	// 4.5 Evaluate Smart Multi-Provider Router & SLA Arbiter (Phase 14)
 	routingStats := SmartRoutingStats{}
 	isRouterRequested := strings.HasPrefix(strings.ToLower(actualModel), "router:") ||
@@ -1212,6 +1248,11 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		}
 	}
 
+	// Phase 28: Forward initial Sandbox/Tool headers if requested
+	if c.GetHeader("X-AIMeter-Sandbox-Runtime") != "" || c.GetHeader("X-AIMeter-Tool-Name") != "" {
+		c.Header("X-AIMeter-Sandbox-Status", string(domain.SandboxStatusRunning))
+	}
+
 	// Extract GPU headers
 	gpuType := c.GetHeader("X-AIMeter-GPU-Type")
 	gpuCount := c.GetHeader("X-AIMeter-GPU-Count")
@@ -1450,6 +1491,100 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 						respData.Usage.CompletionTokens,
 						duration.Milliseconds(),
 					)
+				}
+			}
+
+			// Phase 28: Clear Agent Sandbox Compute & Tool Micro-transactions
+			if h.sandboxManager != nil {
+				sbxRuntime := c.GetHeader("X-AIMeter-Sandbox-Runtime")
+				toolName := c.GetHeader("X-AIMeter-Tool-Name")
+				sbxEnabled := strings.EqualFold(c.GetHeader("X-AIMeter-Sandbox-Enabled"), "true")
+				if sbxRuntime != "" || toolName != "" || sbxEnabled {
+					sessID := c.GetHeader("X-AIMeter-Session-Id")
+					if sessID == "" {
+						sessID = c.GetHeader("X-Session-ID")
+					}
+					if sessID == "" {
+						sessID = traceID
+					}
+
+					agentRole := c.GetHeader("X-AIMeter-Agent-Role")
+					if agentRole == "" {
+						agentRole = c.GetHeader("X-AIMeter-Agent-Name")
+					}
+					if agentRole == "" {
+						agentRole = "AutonomousAgent"
+					}
+
+					cpu := 1
+					if cpuStr := c.GetHeader("X-AIMeter-Sandbox-CPU"); cpuStr != "" {
+						if v, err := strconv.Atoi(cpuStr); err == nil && v > 0 {
+							cpu = v
+						}
+					}
+
+					ramMB := 1024
+					if ramStr := c.GetHeader("X-AIMeter-Sandbox-RAM-MB"); ramStr != "" {
+						if v, err := strconv.Atoi(ramStr); err == nil && v > 0 {
+							ramMB = v
+						}
+					}
+
+					durMs := duration.Milliseconds()
+					if durStr := c.GetHeader("X-AIMeter-Sandbox-Duration-Ms"); durStr != "" {
+						if v, err := strconv.ParseInt(durStr, 10, 64); err == nil && v > 0 {
+							durMs = v
+						}
+					}
+
+					sessCap := 0.0
+					if capStr := c.GetHeader("X-AIMeter-Sandbox-Budget"); capStr != "" {
+						if v, err := strconv.ParseFloat(capStr, 64); err == nil && v > 0 {
+							sessCap = v
+						}
+					}
+
+					customToolCost := 0.0
+					if tcStr := c.GetHeader("X-AIMeter-Tool-Cost"); tcStr != "" {
+						if v, err := strconv.ParseFloat(tcStr, 64); err == nil && v > 0 {
+							customToolCost = v
+						}
+					}
+
+					codeSnippet := c.GetHeader("X-AIMeter-Sandbox-Snippet")
+					if codeSnippet == "" && len(promptText) > 0 {
+						if len(promptText) > 100 {
+							codeSnippet = promptText[:100] + "..."
+						} else {
+							codeSnippet = promptText
+						}
+					}
+
+					sbxReq := domain.SandboxExecuteRequest{
+						TenantID:      tenantID,
+						SessionID:     sessID,
+						AgentRole:     agentRole,
+						Runtime:       domain.SandboxRuntime(sbxRuntime),
+						CPU:           cpu,
+						RAMMB:         ramMB,
+						DurationMs:    durMs,
+						ToolName:      toolName,
+						ToolCostUSD:   customToolCost,
+						LLMCostUSD:    costUSD,
+						SessionCapUSD: sessCap,
+						CodeSnippet:   codeSnippet,
+					}
+
+					sbxRes, execErr := h.sandboxManager.Execute(sbxReq)
+					if execErr == nil {
+						c.Header("X-AIMeter-Sandbox-Cost", fmt.Sprintf("%.6f", sbxRes.Record.ComputeCostUSD))
+						c.Header("X-AIMeter-Tool-Cost", fmt.Sprintf("%.6f", sbxRes.Record.ToolCostUSD))
+						c.Header("X-AIMeter-Tripartite-Total-Cost", fmt.Sprintf("%.6f", sbxRes.Record.TripartiteTotalUSD))
+						c.Header("X-AIMeter-Sandbox-Status", string(sbxRes.Record.Status))
+						if sbxRes.Record.ID != "" {
+							c.Header("X-AIMeter-Sandbox-Execution-ID", sbxRes.Record.ID)
+						}
+					}
 				}
 			}
 

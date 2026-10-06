@@ -2083,7 +2083,149 @@ type WorkflowSimulateResponse struct {
 	Recommendations []string               `json:"recommendations"`
 }
 
+// ==========================================
+// Phase 28: Agent Sandbox Compute & Tool Micro-Transaction Clearing Engine
+// ==========================================
 
+// SandboxRuntime specifies execution virtualization technology
+type SandboxRuntime string
 
+const (
+	SandboxRuntimeDocker      SandboxRuntime = "docker"
+	SandboxRuntimeE2B         SandboxRuntime = "e2b"
+	SandboxRuntimeModal       SandboxRuntime = "modal"
+	SandboxRuntimeWasm        SandboxRuntime = "wasm"
+	SandboxRuntimeFirecracker SandboxRuntime = "firecracker"
+)
 
+// SandboxExecutionStatus tracks lifecycle status of micro-VM / code execution
+type SandboxExecutionStatus string
 
+const (
+	SandboxStatusRunning        SandboxExecutionStatus = "running"
+	SandboxStatusCompleted      SandboxExecutionStatus = "completed"
+	SandboxStatusTimeoutCapped  SandboxExecutionStatus = "timeout_capped"
+	SandboxStatusBudgetBreached SandboxExecutionStatus = "budget_breached"
+	SandboxStatusFailed         SandboxExecutionStatus = "failed"
+)
+
+// SandboxComputeSpec defines compute hardware allocation and base rates
+type SandboxComputeSpec struct {
+	CPU              int     `json:"cpu"`                 // vCPU allocation (e.g. 1, 2, 4)
+	RAMMB            int     `json:"ram_mb"`              // Memory in MB (e.g. 1024, 2048, 4096)
+	ColdStartBaseUSD float64 `json:"cold_start_base_usd"` // Baseline spin-up charge (e.g. 0.0010)
+	RatePerCPUSec    float64 `json:"rate_per_cpu_sec"`    // CPU/sec rate (e.g. 0.000015)
+	RatePerRAMGBSec  float64 `json:"rate_per_ram_gb_sec"` // RAM GB/sec rate (e.g. 0.000004)
+	TimeoutSec       int     `json:"timeout_sec"`         // Hard execution ceiling (default 60s)
+}
+
+// ToolClearingItem defines registered third-party paid tool pricing item
+type ToolClearingItem struct {
+	ToolName       string  `json:"tool_name"`         // e.g. code_interpreter, web_search
+	Provider       string  `json:"provider"`          // e.g. E2B, SerpApi, Playwright
+	CostPerCallUSD float64 `json:"cost_per_call_usd"` // Micro-transaction fee
+	Category       string  `json:"category"`          // compute, search, browser, data
+	Description    string  `json:"description"`
+	Enabled        bool    `json:"enabled"`
+}
+
+// SandboxExecutionRecord records a unified code interpreter or tool execution event
+type SandboxExecutionRecord struct {
+	ID                 string                 `json:"id"`
+	TenantID           string                 `json:"tenant_id"`
+	SessionID          string                 `json:"session_id"`
+	TraceID            string                 `json:"trace_id"`
+	AgentRole          string                 `json:"agent_role"`
+	Runtime            SandboxRuntime         `json:"runtime"`
+	CPU                int                    `json:"cpu"`
+	RAMMB              int                    `json:"ram_mb"`
+	DurationMs         int64                  `json:"duration_ms"`
+	ComputeCostUSD     float64                `json:"compute_cost_usd"`
+	ToolName           string                 `json:"tool_name"`
+	ToolCostUSD        float64                `json:"tool_cost_usd"`
+	LLMCostUSD         float64                `json:"llm_cost_usd"`
+	TripartiteTotalUSD float64                `json:"tripartite_total_usd"`
+	Status             SandboxExecutionStatus `json:"status"`
+	CodeSnippet        string                 `json:"code_snippet,omitempty"`
+	ErrorMessage       string                 `json:"error_message,omitempty"`
+	CreatedAt          time.Time              `json:"created_at"`
+}
+
+// SandboxStatsSummary aggregates compute and tool micro-transactions across agents
+type SandboxStatsSummary struct {
+	TotalExecutions     int64   `json:"total_executions"`
+	ActiveSandboxes     int64   `json:"active_sandboxes"`
+	TotalComputeCostUSD float64 `json:"total_compute_cost_usd"`
+	TotalToolCostUSD    float64 `json:"total_tool_cost_usd"`
+	TotalLLMCostUSD     float64 `json:"total_llm_cost_usd"`
+	TripartiteTotalUSD  float64 `json:"tripartite_total_usd"`
+	BudgetBreachCount   int64   `json:"budget_breach_count"`
+	TimeoutCapCount     int64   `json:"timeout_cap_count"`
+	AvgDurationMs       float64 `json:"avg_duration_ms"`
+}
+
+// SandboxExecuteRequest simulates or reports a micro-VM or code execution
+type SandboxExecuteRequest struct {
+	TenantID      string         `json:"tenant_id"`
+	SessionID     string         `json:"session_id"`
+	AgentRole     string         `json:"agent_role"`
+	Runtime       SandboxRuntime `json:"runtime"`
+	CPU           int            `json:"cpu"`
+	RAMMB         int            `json:"ram_mb"`
+	DurationMs    int64          `json:"duration_ms"`
+	ToolName      string         `json:"tool_name"`
+	ToolCostUSD   float64        `json:"tool_cost_usd"`
+	LLMCostUSD    float64        `json:"llm_cost_usd"`
+	CodeSnippet   string         `json:"code_snippet,omitempty"`
+	SessionCapUSD float64        `json:"session_cap_usd,omitempty"`
+}
+
+// SandboxExecuteResponse returns recorded costs and control actions
+type SandboxExecuteResponse struct {
+	Record   SandboxExecutionRecord `json:"record"`
+	Breached bool                   `json:"breached"`
+	Message  string                 `json:"message"`
+}
+
+// SandboxScenarioTurn represents economics for simulated sandbox workload
+type SandboxScenarioTurn struct {
+	ScenarioName       string  `json:"scenario_name"`
+	Description        string  `json:"description"`
+	AgentRole          string  `json:"agent_role"`
+	Runtime            string  `json:"runtime"`
+	DurationSec        int     `json:"duration_sec"`
+	LLMCostUSD         float64 `json:"llm_cost_usd"`
+	ComputeCostUSD     float64 `json:"compute_cost_usd"`
+	ToolCostUSD        float64 `json:"tool_cost_usd"`
+	TripartiteTotalUSD float64 `json:"tripartite_total_usd"`
+	ComputePct         float64 `json:"compute_pct"`
+	ToolPct            float64 `json:"tool_pct"`
+	IsBreached         bool    `json:"is_breached"`
+}
+
+// SandboxSimulateRequest defines input parameters for interactive sandbox simulation
+type SandboxSimulateRequest struct {
+	Runtime       SandboxRuntime `json:"runtime,omitempty"`
+	CPU           int            `json:"cpu,omitempty"`
+	RAMMB         int            `json:"ram_mb,omitempty"`
+	DurationSec   int            `json:"duration_sec,omitempty"`
+	ToolName      string         `json:"tool_name,omitempty"`
+	ToolCalls     int            `json:"tool_calls,omitempty"`
+	LLMTokens     int            `json:"llm_tokens,omitempty"`
+	SessionCapUSD float64        `json:"session_cap_usd,omitempty"`
+}
+
+// SandboxSimulateResponse returns breakdown and comparison scenarios
+type SandboxSimulateResponse struct {
+	ComputeCostUSD     float64               `json:"compute_cost_usd"`
+	ToolCostUSD        float64               `json:"tool_cost_usd"`
+	LLMCostUSD         float64               `json:"llm_cost_usd"`
+	TripartiteTotalUSD float64               `json:"tripartite_total_usd"`
+	ComputePct         float64               `json:"compute_pct"`
+	ToolPct            float64               `json:"tool_pct"`
+	LLMPct             float64               `json:"llm_pct"`
+	IsTimeoutCapped    bool                  `json:"is_timeout_capped"`
+	IsBudgetBreached   bool                  `json:"is_budget_breached"`
+	Scenarios          []SandboxScenarioTurn `json:"scenarios"`
+	Recommendations    []string              `json:"recommendations"`
+}

@@ -1690,3 +1690,114 @@ export interface WorkflowSimulateResponse {
   scenarios: WorkflowScenarioTurn[];
   recommendations: string[];
 }
+
+// ==========================================
+// Phase 28: Agent Sandbox & Tool Clearing Engine
+// ==========================================
+
+export type SandboxRuntime = "docker" | "wasm" | "e2b" | "modal" | "firecracker";
+export type SandboxExecutionStatus = "running" | "completed" | "failed" | "timeout_capped" | "budget_breached";
+
+export interface ToolClearingItem {
+  tool_name: string;
+  provider: string;
+  cost_per_call_usd: number;
+  category: string; // compute, search, browser, data, custom
+  description: string;
+  enabled: boolean;
+}
+
+export interface SandboxExecutionRecord {
+  id: string;
+  tenant_id: string;
+  session_id: string;
+  trace_id: string;
+  agent_role: string;
+  runtime: SandboxRuntime;
+  cpu: number;
+  ram_mb: number;
+  duration_ms: number;
+  compute_cost_usd: number;
+  tool_name: string;
+  tool_cost_usd: number;
+  llm_cost_usd: number;
+  tripartite_total_usd: number;
+  status: SandboxExecutionStatus;
+  code_snippet?: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface SandboxStatsSummary {
+  total_executions: number;
+  active_sandboxes: number;
+  total_compute_cost_usd: number;
+  total_tool_cost_usd: number;
+  total_llm_cost_usd: number;
+  tripartite_total_usd: number;
+  budget_breach_count: number;
+  timeout_cap_count: number;
+  avg_duration_ms: number;
+}
+
+export interface SandboxExecuteRequest {
+  tenant_id?: string;
+  session_id?: string;
+  agent_role?: string;
+  runtime?: SandboxRuntime;
+  cpu?: number;
+  ram_mb?: number;
+  duration_ms?: number;
+  tool_name?: string;
+  tool_cost_usd?: number;
+  llm_cost_usd?: number;
+  code_snippet?: string;
+  session_cap_usd?: number;
+}
+
+export interface SandboxExecuteResponse {
+  record: SandboxExecutionRecord;
+  breached: boolean;
+  message: string;
+}
+
+export interface SandboxScenarioTurn {
+  scenario_name: string;
+  description: string;
+  agent_role: string;
+  runtime: SandboxRuntime;
+  duration_sec: number;
+  llm_cost_usd: number;
+  compute_cost_usd: number;
+  tool_cost_usd: number;
+  tripartite_total_usd: number;
+  compute_pct: number;
+  tool_pct: number;
+  is_breached: boolean;
+}
+
+export interface SandboxSimulateRequest {
+  scenario_name?: string;
+  runtime?: SandboxRuntime;
+  duration_sec?: number;
+  cpu?: number;
+  ram_mb?: number;
+  tool_name?: string;
+  llm_tokens?: number;
+  session_cap_usd?: number;
+}
+
+export interface SandboxSimulateResponse {
+  compute_cost_usd: number;
+  tool_cost_usd: number;
+  llm_cost_usd: number;
+  tripartite_total_usd: number;
+  compute_pct: number;
+  tool_pct: number;
+  llm_pct: number;
+  is_timeout_capped: boolean;
+  is_budget_breached: boolean;
+  scenarios: SandboxScenarioTurn[];
+  recommendations: string[];
+}
+

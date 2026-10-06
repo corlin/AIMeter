@@ -953,6 +953,36 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（28/28 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 28: Agent 运行时沙箱代码解释器、微轻量虚拟机算力与外部工具微事务清算引擎 (Agent Code Interpreter Sandbox, Ephemeral Micro-VM Compute & Tool Micro-Transaction Clearing Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/sandbox_seed.json`）**：
+  * 定义核心数据结构：`SandboxRuntime`（docker, wasm, e2b, modal, firecracker）、`SandboxExecutionStatus`（running, completed, failed, timeout_capped, budget_breached）、`SandboxComputeSpec`、`ToolClearingItem`（工具名称、服务商、单次调用单价、分类、描述与启用开关）、`SandboxExecutionRecord`（唯一 ID、租户、会话、Agent 角色、运行时、CPU/RAM 规格、耗时、算力成本、工具成本、LLM 成本、三合一总成本、状态、代码片段与时间戳）、`SandboxStatsSummary`、`SandboxExecuteRequest`、`SandboxExecuteResponse`、`SandboxScenarioTurn`、`SandboxSimulateRequest` 与 `SandboxSimulateResponse`；
+  * 预置种子配置：`configs/sandbox_seed.json` 包含预置宏观大盘统计、5 大主流外部工具微事务费率字典（`code_interpreter`, `web_search`, `browser_automation`, `financial_data`, `sql_sandbox`）与 5 条经典 Agent 审计流水（数据分析、网页抓取、安全审计、合规数据与高频量化调用）。
+* [x] **纯 Go 高性能瞬态微轻量虚拟机算力折算、工具清算与生命周期管理器（`pkg/sandbox/`）**：
+  * **瞬态算力折算模型与 60s 硬超时判定（`compute.go`）**：精准按秒级折算 vCPU-sec 与 RAM-GB-sec，叠加微虚拟机容器拉起冷启动保底开销（$0.0005/run），对执行时长施加 60s 硬截断保护，超出自动标记为 `timeout_capped` 并截断计费；
+  * **外部工具微事务字典（`clearing.go`）**：并发安全的工具费率注册中心，支持动态解析工具调用单价与自定义覆盖单价；
+  * **三合一全口径综合账本与会话级熔断防失控状态机（`manager.go`）**：打通 $\text{TripartiteTotal} = \text{ComputeCost} + \text{ToolCost} + \text{LLMCost}$，实时追踪 `SessionSpend`，当单会话累计支出超过 `SessionCapUSD` 时触发主动预算熔断；
+  * **多场景经济学推演沙箱（`manager.Simulate`）**：支持在不同 Runtime、vCPU/RAM 规格、不同工具与 Token 规模下推演三合一全口径成本结构与优化策略。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 6 大 REST 控制端点：
+    * `GET /api/v1/sandboxes/stats`（宏观沙箱算力与三合一账本统计）
+    * `GET /api/v1/sandboxes/executions`（沙箱审计流水列表，支持租户、角色与状态过滤）
+    * `GET /api/v1/sandboxes/tools`（外部工具微事务费率字典列表）
+    * `POST /api/v1/sandboxes/tools`（注册或修改外部工具清算单价）
+    * `POST /api/v1/sandboxes/execute`（执行一次沙箱与工具清算并落库）
+    * `POST /api/v1/sandboxes/simulate`（在线微虚拟机与工具负载经济学推演）
+  * 反向代理网关双向协同与全息响应头：
+    * **入站会话级硬预算熔断阻断**：当请求携带 `X-AIMeter-Sandbox-Budget` 且该会话累计支出超标时，网关直接返回 HTTP 429 与 `sandbox_budget_breached` 错误码，切断 Agent 无限死循环资损；
+    * **出站三合一全口径账本透传**：响应头全息透传 `X-AIMeter-Sandbox-Cost`、`X-AIMeter-Tool-Cost`、`X-AIMeter-Tripartite-Total-Cost`、`X-AIMeter-Sandbox-Status` 与 `X-AIMeter-Sandbox-Execution-ID`，并异步落库沙箱审计记录。
+* [x] **Web 控制台全新一级看板 `/sandboxes`（`web/src/app/sandboxes/`）**：
+  * **4 维宏观核心 KPI 卡片**：三合一全口径累计账本、瞬态沙箱算力累计支出、外部工具微事务支出、超时硬截断与预算阻断次数；
+  * **三合一成本全息瀑布与审计流水 (Executions Table & Drawer)**：多维筛选表格展现执行 ID、会话 ID、Agent 角色、Runtime、规格耗时、外部工具、三合一成本与状态标签，点击展开查看代码片段与成本拆解条；
+  * **工具微事务费率字典 (Tool Registry & Catalog)**：卡片式浏览预置的 5 大微事务工具，支持在线调节单次调用单价并持久化生效；
+  * **在线算力推演沙箱 (Interactive Playground)**：滑块灵活调节 Runtime、执行时长、vCPU/RAM、工具选择、LLM Tokens 与会话预算，实时渲染三合一成本瀑布图条、行业典型基准对比与智能降本建议。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（29/29 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 

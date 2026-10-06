@@ -109,7 +109,14 @@ import {
   WorkflowResumeRequest,
   WorkflowResumeResponse,
   WorkflowSimulateRequest,
-  WorkflowSimulateResponse
+  WorkflowSimulateResponse,
+  SandboxStatsSummary,
+  SandboxExecutionRecord,
+  ToolClearingItem,
+  SandboxExecuteRequest,
+  SandboxExecuteResponse,
+  SandboxSimulateRequest,
+  SandboxSimulateResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -1827,3 +1834,99 @@ export async function simulateWorkflow(req: WorkflowSimulateRequest): Promise<Wo
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 28: Agent Sandbox & Tool Clearing Engine
+// ==========================================
+
+export async function fetchSandboxStats(): Promise<SandboxStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/sandboxes/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch sandbox stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchSandboxStats failed:", err);
+    return {
+      total_executions: 0,
+      active_sandboxes: 0,
+      total_compute_cost_usd: 0,
+      total_tool_cost_usd: 0,
+      total_llm_cost_usd: 0,
+      tripartite_total_usd: 0,
+      budget_breach_count: 0,
+      timeout_cap_count: 0,
+      avg_duration_ms: 0,
+    };
+  }
+}
+
+export async function fetchSandboxExecutions(tenantId?: string, agentRole?: string, status?: string): Promise<SandboxExecutionRecord[]> {
+  try {
+    const params = new URLSearchParams();
+    if (tenantId && tenantId !== "all") params.append("tenant_id", tenantId);
+    if (agentRole && agentRole !== "all") params.append("agent_role", agentRole);
+    if (status && status !== "all") params.append("status", status);
+
+    const qs = params.toString();
+    const url = qs ? `${API_BASE}/sandboxes/executions?${qs}` : `${API_BASE}/sandboxes/executions`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch sandbox executions");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("fetchSandboxExecutions failed:", err);
+    return [];
+  }
+}
+
+export async function fetchSandboxTools(): Promise<ToolClearingItem[]> {
+  try {
+    const res = await fetch(`${API_BASE}/sandboxes/tools`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch sandbox tools");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("fetchSandboxTools failed:", err);
+    return [];
+  }
+}
+
+export async function upsertSandboxTool(item: ToolClearingItem): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/sandboxes/tools`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(item),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to save tool configuration" }));
+    throw new Error(err.error || "Failed to save tool configuration");
+  }
+  return await res.json();
+}
+
+export async function executeSandbox(req: SandboxExecuteRequest): Promise<SandboxExecuteResponse> {
+  const res = await fetch(`${API_BASE}/sandboxes/execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to execute sandbox" }));
+    throw new Error(err.error || "Failed to execute sandbox");
+  }
+  return await res.json();
+}
+
+export async function simulateSandbox(req: SandboxSimulateRequest): Promise<SandboxSimulateResponse> {
+  const res = await fetch(`${API_BASE}/sandboxes/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate sandbox" }));
+    throw new Error(err.error || "Failed to simulate sandbox");
+  }
+  return await res.json();
+}
+

@@ -1416,6 +1416,117 @@ func TestWorkflowEndpoints(t *testing.T) {
 	}
 }
 
+func TestSandboxEndpoints(t *testing.T) {
+	server := api.NewServer(0, nil, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/sandboxes/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/sandboxes/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/sandboxes/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_executions") || !strings.Contains(w.Body.String(), "tripartite_total_usd") {
+		t.Errorf("Expected sandbox stats fields in response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/sandboxes/executions
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/sandboxes/executions", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/sandboxes/executions, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "sbx-") {
+		t.Errorf("Expected executions list in response, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/sandboxes/tools
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/sandboxes/tools", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/sandboxes/tools, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "tool_name") {
+		t.Errorf("Expected tools in response, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/sandboxes/tools
+	upsertJSON := `{
+		"tool_name": "custom_search",
+		"category": "API",
+		"cost_per_call_usd": 0.008,
+		"pricing_unit": "per_call",
+		"description": "Custom high-precision web search"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/sandboxes/tools", strings.NewReader(upsertJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/sandboxes/tools, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/sandboxes/execute
+	execJSON := `{
+		"tenant_id": "test-tenant",
+		"session_id": "sess-test-01",
+		"agent_role": "PythonDataAnalyst",
+		"runtime": "docker",
+		"cpu": 2,
+		"ram_mb": 2048,
+		"duration_ms": 3500,
+		"tool_name": "custom_search",
+		"llm_cost_usd": 0.012,
+		"session_cap_usd": 1.0,
+		"code_snippet": "import pandas as pd"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/sandboxes/execute", strings.NewReader(execJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/sandboxes/execute, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "tripartite_total_usd") || !strings.Contains(w.Body.String(), "completed") {
+		t.Errorf("Expected execute response with tripartite cost, got: %s", w.Body.String())
+	}
+
+	// 6. POST /api/v1/sandboxes/simulate
+	simJSON := `{
+		"scenario_name": "端到端金融量化研报推演",
+		"turns": [
+			{
+				"turn_index": 1,
+				"agent_role": "MarketCrawler",
+				"tool_name": "web_search",
+				"duration_ms": 1500,
+				"llm_tokens": 1200
+			},
+			{
+				"turn_index": 2,
+				"agent_role": "QuantBacktester",
+				"tool_name": "code_interpreter",
+				"duration_ms": 5000,
+				"llm_tokens": 3000
+			}
+		],
+		"session_cap_usd": 0.50
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/sandboxes/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/sandboxes/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "tripartite_total_usd") || !strings.Contains(w.Body.String(), "scenarios") {
+		t.Errorf("Expected simulate response, got: %s", w.Body.String())
+	}
+}
+
+
 
 
 

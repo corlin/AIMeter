@@ -271,6 +271,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **断点续算与沉没止损熔断保护 (Sunk-Cost Circuit Breaker)**：续算时自动跳过所有已完成并固化快照的前序步骤，规避无谓重复计算；支持单工作流配置沉没成本上限（`SunkCostCapUSD`，如 $0.25），当连续失败重试累计浪费达到上限时即刻熔断，防止资损雪崩。
 * **全生命周期工作流控制中心与沙箱**：全新一级看板 `/workflows`（4 维宏观 KPI、交互式 DAG 流程拓扑图谱、检查点增量快照抽屉、一键断点续算触发、实例审计表与全量重跑 vs 增量续算对比推演沙箱）。
 
+### 29. Agent 运行时沙箱代码解释器、微轻量虚拟机算力与外部工具微事务清算引擎 (Agent Code Interpreter Sandbox, Ephemeral Micro-VM Compute & Tool Micro-Transaction Clearing Engine - Phase 28)
+* **瞬态微轻量虚拟机算力折算模型与 60s 硬超时判定 (`pkg/sandbox/compute.go`)**：秒级精确核算 vCPU-sec 与 RAM-GB-sec，叠加微虚拟机容器拉起冷启动保底开销（$0.0005/run），对执行时长施加 60s 硬截断保护，超出自动标记为 `timeout_capped` 并截断计费，防挂起死锁。
+* **预置外部工具微事务费率字典 (`pkg/sandbox/clearing.go`)**：并发安全纳管 `code_interpreter`, `web_search`, `browser_automation`, `financial_data`, `sql_sandbox` 等高频外部付费工具单价字典，支持动态单价解析与按次结算。
+* **三合一全口径综合账本与会话级防失控熔断状态机 (`pkg/sandbox/manager.go`)**：打通 $\text{TripartiteTotal} = \text{ComputeCost} + \text{ToolCost} + \text{LLMCost}$，实时追踪会话累计支出；当单会话超出 `SessionCapUSD` 硬预算时网关直接返回 HTTP 429 斩断 Agent 失控死循环资损。
+* **反向代理双向协同与全息响应头审计**：透传 `X-AIMeter-Sandbox-Cost`, `X-AIMeter-Tool-Cost`, `X-AIMeter-Tripartite-Total-Cost`, `X-AIMeter-Sandbox-Status` 与 `X-AIMeter-Sandbox-Execution-ID`，实时记录沙箱审计流水。
+* **全生命周期沙箱控制中心与推演沙箱**：全新一级看板 `/sandboxes`（4 维宏观 KPI、三合一成本解耦瀑布与审计流水抽屉、工具微事务字典管理面板与交互式在线算力推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -278,6 +285,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/sandboxes` | **Agent 沙箱代码解释器与工具微事务清算中心** | 4 维宏观 KPI（三合一总账本、沙箱算力累计、工具微事务累计、超时截断与预算阻断）、三合一全口径成本解耦瀑布、审计流水抽屉、预置工具单价字典在线编辑与交互式算力推演沙箱 |
 | `/workflows` | **长程 Agent DAG 工作流编排计费与检查点控制中心** | 4 维宏观 KPI（累计发生、有效成本、续算规避浪费、失败沉没成本）、交互式 DAG 拓扑流程时序流、增量快照 Payload 预览抽屉、一键断点续算触发器、全量重跑 vs 断点续算经济学对比沙箱与实例审计表 |
 | `/quality` | **质量漂移检测与幻觉惩罚经济学大盘** | 4 维宏观 KPI（评估请求数、自愈成功率、幻觉拦截数、SLA 惩罚与坏账冲销金额）、供应商可信度排行榜 (0~100)、在线自愈与损失推演沙箱（带自愈前后 Diff 与阶梯扣减拆解）、坏账审计流水表与策略配置面板 |
 | `/kvcache` | **前缀缓存共享与 KV-Cache 经济学大盘** | 4 维宏观 KPI（前缀请求数、命中 Tokens、KV 命中率、节省金额）、交互式 Radix 前缀树拓扑图谱（展开/折叠/命中热力）、变量沉底规范化收益对比沙箱、主动 1-Token 预热工作台与实时审计流水 |

@@ -34,6 +34,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/corlin/AIMeter/pkg/workflow"
+	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/gin-gonic/gin"
 )
 
@@ -63,6 +64,17 @@ type APIHandler struct {
 	kvCacheManager     *kvcache.Manager
 	qualityManager     *quality.QualityManager
 	workflowManager    *workflow.WorkflowManager
+	sandboxManager     *sandbox.SandboxManager
+}
+
+// SetSandboxManager attaches a sandbox manager to the API handler
+func (h *APIHandler) SetSandboxManager(sm *sandbox.SandboxManager) {
+	h.sandboxManager = sm
+}
+
+// GetSandboxManager returns the attached sandbox manager
+func (h *APIHandler) GetSandboxManager() *sandbox.SandboxManager {
+	return h.sandboxManager
 }
 
 // SetWorkflowManager attaches a workflow manager to the API handler
@@ -2278,3 +2290,91 @@ func (h *APIHandler) SimulateWorkflow(c *gin.Context) {
 	resp := h.workflowManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 28: Agent Sandbox Compute & Tool Micro-Transaction Handlers
+// ==========================================
+
+// GetSandboxStats returns macro aggregates across sandbox runs and tool transactions
+func (h *APIHandler) GetSandboxStats(c *gin.Context) {
+	if h.sandboxManager == nil {
+		c.JSON(http.StatusOK, domain.SandboxStatsSummary{})
+		return
+	}
+	c.JSON(http.StatusOK, h.sandboxManager.GetStats())
+}
+
+// GetSandboxExecutions returns filtered sandbox execution records
+func (h *APIHandler) GetSandboxExecutions(c *gin.Context) {
+	if h.sandboxManager == nil {
+		c.JSON(http.StatusOK, []domain.SandboxExecutionRecord{})
+		return
+	}
+	tenantID := c.Query("tenant_id")
+	agentRole := c.Query("agent_role")
+	status := c.Query("status")
+	c.JSON(http.StatusOK, h.sandboxManager.GetExecutions(tenantID, agentRole, status))
+}
+
+// GetSandboxTools returns all registered tool micro-transaction fees
+func (h *APIHandler) GetSandboxTools(c *gin.Context) {
+	if h.sandboxManager == nil {
+		c.JSON(http.StatusOK, []domain.ToolClearingItem{})
+		return
+	}
+	c.JSON(http.StatusOK, h.sandboxManager.ListTools())
+}
+
+// UpsertSandboxTool adds or modifies a tool pricing entry
+func (h *APIHandler) UpsertSandboxTool(c *gin.Context) {
+	if h.sandboxManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sandbox manager not initialized"})
+		return
+	}
+	var item domain.ToolClearingItem
+	if err := c.ShouldBindJSON(&item); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.sandboxManager.UpsertTool(item)
+	c.JSON(http.StatusOK, item)
+}
+
+// ExecuteSandbox simulates or records a code execution or tool transaction
+func (h *APIHandler) ExecuteSandbox(c *gin.Context) {
+	if h.sandboxManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sandbox manager not initialized"})
+		return
+	}
+	var req domain.SandboxExecuteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.sandboxManager.Execute(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if resp.Breached {
+		c.JSON(http.StatusTooManyRequests, resp)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// SimulateSandbox runs interactive what-if simulation comparing compute and tool combinations
+func (h *APIHandler) SimulateSandbox(c *gin.Context) {
+	if h.sandboxManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sandbox manager not initialized"})
+		return
+	}
+	var req domain.SandboxSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.sandboxManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
