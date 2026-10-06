@@ -1815,5 +1815,141 @@ type KVCacheSimulateResponse struct {
 	Recommendations          []string              `json:"recommendations"`
 }
 
+// ==========================================
+// Phase 26: LLM Output Quality Drift, Hallucination Penalty & Robustness Guard
+// ==========================================
+
+// DriftLevel represents severity of output quality drift
+type DriftLevel string
+
+const (
+	DriftLevelNormal        DriftLevel = "normal"
+	DriftLevelRepaired      DriftLevel = "repaired"
+	DriftLevelDegraded      DriftLevel = "degraded"
+	DriftLevelHallucination DriftLevel = "hallucination"
+	DriftLevelFatalBadDebt  DriftLevel = "fatal_bad_debt"
+)
+
+// QualityPolicy defines tenant-level quality drift detection, auto-repair, and penalty economics
+type QualityPolicy struct {
+	TenantID               string    `json:"tenant_id"`
+	EnableDetection        bool      `json:"enable_detection"`
+	EnableAutoRepair       bool      `json:"enable_auto_repair"`        // Microsecond syntax/JSON auto-repair
+	HallucinationThreshold float64   `json:"hallucination_threshold"`  // e.g. 0.40 triggers penalty, 0.75 triggers bad-debt
+	BadDebtThreshold       float64   `json:"bad_debt_threshold"`      // e.g. 0.80 triggers 100% write-off
+	RepairedCreditRate     float64   `json:"repaired_credit_rate"`     // e.g. 0.20 (20% discount compensation on repaired outputs)
+	ModeratePenaltyRate    float64   `json:"moderate_penalty_rate"`    // e.g. 0.50 (50% penalty deduction)
+	MaxRepairAttempts      int       `json:"max_repair_attempts"`      // max syntax healing passes
+	AsyncAuditSampleRate   float64   `json:"async_audit_sample_rate"`  // e.g. 0.10 (10% asynchronous deep evaluation)
+	UpdatedAt              time.Time `json:"updated_at"`
+}
+
+// QualityDriftTrace represents an audited completion output trace with quality metrics
+type QualityDriftTrace struct {
+	ID                   string     `json:"id"`
+	TraceID              string     `json:"trace_id"`
+	TenantID             string     `json:"tenant_id"`
+	Model                string     `json:"model"`
+	Vendor               string     `json:"vendor"`
+	DriftLevel           DriftLevel `json:"drift_level"`
+	WasRepaired          bool       `json:"was_repaired"`
+	RepairDetails        string     `json:"repair_details,omitempty"`
+	HallucinationScore   float64    `json:"hallucination_score"`    // 0.0 ~ 1.0
+	FactConsistencyScore float64    `json:"fact_consistency_score"` // 0.0 ~ 1.0
+	SyntaxValid          bool       `json:"syntax_valid"`
+	OriginalCostUSD      float64    `json:"original_cost_usd"`
+	PenaltyUSD           float64    `json:"penalty_usd"`
+	EffectiveCostUSD     float64    `json:"effective_cost_usd"`
+	IsBadDebt            bool       `json:"is_bad_debt"`
+	LatencyMs            int64      `json:"latency_ms"`
+	Timestamp            time.Time  `json:"timestamp"`
+}
+
+// QualityStatsSummary aggregates macro-level quality, drift, and penalty financial savings
+type QualityStatsSummary struct {
+	TotalEvaluatedRequests int64   `json:"total_evaluated_requests"`
+	SyntaxRepairedCount    int64   `json:"syntax_repaired_count"`
+	SyntaxRepairedRate     float64 `json:"syntax_repaired_rate"`
+	HallucinationsDetected int64   `json:"hallucinations_detected"`
+	HallucinationRate      float64 `json:"hallucination_rate"`
+	BadDebtIncidents       int64   `json:"bad_debt_incidents"`
+	TotalPenaltySavedUSD   float64 `json:"total_penalty_saved_usd"`
+	TotalBadDebtAvoidedUSD float64 `json:"total_bad_debt_avoided_usd"`
+	AvgCredibilityScore    float64 `json:"avg_credibility_score"` // 0.0 ~ 100.0
+}
+
+// VendorCredibility tracks vendor and model real-time output quality and SLA credibility
+type VendorCredibility struct {
+	Vendor             string    `json:"vendor"`
+	Model              string    `json:"model"`
+	TotalRequests      int64     `json:"total_requests"`
+	DriftCount         int64     `json:"drift_count"`
+	RepairCount        int64     `json:"repair_count"`
+	HallucinationCount int64     `json:"hallucination_count"`
+	BadDebtCount       int64     `json:"bad_debt_count"`
+	DriftRate          float64   `json:"drift_rate"`
+	CredibilityScore   float64   `json:"credibility_score"` // 0 ~ 100
+	HealthStatus       string    `json:"health_status"`     // OPTIMAL, GOOD, WARNING, DEGRADED
+	LastEvaluatedAt    time.Time `json:"last_evaluated_at"`
+}
+
+// QualityRepairRequest tests interactive syntax healing on raw LLM output text
+type QualityRepairRequest struct {
+	RawOutputText string `json:"raw_output_text"`
+	Format        string `json:"format,omitempty"` // "json" | "markdown_json" | "auto"
+}
+
+// QualityRepairResponse returns repaired text and transformation diff/diagnostics
+type QualityRepairResponse struct {
+	OriginalText string   `json:"original_text"`
+	RepairedText string   `json:"repaired_text"`
+	Success      bool     `json:"success"`
+	RepairsMade  []string `json:"repairs_made"`
+	DurationUs   int64    `json:"duration_us"` // microseconds
+	Message      string   `json:"message"`
+}
+
+// QualitySimulateRequest triggers interactive simulation across different failure scenarios
+type QualitySimulateRequest struct {
+	TenantID       string         `json:"tenant_id,omitempty"`
+	Model          string         `json:"model,omitempty"`
+	PromptContext  string         `json:"prompt_context,omitempty"`
+	RawResponse    string         `json:"raw_response,omitempty"`
+	OriginalCost   float64        `json:"original_cost_usd,omitempty"`
+	PolicyOverride *QualityPolicy `json:"policy_override,omitempty"`
+}
+
+// QualityScenarioTurn represents a comparison scenario in the quality simulation sandbox
+type QualityScenarioTurn struct {
+	ScenarioName        string     `json:"scenario_name"`
+	Description         string     `json:"description"`
+	Model               string     `json:"model"`
+	DriftLevel          DriftLevel `json:"drift_level"`
+	HallucinationScore  float64    `json:"hallucination_score"`
+	WasRepaired         bool       `json:"was_repaired"`
+	OriginalCostUSD     float64    `json:"original_cost_usd"`
+	PenaltyDeductionUSD float64    `json:"penalty_deduction_usd"`
+	EffectiveCostUSD    float64    `json:"effective_cost_usd"`
+	PenaltyPct          float64    `json:"penalty_pct"`
+	IsBadDebt           bool       `json:"is_bad_debt"`
+}
+
+// QualitySimulateResponse holds simulated metrics, repair diffs and financial breakdown
+type QualitySimulateResponse struct {
+	DriftLevel         DriftLevel            `json:"drift_level"`
+	HallucinationScore float64               `json:"hallucination_score"`
+	FactConsistency    float64               `json:"fact_consistency_score"`
+	OriginalCostUSD    float64               `json:"original_cost_usd"`
+	PenaltySavedUSD    float64               `json:"penalty_saved_usd"`
+	EffectiveCostUSD   float64               `json:"effective_cost_usd"`
+	IsBadDebt          bool                  `json:"is_bad_debt"`
+	WasRepaired        bool                  `json:"was_repaired"`
+	RepairedText       string                `json:"repaired_text,omitempty"`
+	RepairActions      []string              `json:"repair_actions,omitempty"`
+	Scenarios          []QualityScenarioTurn `json:"scenarios"`
+	Recommendations    []string              `json:"recommendations"`
+}
+
+
 
 

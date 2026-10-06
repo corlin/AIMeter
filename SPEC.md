@@ -893,6 +893,37 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（26/26 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 26: 大模型输出质量漂移检测、幻觉惩罚经济学与鲁棒性防御引擎 (LLM Output Quality Drift, Hallucination Penalty Economics & Robustness Guard Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/quality_seed.json`）**：
+  * 定义核心数据结构：`QualityPolicy`（租户、启用开关、微秒语法自愈 `EnableAutoRepair`、幻觉告警阈值 `HallucinationThreshold`、坏账冲销线 `BadDebtThreshold`、自愈补偿率 `RepairedCreditRate`、中度惩罚率 `ModeratePenaltyRate`、最大修复轮次与抽样审计率）、`QualityDriftTrace`（单次质量审计、模型、厂商、漂移等级、自愈标记与细节、幻觉指数、事实一致性、原始账面成本、SLA 违约扣减金额、最终有效支出、坏账标记）、`QualityStatsSummary`、`VendorCredibility`（厂商、模型、总调用数、漂移数、自愈数、幻觉数、坏账数、实时信用评分 0~100 与健康评级 OPTIMAL/GOOD/WARNING/DEGRADED）、`QualityRepairRequest`、`QualityRepairResponse`、`QualityScenarioTurn`、`QualitySimulateRequest` 与 `QualitySimulateResponse`；
+  * 预置种子配置：`configs/quality_seed.json` 包含多租户质量策略、预置厂商基准可信度矩阵与典型漂移审计流水。
+* [x] **纯 Go 高性能质量探测、语法自愈与 SLA 惩罚管理器（`pkg/quality/`）**：
+  * **纯 Go 语法修复状态机（`repairer.go`）**：微秒级（`< 0.2ms`）智能清洗 Markdown 代码块包裹与前后客套语、自动补齐截断未闭合的大括号与中括号、剥离非法尾部多余逗号、闭合截断字符串字面量、修复单引号为标准 JSON 引号；
+  * **三维多轨轻量嗅探器（`detector.go`）**：微秒级评估 JSON 结构合规性、统计数字与事实实体幻觉指数 $H \in [0, 1]$、检测循环吐字与极端截断退化，评定 `normal`, `repaired`, `degraded`, `hallucination`, `fatal_bad_debt` 五级状态；
+  * **三级阶梯式 SLA 惩罚经济学核算（`manager.go`）**：轻度语法自愈按比例补偿（20%）、中度幻觉阶梯扣减（50%）、重度不可恢复全额 100% 冲销为坏账（Bad Debt Write-off），动态刷新各厂商实时信用评分并联动 Smart Router 降权避让；
+  * **多场景质量推演沙箱（`manager.Simulate`）**：提供典型未闭合代码块自愈、财报数字篡改幻觉与严重死循环乱码 3 类场景横向对比矩阵。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 6 大 REST 控制端点：
+    * `GET /api/v1/quality/stats`（宏观质量与坏账大盘指标）
+    * `GET /api/v1/quality/vendors`（供应商实时可信度评分矩阵与健康度）
+    * `GET /api/v1/quality/traces`（质量漂移与坏账审计流水日志）
+    * `POST /api/v1/quality/policies`（保存/修改租户质量与惩罚策略）
+    * `POST /api/v1/quality/repair`（语法自愈与格式修复在线测试）
+    * `POST /api/v1/quality/simulate`（质量漂移与 SLA 经济学推演沙箱）
+  * 反向代理网关双向协同与全息响应头：
+    * **响应体自适应修复**：非流式请求中若检测到语法损坏且自愈成功，网关透明替换为合规 JSON 下发；
+    * **全息指标透传**：透传 `X-AIMeter-Drift-Status`、`X-AIMeter-Hallucination-Score`、`X-AIMeter-Penalty-USD`、`X-AIMeter-Bad-Debt`、`X-AIMeter-Repaired`，非流式与流式异步入库审计 Trace。
+* [x] **Web 控制台全新一级看板 `/quality`（`web/src/app/quality/`）**：
+  * **4 维宏观 KPI 卡片**：评估请求总数、语法自愈成功率与累计次数、幻觉检测数与发生率、累计 SLA 惩罚与坏账冲销总金额；
+  * **供应商可信度评分排行榜 (Scoreboard)**：展示各厂商/模型实时评分（0~100）、漂移数、自愈数、幻觉数与 OPTIMAL/GOOD/WARNING 状态标记；
+  * **在线自愈与损失推演沙箱 (Sandbox)**：预置 3 大典型场景，输入 Prompt 事实上下文与 Mock 输出，展示自愈前后 Diff、幻觉指数、惩罚扣减与最终有效支出拆解瀑布；
+  * **坏账审计流水表与详情抽屉**：带彩色徽标的实时审计日志检索与详细字段弹窗；
+  * **策略配置面板**：自愈开关、容忍阈值滑块、SLA 阶梯扣减比例配置与坏账冲销触发线。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（27/27 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

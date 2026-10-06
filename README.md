@@ -257,6 +257,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理双向协同与全息响应头审计**：网关透明拦截入站请求执行沉底规范化；响应头全息透传 `X-AIMeter-KVCache-Hit`, `X-AIMeter-KVCache-Tokens`, `X-AIMeter-KVCache-Ratio`, `X-AIMeter-KVCache-Saved-USD`, `X-AIMeter-Prefix-Canonicalized`, `X-AIMeter-Prewarm`。
 * **全生命周期 KV-Cache 看板与沙箱**：全新一级看板 `/kvcache`（4 维宏观 KPI、可展开折叠的交互式 Radix 树谱、变量沉底与收益对比沙箱、主动预热控制台、审计流水表与策略配置面板）。
 
+### 27. 大模型输出质量漂移检测、幻觉惩罚经济学与鲁棒性防御引擎 (LLM Output Quality Drift, Hallucination Penalty Economics & Robustness Guard Engine - Phase 26)
+* **纯 Go 语法修复状态机 (`pkg/quality/repairer.go`)**：微秒级（`< 0.2ms`）智能清洗 Markdown 语法围栏、就地自动补齐截断未闭合的大括号与中括号、剥离非法尾部逗号、修复未闭合字符串，实现非流式下发透明自愈，彻底杜绝下游 JSON 解析崩溃。
+* **三维多轨轻量嗅探器 (`pkg/quality/detector.go`)**：微秒级评估结构合规性、统计 Prompt 事实与输出数字/实体的幻觉指数 $H \in [0, 1]$、瞬时检测连续重复吐字退化，评定 `normal`, `repaired`, `degraded`, `hallucination`, `fatal_bad_debt` 五级状态。
+* **三级阶梯式 SLA 惩罚与坏账冲销经济学**：轻度语法自愈按比例补偿（20%）、中度幻觉阶梯扣减（50%）、重度不可恢复全额 100% 冲销为坏账（Bad Debt Write-off），动态刷新各厂商实时信用评分并联动 Smart Router 降权避让。
+* **反向代理双向协同与全息响应头审计**：透传 `X-AIMeter-Drift-Status`、`X-AIMeter-Hallucination-Score`、`X-AIMeter-Penalty-USD`、`X-AIMeter-Bad-Debt`、`X-AIMeter-Repaired`，非流式与流式异步入库审计 Trace。
+* **全生命周期质量大盘与沙箱**：全新一级看板 `/quality`（4 维宏观 KPI、供应商可信度评分排行榜、在线自愈与损失推演沙箱、坏账审计流水表与策略配置面板）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -264,6 +271,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/quality` | **质量漂移检测与幻觉惩罚经济学大盘** | 4 维宏观 KPI（评估请求数、自愈成功率、幻觉拦截数、SLA 惩罚与坏账冲销金额）、供应商可信度排行榜 (0~100)、在线自愈与损失推演沙箱（带自愈前后 Diff 与阶梯扣减拆解）、坏账审计流水表与策略配置面板 |
 | `/kvcache` | **前缀缓存共享与 KV-Cache 经济学大盘** | 4 维宏观 KPI（前缀请求数、命中 Tokens、KV 命中率、节省金额）、交互式 Radix 前缀树拓扑图谱（展开/折叠/命中热力）、变量沉底规范化收益对比沙箱、主动 1-Token 预热工作台与实时审计流水 |
 | `/reasoning` | **AI 推理思维链深度审计与认知剪枝大盘** | 4 维宏观 KPI（思考流总数、节省思考 Tokens、规避过度反思支出、平均反思震荡指数 COI）、思维链认知时序审计（Hypothesis/Deduction/Reflection/Convergence）、反思震荡热力榜、思考预算策略配置与思维经济学推演沙箱 |
 | `/memory` | **Agent 记忆生命周期与分层压缩大盘** | 4 维宏观 KPI（记忆资产总量、节省 Context Tokens、规避浪费支出、平均记忆有效率与噪声拦截）、三层资产泳道（Hot 活跃窗口、Warm Fact Memo 事实摘要、Cold 向量冷存）、有效率与低效噪声审计、策略在线配置与长程对话记忆膨胀沙箱 |
@@ -444,6 +452,7 @@ AIMeter/
 │   ├── metrics/             # Prometheus 核心指标定义与埋点
 │   ├── normalizer/          # 统一计量分类法转换器
 │   ├── proxy/               # 智能反向代理网关、动态平替、断流拦截、缓存回放与思维截断收敛 (Phase 7, 12, 14, 15, 24)
+│   ├── quality/             # 输出质量漂移检测、纯 Go 语法自愈、幻觉量化与 SLA 惩罚引擎 (Phase 26)
 │   ├── rater/               # 实时流式计价与自建 GPU 算力折算引擎 (Phase 1, 11)
 │   ├── reasoning/           # 推理思维链深度审计、四阶段认知状态机与冗余剪枝引擎 (Phase 24)
 │   ├── reconcile/           # 工业级 PDF/CSV 对账与 5 维方差拆解引擎

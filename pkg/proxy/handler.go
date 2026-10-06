@@ -27,6 +27,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/normalizer"
+	"github.com/corlin/AIMeter/pkg/quality"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/router"
@@ -101,6 +102,17 @@ type ProxyHandler struct {
 	memoryManager      *memory.MemoryManager
 	reasoningManager   *reasoning.ReasoningManager
 	kvCacheManager     *kvcache.Manager
+	qualityManager     *quality.QualityManager
+}
+
+// SetQualityManager attaches a quality manager
+func (h *ProxyHandler) SetQualityManager(qm *quality.QualityManager) {
+	h.qualityManager = qm
+}
+
+// GetQualityManager returns the attached quality manager
+func (h *ProxyHandler) GetQualityManager() *quality.QualityManager {
+	return h.qualityManager
 }
 
 // SetKVCacheManager attaches a KV-Cache manager
@@ -1343,6 +1355,28 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				})
 			}
 
+			// Audit Output Quality Drift, Hallucination & Robustness Guard (Phase 26)
+			if h.qualityManager != nil && len(respData.Choices) > 0 {
+				rawOutput := respData.Choices[0].Message.Content
+				_, qTrace := h.qualityManager.InspectAndProcess(
+					c.Request.Context(),
+					traceID,
+					tenantID,
+					fbResult.ActualModel,
+					provider,
+					promptText,
+					rawOutput,
+					costUSD,
+					duration.Milliseconds(),
+				)
+
+				c.Header("X-AIMeter-Drift-Status", string(qTrace.DriftLevel))
+				c.Header("X-AIMeter-Hallucination-Score", fmt.Sprintf("%.2f", qTrace.HallucinationScore))
+				c.Header("X-AIMeter-Penalty-USD", fmt.Sprintf("%.6f", qTrace.PenaltyUSD))
+				c.Header("X-AIMeter-Bad-Debt", strconv.FormatBool(qTrace.IsBadDebt))
+				c.Header("X-AIMeter-Repaired", strconv.FormatBool(qTrace.WasRepaired))
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1601,6 +1635,21 @@ func (h *ProxyHandler) handleStreamingResponse(
 				CostSavedUSD:       costSaved,
 				WasCanonicalized:   c.Writer.Header().Get("X-AIMeter-Prefix-Canonicalized") == "true",
 			})
+		}
+
+		// Audit Output Quality Drift, Hallucination & Robustness Guard (Phase 26)
+		if h.qualityManager != nil && accumulatedContent.Len() > 0 {
+			go h.qualityManager.InspectAndProcess(
+				context.Background(),
+				traceID,
+				tenantID,
+				fbResult.ActualModel,
+				provider,
+				promptText,
+				accumulatedContent.String(),
+				costUSD,
+				totalDuration.Milliseconds(),
+			)
 		}
 
 		go h.recordUsage(

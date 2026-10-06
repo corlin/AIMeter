@@ -1233,6 +1233,103 @@ func TestKVCacheEndpoints(t *testing.T) {
 	}
 }
 
+func TestQualityEndpoints(t *testing.T) {
+	store := storage.NewMemoryStore()
+	server := api.NewServer(
+		8080,
+		store,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+	)
+
+	// 1. GET /api/v1/quality/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/quality/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/quality/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"avg_credibility_score"`) {
+		t.Errorf("Expected avg_credibility_score in stats response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/quality/vendors
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/quality/vendors", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/quality/vendors, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"credibility_score"`) {
+		t.Errorf("Expected credibility_score in vendors response, got: %s", w.Body.String())
+	}
+
+	// 3. GET /api/v1/quality/traces
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/quality/traces?limit=10", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/quality/traces, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 4. POST /api/v1/quality/policies
+	policyJSON := `{
+		"tenant_id": "test-org-quality",
+		"enable_detection": true,
+		"enable_auto_repair": true,
+		"hallucination_threshold": 0.35,
+		"bad_debt_threshold": 0.75,
+		"repaired_credit_rate": 0.25,
+		"moderate_penalty_rate": 0.55
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/quality/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/quality/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/quality/repair
+	repairJSON := "{\"raw_output_text\": \"```json\\n{\\\"task\\\": \\\"analysis\\\", \\\"score\\\": 99\"}"
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/quality/repair", strings.NewReader(repairJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/quality/repair, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"success":true`) {
+		t.Errorf("Expected success=true in repair response, got: %s", w.Body.String())
+	}
+
+	// 6. POST /api/v1/quality/simulate
+	simJSON := `{
+		"tenant_id": "test-org-quality",
+		"model": "gpt-4o",
+		"prompt_context": "The annual profit is $500,000.",
+		"raw_response": "The annual profit is $500,000.",
+		"original_cost_usd": 0.02
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/quality/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/quality/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"scenarios"`) {
+		t.Errorf("Expected scenarios in simulate response, got: %s", w.Body.String())
+	}
+}
+
 
 
 

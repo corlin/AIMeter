@@ -24,6 +24,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/proxy"
+	"github.com/corlin/AIMeter/pkg/quality"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reasoning"
 	aimeterRouter "github.com/corlin/AIMeter/pkg/router"
@@ -66,8 +67,8 @@ func NewServer(
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-API-Key, X-AIMeter-API-Key, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache, X-AIMeter-Cache-Threshold, X-AIMeter-Cache-Refresh, X-AIMeter-Cache-TTL, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment, X-AIMeter-Variant, X-AIMeter-Session-Id, X-AIMeter-User-Id, X-AIMeter-DLP-Bypass, X-AIMeter-Agent-Name, X-AIMeter-Parent-Agent, X-AIMeter-Agent-Role, X-AIMeter-Memory-Session, X-AIMeter-Memory-Bypass, X-AIMeter-Reasoning-Tokens, X-AIMeter-Reasoning-Cost, X-AIMeter-Thinking-Oscillation, X-AIMeter-Thinking-Action, X-AIMeter-Thinking-Budget, X-AIMeter-KVCache-Hit, X-AIMeter-KVCache-Tokens, X-AIMeter-KVCache-Ratio, X-AIMeter-KVCache-Saved-USD, X-AIMeter-Prefix-Canonicalized, X-AIMeter-Prewarm")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment-Id, X-AIMeter-Variant, X-AIMeter-Variant-Model, X-AIMeter-DLP-Action, X-AIMeter-DLP-Violations, X-AIMeter-Swarm-Loop, X-AIMeter-Swarm-Loop-Agents, X-AIMeter-Memory-Tokens, X-AIMeter-Memory-Cost, X-AIMeter-Memory-Utility-Pct, X-AIMeter-Memory-Active-Tier, X-AIMeter-Reasoning-Tokens, X-AIMeter-Reasoning-Cost, X-AIMeter-Thinking-Oscillation, X-AIMeter-Thinking-Action, X-AIMeter-KVCache-Hit, X-AIMeter-KVCache-Tokens, X-AIMeter-KVCache-Ratio, X-AIMeter-KVCache-Saved-USD, X-AIMeter-Prefix-Canonicalized")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, baggage, traceparent, X-Tenant-ID, X-App-ID, X-Workflow-ID, X-API-Key, X-AIMeter-API-Key, X-AIMeter-Provider, X-AIMeter-Target-URL, X-AIMeter-Disable-Fallback, X-AIMeter-GPU-Type, X-AIMeter-GPU-Count, X-AIMeter-Framework, X-AIMeter-Self-Hosted, X-AIMeter-Duration-Ms, X-AIMeter-Max-Tokens, X-AIMeter-Max-Cost-USD, X-AIMeter-Stream-Capped, X-AIMeter-Compress-Prompt, X-AIMeter-Compress-Mode, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Router-Strategy, X-AIMeter-Router-Pool, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache, X-AIMeter-Cache-Threshold, X-AIMeter-Cache-Refresh, X-AIMeter-Cache-TTL, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment, X-AIMeter-Variant, X-AIMeter-Session-Id, X-AIMeter-User-Id, X-AIMeter-DLP-Bypass, X-AIMeter-Agent-Name, X-AIMeter-Parent-Agent, X-AIMeter-Agent-Role, X-AIMeter-Memory-Session, X-AIMeter-Memory-Bypass, X-AIMeter-Reasoning-Tokens, X-AIMeter-Reasoning-Cost, X-AIMeter-Thinking-Oscillation, X-AIMeter-Thinking-Action, X-AIMeter-Thinking-Budget, X-AIMeter-KVCache-Hit, X-AIMeter-KVCache-Tokens, X-AIMeter-KVCache-Ratio, X-AIMeter-KVCache-Saved-USD, X-AIMeter-Prefix-Canonicalized, X-AIMeter-Prewarm, X-AIMeter-Drift-Status, X-AIMeter-Hallucination-Score, X-AIMeter-Penalty-USD, X-AIMeter-Bad-Debt, X-AIMeter-Repaired")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-AIMeter-Trace-ID, X-AIMeter-Fallback, X-AIMeter-Original-Model, X-AIMeter-Actual-Model, X-AIMeter-Stream-Capped, X-AIMeter-Prompt-Compressed, X-AIMeter-Tokens-Saved, X-AIMeter-Compression-Ratio, X-AIMeter-Routed, X-AIMeter-Routed-To, X-AIMeter-Routing-Strategy, X-AIMeter-Failover-Count, X-AIMeter-Cache-Hit, X-AIMeter-Cache-Match-Type, X-AIMeter-Cache-Similarity, X-AIMeter-Cost-Avoided, X-AIMeter-Latency-Saved-Ms, X-AIMeter-Tool-Calls, X-AIMeter-Audio-Tokens, X-AIMeter-Vision-Tiles, X-AIMeter-Multimodal-Cost, X-RateLimit-Limit-RPM, X-RateLimit-Remaining-RPM, X-RateLimit-Limit-TPM, X-RateLimit-Remaining-TPM, X-RateLimit-Limit-CPM, X-RateLimit-Remaining-CPM, X-RateLimit-Reset, Retry-After, X-AIMeter-Rate-Limited, X-AIMeter-Rate-Limit-Breach, X-AIMeter-Throttled-Queue-Ms, X-AIMeter-Experiment-Id, X-AIMeter-Variant, X-AIMeter-Variant-Model, X-AIMeter-DLP-Action, X-AIMeter-DLP-Violations, X-AIMeter-Swarm-Loop, X-AIMeter-Swarm-Loop-Agents, X-AIMeter-Memory-Tokens, X-AIMeter-Memory-Cost, X-AIMeter-Memory-Utility-Pct, X-AIMeter-Memory-Active-Tier, X-AIMeter-Reasoning-Tokens, X-AIMeter-Reasoning-Cost, X-AIMeter-Thinking-Oscillation, X-AIMeter-Thinking-Action, X-AIMeter-KVCache-Hit, X-AIMeter-KVCache-Tokens, X-AIMeter-KVCache-Ratio, X-AIMeter-KVCache-Saved-USD, X-AIMeter-Prefix-Canonicalized, X-AIMeter-Drift-Status, X-AIMeter-Hallucination-Score, X-AIMeter-Penalty-USD, X-AIMeter-Bad-Debt, X-AIMeter-Repaired")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
@@ -203,6 +204,9 @@ func NewServer(
 	kvCacheManager := kvcache.NewManager("configs/kvcache_seed.json")
 	handler.SetKVCacheManager(kvCacheManager)
 	proxyHandler.SetKVCacheManager(kvCacheManager)
+	qualityManager := quality.NewQualityManager("configs/quality_seed.json")
+	handler.SetQualityManager(qualityManager)
+	proxyHandler.SetQualityManager(qualityManager)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
@@ -352,6 +356,14 @@ func NewServer(
 		apiV1.POST("/kvcache/policies", handler.SaveKVCachePolicy)
 		apiV1.POST("/kvcache/prewarm", handler.PrewarmKVCache)
 		apiV1.POST("/kvcache/simulate", handler.SimulateKVCache)
+
+		// Phase 26: Quality Drift, Hallucination Penalty & Robustness Guard Engine
+		apiV1.GET("/quality/stats", handler.GetQualityStats)
+		apiV1.GET("/quality/vendors", handler.GetQualityVendors)
+		apiV1.GET("/quality/traces", handler.GetQualityTraces)
+		apiV1.POST("/quality/policies", handler.SaveQualityPolicy)
+		apiV1.POST("/quality/repair", handler.RepairQuality)
+		apiV1.POST("/quality/simulate", handler.SimulateQuality)
 	}
 
 	return &Server{

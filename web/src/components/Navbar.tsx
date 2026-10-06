@@ -25,7 +25,8 @@ import {
   Share2,
   BrainCircuit,
   Cpu,
-  Database
+  Database,
+  BadgeCheck
 } from "lucide-react";
 
 export function Navbar() {
@@ -33,6 +34,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Quality & SLA", href: "/quality", icon: BadgeCheck },
     { label: "KV-Cache", href: "/kvcache", icon: Database },
     { label: "CoT Reasoning", href: "/reasoning", icon: Cpu },
     { label: "Agent Memory", href: "/memory", icon: BrainCircuit },

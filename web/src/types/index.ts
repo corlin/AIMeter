@@ -1472,6 +1472,124 @@ export interface KVCacheSimulateResponse {
   recommendations: string[];
 }
 
+// ==========================================
+// Phase 26: Quality Drift, Hallucination Penalty & Robustness Guard
+// ==========================================
+
+export type DriftLevel = 'normal' | 'repaired' | 'degraded' | 'hallucination' | 'fatal_bad_debt';
+
+export interface QualityPolicy {
+  tenant_id: string;
+  enable_detection: boolean;
+  enable_auto_repair: boolean;
+  hallucination_threshold: number;
+  bad_debt_threshold: number;
+  repaired_credit_rate: number;
+  moderate_penalty_rate: number;
+  max_repair_attempts: number;
+  async_audit_sample_rate: number;
+  updated_at?: string;
+}
+
+export interface QualityDriftTrace {
+  id: string;
+  trace_id: string;
+  tenant_id: string;
+  model: string;
+  vendor: string;
+  drift_level: DriftLevel;
+  was_repaired: boolean;
+  repair_details?: string;
+  hallucination_score: number;
+  fact_consistency_score: number;
+  syntax_valid: boolean;
+  original_cost_usd: number;
+  penalty_usd: number;
+  effective_cost_usd: number;
+  is_bad_debt: boolean;
+  latency_ms: number;
+  timestamp: string;
+}
+
+export interface QualityStatsSummary {
+  total_evaluated_requests: number;
+  syntax_repaired_count: number;
+  syntax_repaired_rate: number;
+  hallucinations_detected: number;
+  hallucination_rate: number;
+  bad_debt_incidents: number;
+  total_penalty_saved_usd: number;
+  total_bad_debt_avoided_usd: number;
+  avg_credibility_score: number;
+}
+
+export interface VendorCredibility {
+  vendor: string;
+  model: string;
+  total_requests: number;
+  drift_count: number;
+  repair_count: number;
+  hallucination_count: number;
+  bad_debt_count: number;
+  drift_rate: number;
+  credibility_score: number;
+  health_status: 'OPTIMAL' | 'GOOD' | 'WARNING' | 'DEGRADED';
+  last_evaluated_at: string;
+}
+
+export interface QualityRepairRequest {
+  raw_output_text: string;
+  format?: string;
+}
+
+export interface QualityRepairResponse {
+  original_text: string;
+  repaired_text: string;
+  success: boolean;
+  repairs_made: string[];
+  duration_us: number;
+  message: string;
+}
+
+export interface QualityScenarioTurn {
+  scenario_name: string;
+  description: string;
+  model: string;
+  drift_level: DriftLevel;
+  hallucination_score: number;
+  was_repaired: boolean;
+  original_cost_usd: number;
+  penalty_deduction_usd: number;
+  effective_cost_usd: number;
+  penalty_pct: number;
+  is_bad_debt: boolean;
+}
+
+export interface QualitySimulateRequest {
+  tenant_id?: string;
+  model?: string;
+  prompt_context?: string;
+  raw_response?: string;
+  original_cost_usd?: number;
+  policy_override?: QualityPolicy;
+}
+
+export interface QualitySimulateResponse {
+  drift_level: DriftLevel;
+  hallucination_score: number;
+  fact_consistency_score: number;
+  original_cost_usd: number;
+  penalty_saved_usd: number;
+  effective_cost_usd: number;
+  is_bad_debt: boolean;
+  was_repaired: boolean;
+  repaired_text?: string;
+  repair_actions?: string[];
+  scenarios: QualityScenarioTurn[];
+  recommendations: string[];
+}
+
+
 
 
 

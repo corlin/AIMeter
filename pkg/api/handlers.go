@@ -25,6 +25,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
+	"github.com/corlin/AIMeter/pkg/quality"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/reconcile"
@@ -59,6 +60,7 @@ type APIHandler struct {
 	memoryManager      *memory.MemoryManager
 	reasoningManager   *reasoning.ReasoningManager
 	kvCacheManager     *kvcache.Manager
+	qualityManager     *quality.QualityManager
 }
 
 // SetReasoningManager attaches a reasoning manager to the API handler
@@ -74,6 +76,16 @@ func (h *APIHandler) SetKVCacheManager(km *kvcache.Manager) {
 // GetKVCacheManager returns the attached KV-Cache manager
 func (h *APIHandler) GetKVCacheManager() *kvcache.Manager {
 	return h.kvCacheManager
+}
+
+// SetQualityManager attaches a quality manager to the API handler
+func (h *APIHandler) SetQualityManager(qm *quality.QualityManager) {
+	h.qualityManager = qm
+}
+
+// GetQualityManager returns the attached quality manager
+func (h *APIHandler) GetQualityManager() *quality.QualityManager {
+	return h.qualityManager
 }
 
 // SetMemoryManager attaches a memory manager to the API handler
@@ -2073,6 +2085,87 @@ func (h *APIHandler) SimulateKVCache(c *gin.Context) {
 		return
 	}
 	resp := h.kvCacheManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
+// ==========================================
+// Phase 26: Quality Drift, Hallucination Penalty & Robustness Handlers
+// ==========================================
+
+// GetQualityStats retrieves global output quality, drift rates and SLA penalty savings
+func (h *APIHandler) GetQualityStats(c *gin.Context) {
+	if h.qualityManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quality manager not initialized"})
+		return
+	}
+	stats := h.qualityManager.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetQualityVendors retrieves vendor credibility scoreboard and drift rates
+func (h *APIHandler) GetQualityVendors(c *gin.Context) {
+	if h.qualityManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quality manager not initialized"})
+		return
+	}
+	vendors := h.qualityManager.GetVendors()
+	c.JSON(http.StatusOK, vendors)
+}
+
+// GetQualityTraces retrieves recent quality drift and bad-debt audit traces
+func (h *APIHandler) GetQualityTraces(c *gin.Context) {
+	if h.qualityManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quality manager not initialized"})
+		return
+	}
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, _ := strconv.Atoi(limitStr)
+	traces := h.qualityManager.GetTraces(limit)
+	c.JSON(http.StatusOK, traces)
+}
+
+// SaveQualityPolicy updates or saves a tenant's output quality, auto-repair and penalty policy
+func (h *APIHandler) SaveQualityPolicy(c *gin.Context) {
+	if h.qualityManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quality manager not initialized"})
+		return
+	}
+	var policy domain.QualityPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.qualityManager.SavePolicy(policy)
+	c.JSON(http.StatusOK, policy)
+}
+
+// RepairQuality runs interactive microsecond syntax healing on raw LLM output text
+func (h *APIHandler) RepairQuality(c *gin.Context) {
+	if h.qualityManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quality manager not initialized"})
+		return
+	}
+	var req domain.QualityRepairRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := quality.RepairRequestPayload(req)
+	c.JSON(http.StatusOK, resp)
+}
+
+// SimulateQuality runs interactive multi-scenario quality drift and penalty economics simulation
+func (h *APIHandler) SimulateQuality(c *gin.Context) {
+	if h.qualityManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quality manager not initialized"})
+		return
+	}
+	var req domain.QualitySimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.qualityManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
 
