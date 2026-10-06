@@ -1,0 +1,177 @@
+{
+  "workspaces": [
+    {
+      "id": "ws-quant-alpha",
+      "tenant_id": "default",
+      "name": "高频算法交易与量化群 (Quant Alpha Workspace)",
+      "balance_usd": 500.00,
+      "escrow_locked_usd": 45.00,
+      "total_earned_usd": 1280.00,
+      "reputation_score": 98.5,
+      "tasks_completed": 48,
+      "tasks_created": 32,
+      "created_at": "2026-10-01T08:00:00Z",
+      "updated_at": "2026-10-06T10:00:00Z"
+    },
+    {
+      "id": "ws-risk-crawler",
+      "tenant_id": "default",
+      "name": "全球风险与市场舆情情报群 (Risk Crawler Workspace)",
+      "balance_usd": 350.00,
+      "escrow_locked_usd": 20.00,
+      "total_earned_usd": 840.00,
+      "reputation_score": 96.0,
+      "tasks_completed": 64,
+      "tasks_created": 15,
+      "created_at": "2026-10-01T09:30:00Z",
+      "updated_at": "2026-10-06T10:30:00Z"
+    },
+    {
+      "id": "ws-compliance-sec",
+      "tenant_id": "default",
+      "name": "安全合规与法务审计风控群 (Compliance Sec Workspace)",
+      "balance_usd": 600.00,
+      "escrow_locked_usd": 0.00,
+      "total_earned_usd": 620.00,
+      "reputation_score": 99.2,
+      "tasks_completed": 29,
+      "tasks_created": 22,
+      "created_at": "2026-10-02T11:00:00Z",
+      "updated_at": "2026-10-06T11:00:00Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-fed-101",
+      "tenant_id": "default",
+      "title": "跨交易所高频套利滑点与做市深度分析",
+      "description": "需要抓取全球 5 大衍生品交易所实盘订单簿，分析极端行情下的滑点分布与流动性黑洞。",
+      "category": "quant_predict",
+      "source_workspace": "ws-quant-alpha",
+      "creator_agent": "ArbitrageStrategistAgent",
+      "bounty_cap_usd": 25.00,
+      "assigned_workspace": "ws-risk-crawler",
+      "assigned_agent": "OrderbookSpiderAgent",
+      "status": "completed",
+      "voucher_id": "vch-escrow-8001",
+      "bids": [
+        {
+          "id": "bid-901",
+          "task_id": "task-fed-101",
+          "bidder_workspace": "ws-risk-crawler",
+          "bidder_agent": "OrderbookSpiderAgent",
+          "quoted_price_usd": 22.50,
+          "estimated_duration_ms": 3500,
+          "reputation_score": 96.0,
+          "composite_score": 94.8,
+          "created_at": "2026-10-06T08:10:00Z"
+        },
+        {
+          "id": "bid-902",
+          "task_id": "task-fed-101",
+          "bidder_workspace": "ws-compliance-sec",
+          "bidder_agent": "AuditCrawlerAgent",
+          "quoted_price_usd": 24.80,
+          "estimated_duration_ms": 5000,
+          "reputation_score": 99.2,
+          "composite_score": 88.5,
+          "created_at": "2026-10-06T08:12:00Z"
+        }
+      ],
+      "created_at": "2026-10-06T08:00:00Z",
+      "updated_at": "2026-10-06T08:15:00Z"
+    },
+    {
+      "id": "task-fed-102",
+      "tenant_id": "default",
+      "title": "欧盟 AI 法案 (EU AI Act) 合规审计与红线检测",
+      "description": "针对新研发的信用评分 Agent 开展全链路不可解释性与歧视性 bias 审计，出具不可篡改报告。",
+      "category": "compliance_audit",
+      "source_workspace": "ws-quant-alpha",
+      "creator_agent": "QuantDirectorAgent",
+      "bounty_cap_usd": 45.00,
+      "assigned_workspace": "ws-compliance-sec",
+      "assigned_agent": "ModelAuditorAgent",
+      "status": "in_progress",
+      "voucher_id": "vch-escrow-8002",
+      "bids": [
+        {
+          "id": "bid-903",
+          "task_id": "task-fed-102",
+          "bidder_workspace": "ws-compliance-sec",
+          "bidder_agent": "ModelAuditorAgent",
+          "quoted_price_usd": 40.00,
+          "estimated_duration_ms": 12000,
+          "reputation_score": 99.2,
+          "composite_score": 97.5,
+          "created_at": "2026-10-06T09:05:00Z"
+        }
+      ],
+      "created_at": "2026-10-06T09:00:00Z",
+      "updated_at": "2026-10-06T09:10:00Z"
+    },
+    {
+      "id": "task-fed-103",
+      "tenant_id": "default",
+      "title": "宏观经济地缘冲突新闻舆情快速情感判读",
+      "description": "抓取多语种突发地缘新闻并提炼关键实体对原油和黄金价格的传导路径。",
+      "category": "market_research",
+      "source_workspace": "ws-risk-crawler",
+      "creator_agent": "NewsAggregatorAgent",
+      "bounty_cap_usd": 20.00,
+      "status": "bidding",
+      "bids": [
+        {
+          "id": "bid-904",
+          "task_id": "task-fed-103",
+          "bidder_workspace": "ws-quant-alpha",
+          "bidder_agent": "SentimentNLPQuant",
+          "quoted_price_usd": 18.00,
+          "estimated_duration_ms": 2500,
+          "reputation_score": 98.5,
+          "composite_score": 96.2,
+          "created_at": "2026-10-06T10:05:00Z"
+        }
+      ],
+      "created_at": "2026-10-06T10:00:00Z",
+      "updated_at": "2026-10-06T10:06:00Z"
+    }
+  ],
+  "vouchers": [
+    {
+      "id": "vch-escrow-8001",
+      "task_id": "task-fed-101",
+      "source_workspace": "ws-quant-alpha",
+      "target_workspace": "ws-risk-crawler",
+      "bounty_cap_usd": 25.00,
+      "actual_cost_usd": 22.50,
+      "clearing_fee_usd": 0.225,
+      "status": "cleared",
+      "proof_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reserved_at": "2026-10-06T08:00:00Z",
+      "settled_at": "2026-10-06T08:15:00Z"
+    },
+    {
+      "id": "vch-escrow-8002",
+      "task_id": "task-fed-102",
+      "source_workspace": "ws-quant-alpha",
+      "target_workspace": "ws-compliance-sec",
+      "bounty_cap_usd": 45.00,
+      "actual_cost_usd": 0.00,
+      "clearing_fee_usd": 0.00,
+      "status": "reserved",
+      "reserved_at": "2026-10-06T09:00:00Z"
+    }
+  ],
+  "stats": {
+    "total_workspaces": 3,
+    "active_workspaces": 3,
+    "total_escrow_pool_usd": 65.00,
+    "total_cleared_usd": 2740.00,
+    "total_clearing_fee_usd": 27.40,
+    "total_tasks": 3,
+    "completed_tasks": 1,
+    "match_success_rate": 96.5,
+    "dispute_rate": 0.0
+  }
+}

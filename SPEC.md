@@ -1014,7 +1014,41 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（30/30 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 30: 多智能体跨工作区联合协作、分布式代币清算协议与互不信任结算所 (Multi-Agent Cross-Workspace Federation Clearinghouse, Token Barter & Inter-Org Settlement Protocol)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/federation_seed.json`）**：
+  * 定义核心数据结构：`EscrowStatus`（reserved, finalized, refunded, disputed）、`FederatedTaskStatus`（open, bidding, in_progress, completed, cancelled）、`FederationWorkspace`（工作区 ID、名称、组织所属、代币结余、冻结额度、信用分、费率折扣、已完成任务与已清算总金额）、`EscrowVoucher`（凭证 ID、任务 ID、发起方与承接方、锁定量、服务费、执行证明 SHA-256 哈希、状态及时间戳）、`FederationBid`（竞标 ID、竞标方工作区与 Agent、报价、SLA 承诺耗时、信用加权得分与状态）、`FederatedTask`（任务 ID、标题、需求方工作区、分类、悬赏金额上限、截止时间、竞标列表、中标方与托管凭证）、`FederationStatsSummary`、`FederationTaskCreateRequest`、`FederationBidCreateRequest`、`FederationFinalizeRequest`、`FederationSimulateScenarioTurn`、`FederationSimulateRequest` 与 `FederationSimulateResponse`；
+  * 预置种子配置：`configs/federation_seed.json` 包含 3 大典型跨域独立团队工作区（高频量化交易群 `ws-quant-alpha`、全球风险情报群 `ws-risk-crawler`、安全合规审计群 `ws-compliance-sec`）及 4 条历史跨组织悬赏协作任务与加密托管凭证流水。
+* [x] **纯 Go 高性能加密托管凭证、竞标撮合与两阶段清算所核心引擎（`pkg/federation/`）**：
+  * **工作区代币账本与原子记账（`workspace.go`）**：工作区代币账户并发安全管理，支持原子预冻结代币（`ReserveEscrow`）、退款解冻（`RefundEscrow`）与最终两阶段清算转账（`FinalizeTransfer`，精准扣取 1% 平台仲裁清算费，并奖励履约成功方信誉分）；
+  * **加密托管凭证状态机与执行证明（`escrow.go`）**：支持基于任务参数、承接方与输出摘要生成不可伪造的 SHA-256 执行证明指纹（`GenerateProofHash`），支持二阶段提交确认与超时自动原路解冻退款；
+  * **跨域多智能体多目标竞标撮合（`auction.go`）**：支持多 Agent 竞标收集，综合报价（50% 权重）、SLA 耗时（30% 权重）与团队信用分（20% 权重）进行加权智能撮合优选；
+  * **网关自适应预冻结与决算主调度器（`manager.go`）**：实现网关请求入站自动预冻结（`CheckAndReserveGateway`）、出站 2PC 自动决算划转（`RecordGatewaySettlement`）及多组织并发协作 What-If 清算推演沙箱。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 8 大 REST 控制端点：
+    * `GET /api/v1/federation/stats`（宏观结算所协作与清算账本统计）
+    * `GET /api/v1/federation/workspaces`（跨域工作区代币账户与信用分列表）
+    * `GET /api/v1/federation/tasks`（跨域悬赏任务大厅列表，支持状态与工作区过滤）
+    * `POST /api/v1/federation/tasks`（发布新的跨工作区联合协作任务并预冻结悬赏金）
+    * `POST /api/v1/federation/tasks/:id/bids`（外部 Agent 提交竞标并智能撮合更新）
+    * `POST /api/v1/federation/tasks/:id/finalize`（两阶段提交决算、验证证明并划转代币）
+    * `GET /api/v1/federation/vouchers`（加密托管凭证全息审计列表）
+    * `POST /api/v1/federation/simulate`（在线跨组织协作撮合与清算 What-If 推演）
+  * 反向代理网关双向协同与全息响应头：
+    * **入站跨域凭证嗅探与自动托管预冻结**：网关提取 `X-AIMeter-Federation-Workspace`、`X-AIMeter-Target-Workspace` 与 `X-AIMeter-Federation-Bounty`，自动执行代币预冻结；若可用余额不足直接返回 HTTP 402 `Payment Required` 与 `escrow_insufficient_balance`；
+    * **出站 2PC 自动决算与全息头透传**：请求成功后自动决算并透传 `X-AIMeter-Escrow-Voucher-ID`、`X-AIMeter-Settlement-Status`、`X-AIMeter-Settled-Amount-USD`、`X-AIMeter-Clearing-Fee-USD` 与 `X-AIMeter-Proof-Hash`。
+* [x] **Web 控制台全新一级看板 `/federation`（`web/src/app/federation/`）**：
+  * **4 维宏观核心 KPI 卡片**：清算所总清算代币规模、托管中保障金总额、平台累计清算手续费收入与已决算跨域凭证数量；
+  * **工作区代币账本矩阵 (Workspaces Ledger)**：卡片矩阵展示各工作区代币可用余额、冻结额度、信用分徽章、费率折扣、已清算任务统计与充值入口；
+  * **跨域悬赏任务大厅与详情抽屉 (Task Marketplace & Voucher Drawer)**：展示各跨域任务悬赏、状态标签、竞标列表，支持点击查看加密托管凭证详情、SHA-256 证明哈希与 2PC 决算操作；
+  * **What-If 跨组织代币协作清算沙箱 (Playground)**：在线模拟多工作区发布任务、多 Agent 自动化竞价撮合与两阶段决算流程，输出流水与清算分析；
+  * **交互式操作弹窗**：支持“发布跨域悬赏任务”、“提交 Agent 竞标”与“工作区代币充值”。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（31/31 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
+
 
 
 ## 8. 安全与隐私原则 (Security & Privacy)

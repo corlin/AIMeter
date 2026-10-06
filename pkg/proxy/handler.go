@@ -34,6 +34,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/corlin/AIMeter/pkg/hierarchy"
+	"github.com/corlin/AIMeter/pkg/federation"
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/gin-gonic/gin"
@@ -109,6 +110,17 @@ type ProxyHandler struct {
 	workflowManager    *workflow.WorkflowManager
 	sandboxManager     *sandbox.SandboxManager
 	hierarchyManager   *hierarchy.HierarchyManager
+	federationManager  *federation.FederationManager
+}
+
+// SetFederationManager attaches a federation manager
+func (h *ProxyHandler) SetFederationManager(fm *federation.FederationManager) {
+	h.federationManager = fm
+}
+
+// GetFederationManager returns the attached federation manager
+func (h *ProxyHandler) GetFederationManager() *federation.FederationManager {
+	return h.federationManager
 }
 
 // SetHierarchyManager attaches an enterprise hierarchy manager
@@ -834,6 +846,49 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		if checkRes.Action == domain.OrgActionDegradeCompress || checkRes.Downgraded {
 			c.Header("X-AIMeter-Org-Downgraded", "true")
 		}
+	}
+
+	// 4.11 Evaluate Multi-Agent Federation Escrow & Token Clearinghouse Precheck (Phase 30)
+	fedWs := c.GetHeader("X-AIMeter-Federation-Workspace")
+	if fedWs == "" {
+		fedWs = c.GetHeader("X-Federation-Workspace")
+	}
+	targetWs := c.GetHeader("X-AIMeter-Target-Workspace")
+	if targetWs == "" {
+		targetWs = c.GetHeader("X-Target-Workspace")
+	}
+	voucherID := c.GetHeader("X-AIMeter-Escrow-Voucher-ID")
+
+	if fedWs != "" && h.federationManager != nil {
+		bountyUSD := 0.05
+		if bStr := c.GetHeader("X-AIMeter-Federation-Bounty"); bStr != "" {
+			if v, err := strconv.ParseFloat(bStr, 64); err == nil && v > 0 {
+				bountyUSD = v
+			}
+		}
+
+		if voucherID == "" {
+			vch, err := h.federationManager.CheckAndReserveGateway(fedWs, targetWs, bountyUSD)
+			if err != nil {
+				metrics.RecordProxyRequest(provider, actualModel, "402", false, time.Since(startTime))
+				c.Header("X-AIMeter-Settlement-Status", "disputed")
+				c.JSON(http.StatusPaymentRequired, gin.H{
+					"error": gin.H{
+						"message":              fmt.Sprintf("AI Meter: Request blocked by Federation Clearinghouse escrow lock failure: %s", err.Error()),
+						"type":                 "federation_escrow_error",
+						"code":                 "escrow_insufficient_balance",
+						"federation_workspace": fedWs,
+						"bounty_cap_usd":       bountyUSD,
+					},
+				})
+				return
+			}
+			voucherID = vch.ID
+		}
+
+		c.Header("X-AIMeter-Escrow-Voucher-ID", voucherID)
+		c.Header("X-AIMeter-Federation-Workspace", fedWs)
+		c.Header("X-AIMeter-Settlement-Status", string(domain.EscrowStatusReserved))
 	}
 
 	// 4.5 Evaluate Smart Multi-Provider Router & SLA Arbiter (Phase 14)
@@ -1655,6 +1710,22 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				}
 			}
 
+			// Phase 30: Multi-Agent Federation Escrow 2PC Settlement
+			if h.federationManager != nil {
+				voucherID := c.Writer.Header().Get("X-AIMeter-Escrow-Voucher-ID")
+				if voucherID == "" {
+					voucherID = c.GetHeader("X-AIMeter-Escrow-Voucher-ID")
+				}
+				if voucherID != "" && costUSD > 0 {
+					if finalVch, err := h.federationManager.RecordGatewaySettlement(voucherID, costUSD, promptText); err == nil && finalVch != nil {
+						c.Header("X-AIMeter-Settlement-Status", string(finalVch.Status))
+						c.Header("X-AIMeter-Settled-Amount-USD", fmt.Sprintf("%.6f", finalVch.ActualCostUSD))
+						c.Header("X-AIMeter-Clearing-Fee-USD", fmt.Sprintf("%.6f", finalVch.ClearingFeeUSD))
+						c.Header("X-AIMeter-Proof-Hash", finalVch.ProofHash)
+					}
+				}
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1938,6 +2009,22 @@ func (h *ProxyHandler) handleStreamingResponse(
 			}
 			if orgPath != "" && costUSD > 0 {
 				h.hierarchyManager.RecordSpend(orgPath, costUSD)
+			}
+		}
+
+		// Phase 30: Multi-Agent Federation Escrow 2PC Settlement
+		if h.federationManager != nil {
+			voucherID := c.Writer.Header().Get("X-AIMeter-Escrow-Voucher-ID")
+			if voucherID == "" {
+				voucherID = c.GetHeader("X-AIMeter-Escrow-Voucher-ID")
+			}
+			if voucherID != "" && costUSD > 0 {
+				if finalVch, err := h.federationManager.RecordGatewaySettlement(voucherID, costUSD, promptText); err == nil && finalVch != nil {
+					c.Writer.Header().Set("X-AIMeter-Settlement-Status", string(finalVch.Status))
+					c.Writer.Header().Set("X-AIMeter-Settled-Amount-USD", fmt.Sprintf("%.6f", finalVch.ActualCostUSD))
+					c.Writer.Header().Set("X-AIMeter-Clearing-Fee-USD", fmt.Sprintf("%.6f", finalVch.ClearingFeeUSD))
+					c.Writer.Header().Set("X-AIMeter-Proof-Hash", finalVch.ProofHash)
+				}
 			}
 		}
 

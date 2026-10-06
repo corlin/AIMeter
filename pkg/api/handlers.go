@@ -36,6 +36,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/hierarchy"
+	"github.com/corlin/AIMeter/pkg/federation"
 	"github.com/gin-gonic/gin"
 )
 
@@ -67,6 +68,17 @@ type APIHandler struct {
 	workflowManager    *workflow.WorkflowManager
 	sandboxManager     *sandbox.SandboxManager
 	hierarchyManager   *hierarchy.HierarchyManager
+	federationManager  *federation.FederationManager
+}
+
+// SetFederationManager attaches a federation manager to the API handler
+func (h *APIHandler) SetFederationManager(fm *federation.FederationManager) {
+	h.federationManager = fm
+}
+
+// GetFederationManager returns the attached federation manager
+func (h *APIHandler) GetFederationManager() *federation.FederationManager {
+	return h.federationManager
 }
 
 // SetHierarchyManager attaches a hierarchy manager to the API handler
@@ -2484,5 +2496,130 @@ func (h *APIHandler) SimulateHierarchy(c *gin.Context) {
 	resp := h.hierarchyManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 30: Multi-Agent Federation Clearinghouse Handlers
+// ==========================================
+
+// GetFederationStats returns macro clearinghouse metrics
+func (h *APIHandler) GetFederationStats(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusOK, domain.FederationStatsSummary{})
+		return
+	}
+	stats := h.federationManager.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetFederationWorkspaces returns list of all workspaces
+func (h *APIHandler) GetFederationWorkspaces(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusOK, []*domain.FederationWorkspace{})
+		return
+	}
+	workspaces := h.federationManager.ListWorkspaces()
+	c.JSON(http.StatusOK, workspaces)
+}
+
+// UpsertFederationWorkspace creates or modifies a workspace
+func (h *APIHandler) UpsertFederationWorkspace(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
+		return
+	}
+	var ws domain.FederationWorkspace
+	if err := c.ShouldBindJSON(&ws); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	res := h.federationManager.UpsertWorkspace(ws)
+	c.JSON(http.StatusOK, res)
+}
+
+// GetFederationTasks returns cross-workspace tasks
+func (h *APIHandler) GetFederationTasks(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusOK, []*domain.FederatedTask{})
+		return
+	}
+	category := c.Query("category")
+	status := c.Query("status")
+	tasks := h.federationManager.ListTasks(category, status)
+	c.JSON(http.StatusOK, tasks)
+}
+
+// CreateFederationTask posts a bounty task and locks escrow
+func (h *APIHandler) CreateFederationTask(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
+		return
+	}
+	var req domain.FederationTaskCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	task, voucher, err := h.federationManager.CreateTask(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"task": task, "voucher": voucher})
+}
+
+// SubmitFederationBid submits a proposal by an agent
+func (h *APIHandler) SubmitFederationBid(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
+		return
+	}
+	taskID := c.Param("id")
+	var req domain.FederationBidCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	bid, task, err := h.federationManager.SubmitBid(taskID, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"bid": bid, "task": task})
+}
+
+// FinalizeFederationTask performs 2PC commit or refund on task completion
+func (h *APIHandler) FinalizeFederationTask(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
+		return
+	}
+	var req domain.FederationFinalizeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	voucher, err := h.federationManager.FinalizeTask(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, voucher)
+}
+
+// SimulateFederation runs What-If bidding and 2PC clearing simulation
+func (h *APIHandler) SimulateFederation(c *gin.Context) {
+	if h.federationManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
+		return
+	}
+	var req domain.FederationSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.federationManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 

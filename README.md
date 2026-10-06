@@ -281,7 +281,12 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **链式自底向上递归预检与双轨阈值熔断 (`pkg/hierarchy/checker.go`)**：逐级向上遍历所有祖先节点，当达到 80% 软阈值时自动发出软预警或触发 P2 优先级自动降配标记（`degrade_compress`）；当达到 100% 硬顶时判定是否具备 P0 核心保障与 `enable_overdraft` 透支缓冲借调，否则网关直接 429 熔断阻断。
 * **节点健康状态机与原子级联记账 (`pkg/hierarchy/manager.go`)**：动态评估 `healthy`, `soft_warning`, `overdraft_active`, `hard_capped` 四态；请求成功后原子化自底向上累加该团队及其所有上级祖先的实际消耗金额（`RecordSpend`）。
 * **反向代理双向协同与全息响应头审计**：透传 `X-AIMeter-Org-Path`、`X-AIMeter-Org-Action`、`X-AIMeter-Org-Remaining-USD`、`X-AIMeter-Org-Breach-Node` 与 `X-AIMeter-Org-Downgraded`。
-* **全生命周期组织配额控制中心与沙箱**：全新一级看板 `/hierarchy`（4 维宏观 KPI、交互式可折叠组织层级树图谱、快速配额预检探测器与 What-If 级联配额冲击仿真推演沙箱）。
+### 31. 多智能体跨工作区联合协作、分布式代币清算协议与互不信任结算所 (Multi-Agent Cross-Workspace Federation Clearinghouse, Token Barter & Inter-Org Settlement Protocol - Phase 30)
+* **独立工作区代币账户与并发记账 (`pkg/federation/workspace.go`)**：企业跨部门/外部独立工作区拥有独立代币账本，支持原子预冻结代币（`ReserveEscrow`）、解冻退款（`RefundEscrow`）与最终两阶段清算转账（`FinalizeTransfer`），精准扣取 1% 平台仲裁清算费并奖励成功履约方信用积分。
+* **加密托管凭证状态机与 SHA-256 执行证明 (`pkg/federation/escrow.go`)**：生成不可伪造的执行证明指纹（`GenerateProofHash`），支持二阶段提交确认与防抵赖审计。
+* **跨域多智能体多目标竞标撮合 (`pkg/federation/auction.go`)**：支持多 Agent 提交竞标，综合报价（50% 权重）、SLA 耗时（30% 权重）与团队信用分（20% 权重）进行智能加权撮合。
+* **反向代理双向协同与全息响应头审计**：入站自动预冻结（余额不足直接 HTTP 402 `Payment Required` 与 `escrow_insufficient_balance` 拦截）；出站自动 2PC 划转并透传 `X-AIMeter-Escrow-Voucher-ID`、`X-AIMeter-Settlement-Status`、`X-AIMeter-Settled-Amount-USD`、`X-AIMeter-Clearing-Fee-USD` 与 `X-AIMeter-Proof-Hash`。
+* **全生命周期跨域清算所看板与沙箱**：全新一级看板 `/federation`（4 维宏观 KPI、工作区代币账本矩阵、跨域悬赏任务大厅与凭证详情抽屉、What-If 竞标撮合与 2PC 清算沙箱及 3 个操作弹窗）。
 
 ---
 
@@ -290,6 +295,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/federation` | **多智能体跨域协作与代币清算所看板** | 4 维宏观 KPI（总清算代币规模、托管中保障金、平台清算手续费收入、已决算凭证数）、工作区代币账本矩阵（余额/冻结额/信用分/充值入口）、跨域悬赏任务大厅与加密托管凭证抽屉（SHA-256证明/2PC决算）、What-If 竞标撮合与 2PC 清算沙箱及任务发布/竞标/充值弹窗 |
 | `/hierarchy` | **企业组织架构预算树与双轨配额管控中心** | 4 维宏观 KPI（中央总预算池、组织节点数与架构深度、预警与熔断管控、P0核心业务保障）、交互式可折叠组织拓扑树、配额利用率进度条、快速配额探测器、What-If 级联冲击仿真沙箱与节点配置抽屉 |
 | `/sandboxes` | **Agent 沙箱代码解释器与工具微事务清算中心** | 4 维宏观 KPI（三合一总账本、沙箱算力累计、工具微事务累计、超时截断与预算阻断）、三合一全口径成本解耦瀑布、审计流水抽屉、预置工具单价字典在线编辑与交互式算力推演沙箱 |
 | `/workflows` | **长程 Agent DAG 工作流编排计费与检查点控制中心** | 4 维宏观 KPI（累计发生、有效成本、续算规避浪费、失败沉没成本）、交互式 DAG 拓扑流程时序流、增量快照 Payload 预览抽屉、一键断点续算触发器、全量重跑 vs 断点续算经济学对比沙箱与实例审计表 |

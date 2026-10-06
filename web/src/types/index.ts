@@ -1900,4 +1900,141 @@ export interface OrgSimulateResponse {
   recommendations: string[];
 }
 
+// ==========================================
+// Phase 30: Multi-Agent Federation Clearinghouse & Escrow Protocol
+// ==========================================
+
+export type EscrowStatus = 'pending' | 'reserved' | 'cleared' | 'disputed' | 'refunded';
+export type FederatedTaskStatus = 'open' | 'bidding' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+
+export interface FederationWorkspace {
+  id: string;
+  tenant_id: string;
+  name: string;
+  balance_usd: number;
+  escrow_locked_usd: number;
+  total_earned_usd: number;
+  reputation_score: number;
+  tasks_completed: number;
+  tasks_created: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EscrowVoucher {
+  id: string;
+  task_id: string;
+  source_workspace: string;
+  target_workspace?: string;
+  bounty_cap_usd: number;
+  actual_cost_usd: number;
+  clearing_fee_usd: number;
+  status: EscrowStatus;
+  proof_hash?: string;
+  reason?: string;
+  reserved_at: string;
+  settled_at?: string;
+}
+
+export interface FederationBid {
+  id: string;
+  task_id: string;
+  bidder_workspace: string;
+  bidder_agent: string;
+  quoted_price_usd: number;
+  estimated_duration_ms: number;
+  reputation_score: number;
+  composite_score: number;
+  created_at: string;
+}
+
+export interface FederatedTask {
+  id: string;
+  tenant_id: string;
+  title: string;
+  description: string;
+  category: string;
+  source_workspace: string;
+  creator_agent: string;
+  bounty_cap_usd: number;
+  assigned_workspace?: string;
+  assigned_agent?: string;
+  status: FederatedTaskStatus;
+  voucher_id?: string;
+  bids?: FederationBid[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FederationStatsSummary {
+  total_workspaces: number;
+  active_workspaces: number;
+  total_escrow_pool_usd: number;
+  total_cleared_usd: number;
+  total_clearing_fee_usd: number;
+  total_tasks: number;
+  completed_tasks: number;
+  match_success_rate: number;
+  dispute_rate: number;
+}
+
+export interface FederationTaskCreateRequest {
+  tenant_id?: string;
+  title: string;
+  description: string;
+  category: string;
+  source_workspace: string;
+  creator_agent: string;
+  bounty_cap_usd: number;
+}
+
+export interface FederationBidCreateRequest {
+  bidder_workspace: string;
+  bidder_agent: string;
+  quoted_price_usd: number;
+  estimated_duration_ms: number;
+}
+
+export interface FederationFinalizeRequest {
+  voucher_id: string;
+  actual_cost_usd: number;
+  proof_payload?: string;
+  accept: boolean;
+  dispute_reason?: string;
+}
+
+export interface FederationSimulateScenarioTurn {
+  step_index: number;
+  phase_name: string;
+  agent_role: string;
+  workspace: string;
+  amount_usd: number;
+  status: string;
+  detail: string;
+}
+
+export interface FederationSimulateRequest {
+  task_title: string;
+  category: string;
+  source_workspace: string;
+  bounty_cap_usd: number;
+  simulated_bidders: number;
+  simulate_dispute: boolean;
+}
+
+export interface FederationSimulateResponse {
+  task_id: string;
+  winner_workspace: string;
+  winner_agent: string;
+  winning_bid_usd: number;
+  clearing_fee_usd: number;
+  net_earnings_usd: number;
+  escrow_voucher_id: string;
+  proof_hash: string;
+  final_status: EscrowStatus;
+  scenarios: FederationSimulateScenarioTurn[];
+  finops_advice: string[];
+}
+
+
 

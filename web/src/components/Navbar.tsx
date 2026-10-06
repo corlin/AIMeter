@@ -29,7 +29,8 @@ import {
   BadgeCheck,
   GitFork,
   Terminal,
-  Building2
+  Building2,
+  Coins
 } from "lucide-react";
 
 export function Navbar() {
@@ -37,6 +38,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Federation", href: "/federation", icon: Coins },
     { label: "Org Hierarchy", href: "/hierarchy", icon: Building2 },
     { label: "Sandboxes", href: "/sandboxes", icon: Terminal },
     { label: "Workflows", href: "/workflows", icon: GitFork },

@@ -127,6 +127,16 @@ import {
   OrgNodeUpsertRequest,
   OrgSimulateRequest,
   OrgSimulateResponse,
+  FederationWorkspace,
+  EscrowVoucher,
+  FederationBid,
+  FederatedTask,
+  FederationStatsSummary,
+  FederationTaskCreateRequest,
+  FederationBidCreateRequest,
+  FederationFinalizeRequest,
+  FederationSimulateRequest,
+  FederationSimulateResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -2033,5 +2043,126 @@ export async function simulateHierarchy(req: OrgSimulateRequest): Promise<OrgSim
   }
   return await res.json();
 }
+
+// ==========================================
+// Phase 30: Multi-Agent Federation Clearinghouse
+// ==========================================
+
+export async function fetchFederationStats(): Promise<FederationStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/federation/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch federation stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchFederationStats failed:", err);
+    return {
+      total_workspaces: 0,
+      active_workspaces: 0,
+      total_escrow_pool_usd: 0,
+      total_cleared_usd: 0,
+      total_clearing_fee_usd: 0,
+      total_tasks: 0,
+      completed_tasks: 0,
+      match_success_rate: 0,
+      dispute_rate: 0,
+    };
+  }
+}
+
+export async function fetchFederationWorkspaces(): Promise<FederationWorkspace[]> {
+  try {
+    const res = await fetch(`${API_BASE}/federation/workspaces`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch federation workspaces");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("fetchFederationWorkspaces failed:", err);
+    return [];
+  }
+}
+
+export async function upsertFederationWorkspace(ws: Partial<FederationWorkspace>): Promise<FederationWorkspace> {
+  const res = await fetch(`${API_BASE}/federation/workspaces`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ws),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to upsert workspace" }));
+    throw new Error(err.error || "Failed to upsert workspace");
+  }
+  return await res.json();
+}
+
+export async function fetchFederationTasks(category = "", status = ""): Promise<FederatedTask[]> {
+  try {
+    let url = `${API_BASE}/federation/tasks`;
+    const params = new URLSearchParams();
+    if (category) params.append("category", category);
+    if (status) params.append("status", status);
+    if (params.toString()) url += `?${params.toString()}`;
+
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch federation tasks");
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn("fetchFederationTasks failed:", err);
+    return [];
+  }
+}
+
+export async function createFederationTask(req: FederationTaskCreateRequest): Promise<{ task: FederatedTask; voucher: EscrowVoucher }> {
+  const res = await fetch(`${API_BASE}/federation/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create federation task" }));
+    throw new Error(err.error || "Failed to create federation task");
+  }
+  return await res.json();
+}
+
+export async function submitFederationBid(taskId: string, req: FederationBidCreateRequest): Promise<{ bid: FederationBid; task: FederatedTask }> {
+  const res = await fetch(`${API_BASE}/federation/tasks/${encodeURIComponent(taskId)}/bid`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to submit bid" }));
+    throw new Error(err.error || "Failed to submit bid");
+  }
+  return await res.json();
+}
+
+export async function finalizeFederationTask(taskId: string, req: FederationFinalizeRequest): Promise<EscrowVoucher> {
+  const res = await fetch(`${API_BASE}/federation/tasks/${encodeURIComponent(taskId)}/finalize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to finalize federation task" }));
+    throw new Error(err.error || "Failed to finalize federation task");
+  }
+  return await res.json();
+}
+
+export async function simulateFederation(req: FederationSimulateRequest): Promise<FederationSimulateResponse> {
+  const res = await fetch(`${API_BASE}/federation/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to simulate federation auction" }));
+    throw new Error(err.error || "Failed to simulate federation auction");
+  }
+  return await res.json();
+}
+
 
 

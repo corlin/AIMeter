@@ -2372,3 +2372,171 @@ type OrgSimulateResponse struct {
 	Recommendations     []string          `json:"recommendations"`
 }
 
+// ==========================================
+// Phase 30: Multi-Agent Federation Clearinghouse & Escrow Protocol
+// ==========================================
+
+// EscrowStatus defines state of a cryptographic escrow voucher
+type EscrowStatus string
+
+const (
+	EscrowStatusPending   EscrowStatus = "pending"
+	EscrowStatusReserved  EscrowStatus = "reserved"
+	EscrowStatusCleared   EscrowStatus = "cleared"
+	EscrowStatusDisputed  EscrowStatus = "disputed"
+	EscrowStatusRefunded  EscrowStatus = "refunded"
+)
+
+// FederatedTaskStatus represents state of a cross-workspace task
+type FederatedTaskStatus string
+
+const (
+	FederatedTaskOpen       FederatedTaskStatus = "open"
+	FederatedTaskBidding    FederatedTaskStatus = "bidding"
+	FederatedTaskInProgress FederatedTaskStatus = "in_progress"
+	FederatedTaskCompleted  FederatedTaskStatus = "completed"
+	FederatedTaskFailed     FederatedTaskStatus = "failed"
+	FederatedTaskCancelled  FederatedTaskStatus = "cancelled"
+)
+
+// FederationWorkspace represents an autonomous billing workspace
+type FederationWorkspace struct {
+	ID              string    `json:"id"`
+	TenantID        string    `json:"tenant_id"`
+	Name            string    `json:"name"`
+	BalanceUSD      float64   `json:"balance_usd"`
+	EscrowLockedUSD float64   `json:"escrow_locked_usd"`
+	TotalEarnedUSD  float64   `json:"total_earned_usd"`
+	ReputationScore float64   `json:"reputation_score"` // 0.0 ~ 100.0
+	TasksCompleted  int       `json:"tasks_completed"`
+	TasksCreated    int       `json:"tasks_created"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// EscrowVoucher records cryptographic pre-lock and 2PC settlement receipt
+type EscrowVoucher struct {
+	ID               string       `json:"id"`
+	TaskID           string       `json:"task_id"`
+	SourceWorkspace  string       `json:"source_workspace"`
+	TargetWorkspace  string       `json:"target_workspace,omitempty"`
+	BountyCapUSD     float64      `json:"bounty_cap_usd"`
+	ActualCostUSD    float64      `json:"actual_cost_usd"`
+	ClearingFeeUSD   float64      `json:"clearing_fee_usd"`
+	Status           EscrowStatus `json:"status"`
+	ProofHash        string       `json:"proof_hash,omitempty"`
+	Reason           string       `json:"reason,omitempty"`
+	ReservedAt       time.Time    `json:"reserved_at"`
+	SettledAt        *time.Time   `json:"settled_at,omitempty"`
+}
+
+// FederationBid represents a proposal submitted by an Agent
+type FederationBid struct {
+	ID                  string    `json:"id"`
+	TaskID              string    `json:"task_id"`
+	BidderWorkspace     string    `json:"bidder_workspace"`
+	BidderAgent         string    `json:"bidder_agent"`
+	QuotedPriceUSD      float64   `json:"quoted_price_usd"`
+	EstimatedDurationMs int64     `json:"estimated_duration_ms"`
+	ReputationScore     float64   `json:"reputation_score"`
+	CompositeScore      float64   `json:"composite_score"` // Calculated weighted score
+	CreatedAt           time.Time `json:"created_at"`
+}
+
+// FederatedTask records a cross-workspace collaborative bounty task
+type FederatedTask struct {
+	ID              string              `json:"id"`
+	TenantID        string              `json:"tenant_id"`
+	Title           string              `json:"title"`
+	Description     string              `json:"description"`
+	Category        string              `json:"category"` // e.g. "market_research", "code_audit", "quant_predict"
+	SourceWorkspace string              `json:"source_workspace"`
+	CreatorAgent    string              `json:"creator_agent"`
+	BountyCapUSD    float64             `json:"bounty_cap_usd"`
+	AssignedWorkspace string            `json:"assigned_workspace,omitempty"`
+	AssignedAgent   string              `json:"assigned_agent,omitempty"`
+	Status          FederatedTaskStatus `json:"status"`
+	VoucherID       string              `json:"voucher_id,omitempty"`
+	Bids            []*FederationBid    `json:"bids,omitempty"`
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
+}
+
+// FederationStatsSummary macro clearinghouse metrics
+type FederationStatsSummary struct {
+	TotalWorkspaces     int     `json:"total_workspaces"`
+	ActiveWorkspaces    int     `json:"active_workspaces"`
+	TotalEscrowPoolUSD  float64 `json:"total_escrow_pool_usd"`
+	TotalClearedUSD     float64 `json:"total_cleared_usd"`
+	TotalClearingFeeUSD float64 `json:"total_clearing_fee_usd"`
+	TotalTasks          int     `json:"total_tasks"`
+	CompletedTasks      int     `json:"completed_tasks"`
+	MatchSuccessRate    float64 `json:"match_success_rate"`
+	DisputeRate         float64 `json:"dispute_rate"`
+}
+
+// FederationTaskCreateRequest payload to post a task
+type FederationTaskCreateRequest struct {
+	TenantID        string  `json:"tenant_id,omitempty"`
+	Title           string  `json:"title"`
+	Description     string  `json:"description"`
+	Category        string  `json:"category"`
+	SourceWorkspace string  `json:"source_workspace"`
+	CreatorAgent    string  `json:"creator_agent"`
+	BountyCapUSD    float64 `json:"bounty_cap_usd"`
+}
+
+// FederationBidCreateRequest payload for an agent to bid
+type FederationBidCreateRequest struct {
+	BidderWorkspace     string  `json:"bidder_workspace"`
+	BidderAgent         string  `json:"bidder_agent"`
+	QuotedPriceUSD      float64 `json:"quoted_price_usd"`
+	EstimatedDurationMs int64   `json:"estimated_duration_ms"`
+}
+
+// FederationFinalizeRequest payload to complete 2PC settlement
+type FederationFinalizeRequest struct {
+	VoucherID     string  `json:"voucher_id"`
+	ActualCostUSD float64 `json:"actual_cost_usd"`
+	ProofPayload  string  `json:"proof_payload,omitempty"`
+	Accept        bool    `json:"accept"`
+	DisputeReason string  `json:"dispute_reason,omitempty"`
+}
+
+// FederationSimulateScenarioTurn turn in what-if simulation
+type FederationSimulateScenarioTurn struct {
+	StepIndex        int     `json:"step_index"`
+	PhaseName        string  `json:"phase_name"` // "reserve", "bidding", "execution", "finalize"
+	AgentRole        string  `json:"agent_role"`
+	Workspace        string  `json:"workspace"`
+	AmountUSD        float64 `json:"amount_usd"`
+	Status           string  `json:"status"`
+	Detail           string  `json:"detail"`
+}
+
+// FederationSimulateRequest payload for federation auction & clearing playground
+type FederationSimulateRequest struct {
+	TaskTitle       string  `json:"task_title"`
+	Category        string  `json:"category"`
+	SourceWorkspace string  `json:"source_workspace"`
+	BountyCapUSD    float64 `json:"bounty_cap_usd"`
+	SimulatedBidders int    `json:"simulated_bidders"`
+	SimulateDispute  bool   `json:"simulate_dispute"`
+}
+
+// FederationSimulateResponse output of federation auction & clearing playground
+type FederationSimulateResponse struct {
+	TaskID              string                           `json:"task_id"`
+	WinnerWorkspace     string                           `json:"winner_workspace"`
+	WinnerAgent         string                           `json:"winner_agent"`
+	WinningBidUSD       float64                          `json:"winning_bid_usd"`
+	ClearingFeeUSD      float64                          `json:"clearing_fee_usd"`
+	NetEarningsUSD      float64                          `json:"net_earnings_usd"`
+	EscrowVoucherID     string                           `json:"escrow_voucher_id"`
+	ProofHash           string                           `json:"proof_hash"`
+	FinalStatus         EscrowStatus                     `json:"final_status"`
+	Scenarios           []FederationSimulateScenarioTurn `json:"scenarios"`
+	FinOpsAdvice        []string                         `json:"finops_advice"`
+}
+
+

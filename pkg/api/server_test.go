@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1628,6 +1629,135 @@ func TestHierarchyEndpoints(t *testing.T) {
 		}
 	}
 }
+
+func TestFederationEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/federation/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/federation/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/federation/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_workspaces") {
+		t.Errorf("Expected stats response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/federation/workspaces
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/federation/workspaces", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/federation/workspaces, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "ws-quant-alpha") {
+		t.Errorf("Expected workspaces containing ws-quant-alpha, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/federation/workspaces
+	createWsJSON := `{
+		"id": "ws-new-agent-lab",
+		"tenant_id": "default",
+		"name": "多智能体实验群",
+		"balance_usd": 200.0,
+		"reputation_score": 97.0
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/federation/workspaces", strings.NewReader(createWsJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/federation/workspaces, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "ws-new-agent-lab") {
+		t.Errorf("Expected created workspace ID, got: %s", w.Body.String())
+	}
+
+	// 4. POST /api/v1/federation/tasks (Create task & lock escrow)
+	createTaskJSON := `{
+		"title": "跨域量化特征工程抽取",
+		"category": "quant_predict",
+		"source_workspace": "ws-new-agent-lab",
+		"creator_agent": "QuantEngineer",
+		"bounty_cap_usd": 15.0
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/federation/tasks", strings.NewReader(createTaskJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/federation/tasks, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "task") || !strings.Contains(w.Body.String(), "voucher") {
+		t.Errorf("Expected task and voucher in response, got: %s", w.Body.String())
+	}
+
+	var taskCreatedResp map[string]interface{}
+	_ = json.Unmarshal(w.Body.Bytes(), &taskCreatedResp)
+	taskMap, _ := taskCreatedResp["task"].(map[string]interface{})
+	voucherMap, _ := taskCreatedResp["voucher"].(map[string]interface{})
+	taskID, _ := taskMap["id"].(string)
+	voucherID, _ := voucherMap["id"].(string)
+
+	// 5. POST /api/v1/federation/tasks/:id/bid
+	bidJSON := `{
+		"bidder_workspace": "ws-risk-crawler",
+		"bidder_agent": "IntelScraper",
+		"quoted_price_usd": 12.0,
+		"estimated_duration_ms": 2500
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/federation/tasks/"+taskID+"/bid", strings.NewReader(bidJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/federation/tasks/:id/bid, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "IntelScraper") {
+		t.Errorf("Expected bidder agent in response, got: %s", w.Body.String())
+	}
+
+	// 6. POST /api/v1/federation/tasks/:id/finalize
+	finalizeJSON := fmt.Sprintf(`{
+		"voucher_id": "%s",
+		"actual_cost_usd": 12.0,
+		"proof_payload": "result payload sha",
+		"accept": true
+	}`, voucherID)
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/federation/tasks/"+taskID+"/finalize", strings.NewReader(finalizeJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/federation/tasks/:id/finalize, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "cleared") {
+		t.Errorf("Expected cleared voucher status, got: %s", w.Body.String())
+	}
+
+	// 7. POST /api/v1/federation/simulate
+	simJSON := `{
+		"task_title": "多Agent全球供应链大宗商品价格推演",
+		"category": "market_research",
+		"source_workspace": "ws-quant-alpha",
+		"bounty_cap_usd": 30.0,
+		"simulated_bidders": 3,
+		"simulate_dispute": false
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/federation/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/federation/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "scenarios") || !strings.Contains(w.Body.String(), "finops_advice") {
+		t.Errorf("Expected simulation response, got: %s", w.Body.String())
+	}
+}
+
 
 
 
