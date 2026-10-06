@@ -22,6 +22,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/forecast"
+	"github.com/corlin/AIMeter/pkg/kvcache"
 	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
@@ -99,6 +100,17 @@ type ProxyHandler struct {
 	swarmManager       *swarm.Manager
 	memoryManager      *memory.MemoryManager
 	reasoningManager   *reasoning.ReasoningManager
+	kvCacheManager     *kvcache.Manager
+}
+
+// SetKVCacheManager attaches a KV-Cache manager
+func (h *ProxyHandler) SetKVCacheManager(km *kvcache.Manager) {
+	h.kvCacheManager = km
+}
+
+// GetKVCacheManager returns the attached KV-Cache manager
+func (h *ProxyHandler) GetKVCacheManager() *kvcache.Manager {
+	return h.kvCacheManager
 }
 
 // SetReasoningManager attaches a reasoning manager
@@ -644,6 +656,38 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 				c.Header("X-AIMeter-Thinking-Budget", strconv.Itoa(rPolicy.MaxThinkingTokens))
 				if modBytes, err := json.Marshal(payload); err == nil {
 					bodyBytes = modBytes
+				}
+			}
+		}
+	}
+
+	// 4.8 Evaluate Prefix Caching & Dynamic Variable Sinking (Phase 25)
+	var wasCanonicalized bool
+	if h.kvCacheManager != nil {
+		kvPolicy := h.kvCacheManager.GetPolicy(tenantID)
+		if kvPolicy.Enabled && kvPolicy.EnableCanonicalization {
+			if rawMsgs, ok := payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
+				var chatMsgs []domain.ChatMessage
+				msgBytes, mErr := json.Marshal(rawMsgs)
+				if mErr == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
+					for idx, msg := range chatMsgs {
+						if msg.Role == "system" || (idx == 0 && msg.Role == "user") {
+							if contentStr, ok := msg.Content.(string); ok && contentStr != "" {
+								clean, canon, _ := h.kvCacheManager.CanonicalizePrompt(contentStr, tenantID)
+								if canon {
+									chatMsgs[idx].Content = clean
+									wasCanonicalized = true
+								}
+							}
+						}
+					}
+					if wasCanonicalized {
+						payload["messages"] = chatMsgs
+						c.Header("X-AIMeter-Prefix-Canonicalized", "true")
+						if modBytes, err := json.Marshal(payload); err == nil {
+							bodyBytes = modBytes
+						}
+					}
 				}
 			}
 		}
@@ -1266,6 +1310,39 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				}
 			}
 
+			// Audit Prefix Caching & KV-Cache Economics (Phase 25)
+			if h.kvCacheManager != nil {
+				cachedTokens := respData.Usage.PromptTokensDetails.CachedTokens
+				costSaved := 0.0
+				if cachedTokens > 0 {
+					costSaved = float64(cachedTokens) * 0.000000126
+				}
+				promptToks := respData.Usage.PromptTokens
+				if promptToks == 0 {
+					promptToks = 1
+				}
+				ratio := float64(cachedTokens) / float64(promptToks)
+
+				c.Header("X-AIMeter-KVCache-Hit", strconv.FormatBool(cachedTokens > 0))
+				c.Header("X-AIMeter-KVCache-Tokens", strconv.Itoa(cachedTokens))
+				c.Header("X-AIMeter-KVCache-Ratio", fmt.Sprintf("%.4f", ratio))
+				if costSaved > 0 {
+					c.Header("X-AIMeter-KVCache-Saved-USD", fmt.Sprintf("%.6f", costSaved))
+				}
+
+				h.kvCacheManager.RecordTrace(&domain.KVCacheTrace{
+					ID:                 traceID,
+					TenantID:           tenantID,
+					RequestID:          traceID,
+					Model:              fbResult.ActualModel,
+					PromptPreview:      promptText,
+					PromptTokens:       promptToks,
+					ActualCachedTokens: cachedTokens,
+					CostSavedUSD:       costSaved,
+					WasCanonicalized:   c.Writer.Header().Get("X-AIMeter-Prefix-Canonicalized") == "true",
+				})
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -1507,6 +1584,23 @@ func (h *ProxyHandler) handleStreamingResponse(
 			variantID := c.Writer.Header().Get("X-AIMeter-Variant")
 			streamCost := float64(extractedUsage.TotalTokens) * 0.000003
 			h.experimentEngine.RecordResult(expID, variantID, int64(extractedUsage.TotalTokens), streamCost, float64(totalDuration.Milliseconds()), 4.6, true)
+		}
+
+		// Audit Prefix Caching & KV-Cache Economics (Phase 25)
+		if h.kvCacheManager != nil && extractedUsage.PromptTokensDetails.CachedTokens > 0 {
+			cachedToks := extractedUsage.PromptTokensDetails.CachedTokens
+			costSaved := float64(cachedToks) * 0.000000126
+			go h.kvCacheManager.RecordTrace(&domain.KVCacheTrace{
+				ID:                 traceID,
+				TenantID:           tenantID,
+				RequestID:          traceID,
+				Model:              fbResult.ActualModel,
+				PromptPreview:      promptText,
+				PromptTokens:       extractedUsage.PromptTokens,
+				ActualCachedTokens: cachedToks,
+				CostSavedUSD:       costSaved,
+				WasCanonicalized:   c.Writer.Header().Get("X-AIMeter-Prefix-Canonicalized") == "true",
+			})
 		}
 
 		go h.recordUsage(

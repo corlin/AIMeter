@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   Share2,
   BrainCircuit,
-  Cpu
+  Cpu,
+  Database
 } from "lucide-react";
 
 export function Navbar() {
@@ -32,6 +33,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "KV-Cache", href: "/kvcache", icon: Database },
     { label: "CoT Reasoning", href: "/reasoning", icon: Cpu },
     { label: "Agent Memory", href: "/memory", icon: BrainCircuit },
     { label: "Agent Swarm", href: "/swarm", icon: Share2 },

@@ -250,6 +250,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **网关三级弹性干预与流式 SSE 优雅收敛**：入站按策略自适应注入 `max_thinking_tokens`；出站透传 `X-AIMeter-Reasoning-Tokens`、`X-AIMeter-Reasoning-Cost`、`X-AIMeter-Thinking-Oscillation`、`X-AIMeter-Thinking-Action`、`X-AIMeter-Thinking-Budget`；流式超出思考预算时动态闭合 `</think>` 标签并注入收敛声明，保证客户端 UI 零崩溃。
 * **全生命周期思维大盘与沙箱**：全新一级看板 `/reasoning`（4 维宏观 KPI、思维链认知时序审计、反思震荡热力榜、思考预算策略配置、以及内置 4 场景推演沙箱）。
 
+### 26. 提示词前缀共享编排、多租户 KV-Cache 命中率经济学与上下文预热调度引擎 (Prefix Caching / KV-Cache Hit-Rate Economics & Context Prewarming Engine - Phase 25)
+* **纯 Go 并发安全 Radix 前缀树拓扑 (`pkg/kvcache`)**：微秒级计算最长公共前缀 Token 匹配，支持节点动态分裂、块对齐判定（Block-Alignment Sensing，如 64/1024 Tokens）与 LRU/TTL 老化淘汰，内存无外部依赖。
+* **动态变量沉底规范化重排 (Variable Sink Canonicalization)**：自动嗅探高熵动态变量（当前时间戳、UUID、会话 SessionID、随机种子），将其从 System Prompt 或静态前缀剥离并下沉至尾部重构，恢复被割裂的长知识库前缀连续性，提升缓存命中率 50%+。
+* **轻量级 1-Token 探针预热与显存保鲜调度 (1-Token Probing & Context Prewarming)**：支持针对高频基础提示词执行后台 1-Token 轻量预热唤醒，标记 GPU 显存驻留保鲜状态（10 分钟 TTL），消除早高峰首请求冷启动（TTFT）毛刺。
+* **反向代理双向协同与全息响应头审计**：网关透明拦截入站请求执行沉底规范化；响应头全息透传 `X-AIMeter-KVCache-Hit`, `X-AIMeter-KVCache-Tokens`, `X-AIMeter-KVCache-Ratio`, `X-AIMeter-KVCache-Saved-USD`, `X-AIMeter-Prefix-Canonicalized`, `X-AIMeter-Prewarm`。
+* **全生命周期 KV-Cache 看板与沙箱**：全新一级看板 `/kvcache`（4 维宏观 KPI、可展开折叠的交互式 Radix 树谱、变量沉底与收益对比沙箱、主动预热控制台、审计流水表与策略配置面板）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -257,6 +264,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/kvcache` | **前缀缓存共享与 KV-Cache 经济学大盘** | 4 维宏观 KPI（前缀请求数、命中 Tokens、KV 命中率、节省金额）、交互式 Radix 前缀树拓扑图谱（展开/折叠/命中热力）、变量沉底规范化收益对比沙箱、主动 1-Token 预热工作台与实时审计流水 |
 | `/reasoning` | **AI 推理思维链深度审计与认知剪枝大盘** | 4 维宏观 KPI（思考流总数、节省思考 Tokens、规避过度反思支出、平均反思震荡指数 COI）、思维链认知时序审计（Hypothesis/Deduction/Reflection/Convergence）、反思震荡热力榜、思考预算策略配置与思维经济学推演沙箱 |
 | `/memory` | **Agent 记忆生命周期与分层压缩大盘** | 4 维宏观 KPI（记忆资产总量、节省 Context Tokens、规避浪费支出、平均记忆有效率与噪声拦截）、三层资产泳道（Hot 活跃窗口、Warm Fact Memo 事实摘要、Cold 向量冷存）、有效率与低效噪声审计、策略在线配置与长程对话记忆膨胀沙箱 |
 | `/swarm` | **多智能体拓扑与死循环审计大盘** | 4 维宏观 KPI（协作会话数、死循环拦截数、破局自愈率、规避浪费金额）、交互式 SVG 拓扑网络图谱（径向轨道布局、带权重贝塞尔连线、死循环虚线脉冲高亮）、多轮状态机成本归因下钻表、时序流水抽屉与在线死循环演练沙箱 |
@@ -431,6 +439,7 @@ AIMeter/
 │   ├── domain/              # 核心领域模型与数据结构
 │   ├── focus/               # FinOps FOCUS 1.0/1.1 标准导出器
 │   ├── guard/               # 闭环防护与三态熔断器核心引擎
+│   ├── kvcache/             # 提示词前缀共享编排、Radix树拓扑、变量沉底与预热调度引擎 (Phase 25)
 │   ├── memory/              # Agent 记忆生命周期、长期上下文向量检索归因与冷热压缩归档引擎 (Phase 23)
 │   ├── metrics/             # Prometheus 核心指标定义与埋点
 │   ├── normalizer/          # 统一计量分类法转换器

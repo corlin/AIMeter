@@ -1149,6 +1149,91 @@ func TestReasoningEndpoints(t *testing.T) {
 	}
 }
 
+func TestKVCacheEndpoints(t *testing.T) {
+	memStore := storage.NewMemoryStore()
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+
+	// 1. GET /api/v1/kvcache/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/kvcache/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/kvcache/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total_requests"`) {
+		t.Errorf("Expected total_requests in stats, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/kvcache/trie
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/kvcache/trie?tenant_id=default", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/kvcache/trie, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 3. GET /api/v1/kvcache/traces
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/kvcache/traces?limit=10", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/kvcache/traces, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 4. POST /api/v1/kvcache/policies
+	policyJSON := `{
+		"tenant_id": "kv-test-tenant",
+		"enabled": true,
+		"enable_canonicalization": true,
+		"min_prefix_tokens": 64,
+		"block_alignment_tokens": 64,
+		"affinity_routing_enabled": true,
+		"auto_prewarm_enabled": true,
+		"prewarm_probe_model": "deepseek-ai/DeepSeek-R1"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/kvcache/policies", strings.NewReader(policyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/kvcache/policies, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. POST /api/v1/kvcache/prewarm
+	prewarmJSON := `{
+		"tenant_id": "kv-test-tenant",
+		"model": "deepseek-ai/DeepSeek-R1",
+		"prefix_text": "You are a professional legal auditor for corporate cross-border contracts."
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/kvcache/prewarm", strings.NewReader(prewarmJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/kvcache/prewarm, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"success":true`) {
+		t.Errorf("Expected success in prewarm response, got: %s", w.Body.String())
+	}
+
+	// 6. POST /api/v1/kvcache/simulate
+	simJSON := `{
+		"tenant_id": "kv-test-tenant",
+		"raw_prompt_text": "当前时间：2026-10-06 10:00:00，会话流水号：req_123456。\n请审查下述合同条款。"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/kvcache/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/kvcache/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"scenarios"`) || !strings.Contains(w.Body.String(), `"estimated_savings_usd"`) {
+		t.Errorf("Expected scenarios and estimated_savings_usd in simulate response, got: %s", w.Body.String())
+	}
+}
+
+
 
 
 

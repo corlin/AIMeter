@@ -1361,6 +1361,118 @@ export interface ReasoningSimulateResponse {
   recommendations: string[];
 }
 
+// ==========================================
+// Phase 25: Prefix Caching, KV-Cache Hit-Rate Economics & Prewarming
+// ==========================================
+
+export interface KVCachePolicy {
+  tenant_id: string;
+  enabled: boolean;
+  enable_canonicalization: boolean;
+  canonicalize_patterns: string[];
+  min_prefix_tokens: number;
+  block_alignment_tokens: number;
+  affinity_routing_enabled: boolean;
+  auto_prewarm_enabled: boolean;
+  prewarm_probe_model: string;
+  updated_at?: string;
+}
+
+export interface KVCacheNode {
+  id: string;
+  prefix_hash: string;
+  prefix_preview: string;
+  token_count: number;
+  depth: number;
+  hit_count: number;
+  tenant_id?: string;
+  is_block_aligned: boolean;
+  last_accessed_at: string;
+  children?: KVCacheNode[];
+}
+
+export interface KVCacheTrace {
+  id: string;
+  tenant_id: string;
+  request_id: string;
+  model: string;
+  prompt_preview: string;
+  prompt_tokens: number;
+  actual_cached_tokens: number;
+  theoretical_cached_tokens: number;
+  actual_hit_ratio: number;
+  theoretical_hit_ratio: number;
+  cost_saved_usd: number;
+  was_canonicalized: boolean;
+  canonicalized_boost_tokens: number;
+  is_prewarmed: boolean;
+  created_at: string;
+}
+
+export interface KVCacheStatsSummary {
+  total_requests: number;
+  cached_requests_count: number;
+  total_prompt_tokens: number;
+  total_cached_tokens: number;
+  actual_hit_ratio: number;
+  theoretical_hit_ratio: number;
+  total_cost_saved_usd: number;
+  canonicalized_count: number;
+  canonicalized_saved_usd: number;
+  active_prefix_nodes: number;
+  prewarm_probes_sent: number;
+}
+
+export interface KVCachePrewarmRequest {
+  tenant_id: string;
+  model: string;
+  prefix_text: string;
+  system_role?: string;
+}
+
+export interface KVCachePrewarmResponse {
+  success: boolean;
+  prefix_hash: string;
+  primed_tokens: number;
+  probe_latency_ms: number;
+  estimated_cost_usd: number;
+  estimated_ttl_seconds: number;
+  message: string;
+}
+
+export interface KVCacheScenarioTurn {
+  scenario_name: string;
+  description: string;
+  raw_prompt_tokens: number;
+  polluted_cached_tokens: number;
+  canonicalized_cached_tokens: number;
+  raw_cost_usd: number;
+  optimized_cost_usd: number;
+  cost_saved_usd: number;
+  savings_pct: number;
+  expected_ttft_reduction_pct: number;
+}
+
+export interface KVCacheSimulateRequest {
+  tenant_id?: string;
+  model?: string;
+  raw_prompt_text?: string;
+  policy_override?: KVCachePolicy;
+}
+
+export interface KVCacheSimulateResponse {
+  original_prompt: string;
+  canonicalized_prompt: string;
+  variables_sunk: string[];
+  original_tokens: number;
+  rescued_prefix_tokens: number;
+  estimated_savings_usd: number;
+  scenarios: KVCacheScenarioTurn[];
+  radix_tree_summary: string;
+  recommendations: string[];
+}
+
+
 
 
 

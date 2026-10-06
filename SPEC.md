@@ -862,6 +862,37 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（25/25 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 25: 提示词前缀共享编排、多租户 KV-Cache 命中率经济学与上下文预热调度引擎 (Prefix Caching / KV-Cache Hit-Rate Economics & Context Prewarming Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/kvcache_seed.json`）**：
+  * 定义核心数据结构：`KVCachePolicy`（租户、启用开关、动态变量沉底重排开关 `EnableCanonicalization`、下沉正则列表、最小前缀门槛 `MinPrefixTokens`、块对齐大小 `BlockAlignmentTokens` 如 64/1024、亲和调度开关、自动预热配置）、`KVCacheNode`（Radix 前缀树节点、前缀哈希、前缀预览、Token 计数、深度、命中次数、对齐标记、子节点）、`KVCacheTrace`（单次请求前缀审计、模型、实际命中 Tokens、理论最长匹配 Tokens、命中率、规避节省金额、变量重排标记、预热标记）、`KVCacheStatsSummary`、`KVCachePrewarmRequest`、`KVCachePrewarmResponse`、`KVCacheScenarioTurn`、`KVCacheSimulateRequest` 与 `KVCacheSimulateResponse`；
+  * 预置种子配置：`configs/kvcache_seed.json` 包含 `default` 与 `fintech-corp` 多租户策略、典型时间戳与 UUID 污染正则、基准前缀追踪数据。
+* [x] **纯 Go 高性能 Radix 前缀树、规范化器与预热引擎（`pkg/kvcache/`）**：
+  * **纯 Go 并发安全 Radix 前缀树（`RadixTrie`）**：基于最长公共前缀（LCP）算法进行节点插入与动态分裂，毫秒级维护树状公共主干拓扑，支持 64/1024 厂商块对齐取整，支持 TTL 自动过期淘汰；
+  * **动态变量沉底规范化器（`Canonicalizer`）**：基于预编译正则表达式高效嗅探 Prompt 头部的高熵易变参数（ISO 时间戳、Unix 纪元时间戳、UUID、Session ID、用户令牌），在不破坏语义的前提下安全将其后置沉底至尾部上下文，恢复长企业规范与 RAG 知识前缀的绝对连续性，消除缓存穿透；
+  * **轻量探针上下文预热器（`Prewarmer`）**：支持管理员对新发布或高频的 System Prompt 发起轻量 1-Token 探测请求，锁定上游模型显存中的 KV 缓存并追踪 10 分钟 TTL 保鲜期；
+  * **多场景经济学推演沙箱（`Manager.Simulate`）**：支持针对任意 Prompt 毫秒级对比时间戳污染前 vs 规范化沉底后的命中率与账单差异，计算 TTFT 首字时延与输入成本降幅。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 6 大 REST 控制端点：
+    * `GET /api/v1/kvcache/stats`（宏观前缀缓存大盘指标）
+    * `GET /api/v1/kvcache/trie`（Radix 前缀树层级拓扑结构）
+    * `GET /api/v1/kvcache/traces`（前缀缓存流水审计日志）
+    * `POST /api/v1/kvcache/policies`（保存/修改租户前缀缓存策略）
+    * `POST /api/v1/kvcache/prewarm`（触发主动上下文预热探针）
+    * `POST /api/v1/kvcache/simulate`（在线变量沉底与收益推演沙箱）
+  * 反向代理网关双向协同与全息响应头：
+    * **入站消息自适应规范化**：网关在将请求转发至模型前，根据租户策略自动对 System 或首条 User 消息执行变量沉底，重写请求体并注入 `X-AIMeter-Prefix-Canonicalized: true`；
+    * **出站响应透传指标**：非流式与流式均提取供应商的 `prompt_tokens_details.cached_tokens`，注入 `X-AIMeter-KVCache-Hit`、`X-AIMeter-KVCache-Tokens`、`X-AIMeter-KVCache-Ratio`、`X-AIMeter-KVCache-Saved-USD` 等响应头，并异步记录至前缀审计 Trace。
+* [x] **Web 控制台全新一级看板 `/kvcache`（`web/src/app/kvcache/`）**：
+  * **4 维宏观 KPI 卡片**：实际命中率 vs 理论最优命中率对比、累计复用 Cached Tokens、前缀缓存规避支出（含变量重排贡献金额）、活跃 Radix 树节点与主动预热探针数；
+  * **交互式 Radix 前缀树图谱 (Trie Viewer)**：层级缩进直观渲染企业公共 System Prompt 与知识库主干分支，展示节点哈希、Token 深度、命中热度与 64-Token 块对齐标记；
+  * **在线变量沉底与收益推演沙箱 (Playground)**：内置典型污染场景，左右直观对比重排前后效果，展示 3 类场景的经济学对比矩阵（单次调用支出、降本比例、TTFT 降低百分比）；
+  * **主动上下文预热控制台 (Prewarming Controller)**：支持在线选择 DeepSeek-R1 / GPT-4o 等模型，一键发送探针并展示往返时延与保鲜 TTL；
+  * **前缀审计流水与策略配置矩阵**：表格化展示近期请求的缓存细节与重排徽标，支持在线维护下沉正则与块对齐粒度。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（26/26 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 ## 8. 安全与隐私原则 (Security & Privacy)

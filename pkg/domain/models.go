@@ -1695,4 +1695,125 @@ type ReasoningSimulateResponse struct {
 	Recommendations    []string                `json:"recommendations"`
 }
 
+// ==========================================
+// Phase 25: Prefix Caching, KV-Cache Hit-Rate Economics & Context Prewarming Engine
+// ==========================================
+
+// KVCachePolicy configures prefix matching, canonicalization and prewarming per tenant
+type KVCachePolicy struct {
+	TenantID                 string    `json:"tenant_id"`
+	Enabled                  bool      `json:"enabled"`
+	EnableCanonicalization   bool      `json:"enable_canonicalization"`   // Automatically sink dynamic variables (timestamps, UUIDs) to preserve clean prefixes
+	CanonicalizePatterns     []string  `json:"canonicalize_patterns"`     // Regex patterns to detect & sink (e.g. timestamps, user session keys)
+	MinPrefixTokens          int       `json:"min_prefix_tokens"`          // Minimum length to consider as shared prefix (default 64)
+	BlockAlignmentTokens     int       `json:"block_alignment_tokens"`     // Provider chunk block size (DeepSeek=64, OpenAI=1024, Anthropic=1024)
+	AffinityRoutingEnabled   bool      `json:"affinity_routing_enabled"`   // Route requests with identical trunk prefix to the same target/worker
+	AutoPrewarmEnabled       bool      `json:"auto_prewarm_enabled"`       // Trigger lightweight 1-token dummy probes on updated system prompts
+	PrewarmProbeModel        string    `json:"prewarm_probe_model"`        // Target model for prewarming probes
+	UpdatedAt                time.Time `json:"updated_at"`
+}
+
+// KVCacheNode represents a branch in the pure-Go Radix Prefix Trie
+type KVCacheNode struct {
+	ID                string         `json:"id"`
+	PrefixHash        string         `json:"prefix_hash"`
+	PrefixPreview     string         `json:"prefix_preview"`
+	TokenCount        int            `json:"token_count"`
+	Depth             int            `json:"depth"`
+	HitCount          int64          `json:"hit_count"`
+	TenantID          string         `json:"tenant_id,omitempty"`
+	IsBlockAligned    bool           `json:"is_block_aligned"`
+	LastAccessedAt    time.Time      `json:"last_accessed_at"`
+	Children          []*KVCacheNode `json:"children,omitempty"`
+}
+
+// KVCacheTrace records a single audited request's prefix cache telemetry
+type KVCacheTrace struct {
+	ID                     string    `json:"id"`
+	TenantID               string    `json:"tenant_id"`
+	RequestID              string    `json:"request_id"`
+	Model                  string    `json:"model"`
+	PromptPreview          string    `json:"prompt_preview"`
+	PromptTokens           int       `json:"prompt_tokens"`
+	ActualCachedTokens     int       `json:"actual_cached_tokens"`     // Returned by upstream provider
+	TheoreticalCachedTokens int      `json:"theoretical_cached_tokens"`// Calculated by local Radix Trie
+	ActualHitRatio         float64   `json:"actual_hit_ratio"`         // ActualCached / PromptTokens
+	TheoreticalHitRatio    float64   `json:"theoretical_hit_ratio"`    // TheoreticalCached / PromptTokens
+	CostSavedUSD           float64   `json:"cost_saved_usd"`           // (CachedTokens * (StandardRate - DiscountRate))
+	WasCanonicalized       bool      `json:"was_canonicalized"`        // True if variable sinking rescued the prefix
+	CanonicalizedBoostTokens int     `json:"canonicalized_boost_tokens"`// Extra tokens matched after sink
+	IsPrewarmed            bool      `json:"is_prewarmed"`
+	CreatedAt              time.Time `json:"created_at"`
+}
+
+// KVCacheStatsSummary reports global aggregate metrics for prefix economics dashboard
+type KVCacheStatsSummary struct {
+	TotalRequests              int64   `json:"total_requests"`
+	CachedRequestsCount        int64   `json:"cached_requests_count"`
+	TotalPromptTokens          int64   `json:"total_prompt_tokens"`
+	TotalCachedTokens          int64   `json:"total_cached_tokens"`
+	ActualHitRatio             float64 `json:"actual_hit_ratio"`
+	TheoreticalHitRatio        float64 `json:"theoretical_hit_ratio"`
+	TotalCostSavedUSD          float64 `json:"total_cost_saved_usd"`
+	CanonicalizedCount         int64   `json:"canonicalized_count"`
+	CanonicalizedSavedUSD      float64 `json:"canonicalized_saved_usd"`
+	ActivePrefixNodes          int     `json:"active_prefix_nodes"`
+	PrewarmProbesSent          int     `json:"prewarm_probes_sent"`
+}
+
+// KVCachePrewarmRequest initiates a dummy probe to prime upstream KV cache
+type KVCachePrewarmRequest struct {
+	TenantID    string `json:"tenant_id"`
+	Model       string `json:"model"`
+	PrefixText  string `json:"prefix_text"`
+	SystemRole  string `json:"system_role,omitempty"`
+}
+
+// KVCachePrewarmResponse reports the probe latency, tokens primed and status
+type KVCachePrewarmResponse struct {
+	Success            bool    `json:"success"`
+	PrefixHash         string  `json:"prefix_hash"`
+	PrimedTokens       int     `json:"primed_tokens"`
+	ProbeLatencyMs     int64   `json:"probe_latency_ms"`
+	EstimatedCostUSD   float64 `json:"estimated_cost_usd"`
+	EstimatedTTLSeconds int    `json:"estimated_ttl_seconds"`
+	Message            string  `json:"message"`
+}
+
+// KVCacheScenarioTurn represents a comparison scenario in the simulation playground
+type KVCacheScenarioTurn struct {
+	ScenarioName            string  `json:"scenario_name"`
+	Description             string  `json:"description"`
+	RawPromptTokens         int     `json:"raw_prompt_tokens"`
+	PollutedCachedTokens    int     `json:"polluted_cached_tokens"`     // With unoptimized dynamic timestamp
+	CanonicalizedCachedTokens int   `json:"canonicalized_cached_tokens"`// Rescued by sinking variables
+	RawCostUSD              float64 `json:"raw_cost_usd"`
+	OptimizedCostUSD        float64 `json:"optimized_cost_usd"`
+	CostSavedUSD            float64 `json:"cost_saved_usd"`
+	SavingsPct              float64 `json:"savings_pct"`
+	ExpectedTTFTReductionPct float64 `json:"expected_ttft_reduction_pct"`
+}
+
+// KVCacheSimulateRequest provides inputs for the interactive prefix playground
+type KVCacheSimulateRequest struct {
+	TenantID       string          `json:"tenant_id,omitempty"`
+	Model          string          `json:"model,omitempty"`
+	RawPromptText  string          `json:"raw_prompt_text,omitempty"`
+	PolicyOverride *KVCachePolicy  `json:"policy_override,omitempty"`
+}
+
+// KVCacheSimulateResponse returns canonicalized preview and scenario comparisons
+type KVCacheSimulateResponse struct {
+	OriginalPrompt           string                `json:"original_prompt"`
+	CanonicalizedPrompt      string                `json:"canonicalized_prompt"`
+	VariablesSunk            []string              `json:"variables_sunk"`
+	OriginalTokens           int                   `json:"original_tokens"`
+	RescuedPrefixTokens      int                   `json:"rescued_prefix_tokens"`
+	EstimatedSavingsUSD      float64               `json:"estimated_savings_usd"`
+	Scenarios                []KVCacheScenarioTurn `json:"scenarios"`
+	RadixTreeSummary         string                `json:"radix_tree_summary"`
+	Recommendations          []string              `json:"recommendations"`
+}
+
+
 

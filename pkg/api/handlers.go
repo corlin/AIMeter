@@ -21,6 +21,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/focus"
 	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
+	"github.com/corlin/AIMeter/pkg/kvcache"
 	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
@@ -57,11 +58,22 @@ type APIHandler struct {
 	swarmManager       *swarm.Manager
 	memoryManager      *memory.MemoryManager
 	reasoningManager   *reasoning.ReasoningManager
+	kvCacheManager     *kvcache.Manager
 }
 
 // SetReasoningManager attaches a reasoning manager to the API handler
 func (h *APIHandler) SetReasoningManager(rm *reasoning.ReasoningManager) {
 	h.reasoningManager = rm
+}
+
+// SetKVCacheManager attaches a KV-Cache manager to the API handler
+func (h *APIHandler) SetKVCacheManager(km *kvcache.Manager) {
+	h.kvCacheManager = km
+}
+
+// GetKVCacheManager returns the attached KV-Cache manager
+func (h *APIHandler) GetKVCacheManager() *kvcache.Manager {
+	return h.kvCacheManager
 }
 
 // SetMemoryManager attaches a memory manager to the API handler
@@ -1981,6 +1993,89 @@ func (h *APIHandler) SimulateReasoning(c *gin.Context) {
 	resp := h.reasoningManager.Simulate(&req)
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 25: KV-Cache Hit-Rate Economics & Prewarming Handlers
+// ==========================================
+
+// GetKVCacheStats retrieves global prefix cache economics and hit-rate metrics
+func (h *APIHandler) GetKVCacheStats(c *gin.Context) {
+	if h.kvCacheManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "KV-Cache manager not initialized"})
+		return
+	}
+	stats := h.kvCacheManager.GetStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// GetKVCacheTrie retrieves the hierarchical Radix Trie structure for Web visualization
+func (h *APIHandler) GetKVCacheTrie(c *gin.Context) {
+	if h.kvCacheManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "KV-Cache manager not initialized"})
+		return
+	}
+	tenantID := c.DefaultQuery("tenant_id", "default")
+	trie := h.kvCacheManager.GetTrie(tenantID)
+	c.JSON(http.StatusOK, trie)
+}
+
+// GetKVCacheTraces retrieves recent prefix cache audit traces
+func (h *APIHandler) GetKVCacheTraces(c *gin.Context) {
+	if h.kvCacheManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "KV-Cache manager not initialized"})
+		return
+	}
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, _ := strconv.Atoi(limitStr)
+	traces := h.kvCacheManager.GetTraces(limit)
+	c.JSON(http.StatusOK, traces)
+}
+
+// SaveKVCachePolicy updates or saves a tenant's prefix cache and canonicalization policy
+func (h *APIHandler) SaveKVCachePolicy(c *gin.Context) {
+	if h.kvCacheManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "KV-Cache manager not initialized"})
+		return
+	}
+	var policy domain.KVCachePolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.kvCacheManager.SavePolicy(policy)
+	c.JSON(http.StatusOK, policy)
+}
+
+// PrewarmKVCache triggers dummy probes to prime upstream KV cache
+func (h *APIHandler) PrewarmKVCache(c *gin.Context) {
+	if h.kvCacheManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "KV-Cache manager not initialized"})
+		return
+	}
+	var req domain.KVCachePrewarmRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.kvCacheManager.Prewarm(req)
+	c.JSON(http.StatusOK, resp)
+}
+
+// SimulateKVCache runs interactive prompt canonicalization and savings simulation
+func (h *APIHandler) SimulateKVCache(c *gin.Context) {
+	if h.kvCacheManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "KV-Cache manager not initialized"})
+		return
+	}
+	var req domain.KVCacheSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp := h.kvCacheManager.Simulate(req)
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 
