@@ -12,9 +12,21 @@ interface StatCardProps {
   highlightColor?: string;
 }
 
+const COLOR_ACCENTS: Record<string, string> = {
+  emerald: "hover:border-emerald-500/30",
+  amber: "hover:border-amber-500/30",
+  blue: "hover:border-blue-500/30",
+  purple: "hover:border-purple-500/30",
+  rose: "hover:border-rose-500/30",
+  indigo: "hover:border-indigo-500/30",
+  cyan: "hover:border-cyan-500/30",
+};
+
 export function StatCard({ title, value, subtitle, icon, trend, highlightColor = "emerald" }: StatCardProps) {
+  const accentBorder = COLOR_ACCENTS[highlightColor] || "hover:border-zinc-700";
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm hover:border-zinc-700 transition-all">
+    <div className={`relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm transition-all ${accentBorder}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wider text-zinc-400">{title}</span>
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300 border border-zinc-700/50">

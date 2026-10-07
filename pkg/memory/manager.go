@@ -1,16 +1,15 @@
 package memory
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -53,20 +52,18 @@ func NewMemoryManager(seedFile string) (*MemoryManager, error) {
 	}
 
 	if seedFile != "" {
-		if data, err := os.ReadFile(seedFile); err == nil {
-			var seed SeedData
-			if err := json.Unmarshal(data, &seed); err == nil {
-				for _, p := range seed.Policies {
-					policyCopy := p
-					mgr.policies[p.TenantID] = &policyCopy
-				}
-				for _, item := range seed.SeedItems {
-					itemCopy := item
-					mgr.items[item.ID] = &itemCopy
-					mgr.sessionIndex[item.SessionID] = append(mgr.sessionIndex[item.SessionID], item.ID)
-					mgr.totalSavedTokens += int64(item.Tokens - item.CompressedTokens)
-					mgr.totalAvoidedSpendUSD += item.SavedSpendUSD
-				}
+		var seed SeedData
+		if err := common.LoadSeedFile(seedFile, &seed); err == nil {
+			for _, p := range seed.Policies {
+				policyCopy := p
+				mgr.policies[p.TenantID] = &policyCopy
+			}
+			for _, item := range seed.SeedItems {
+				itemCopy := item
+				mgr.items[item.ID] = &itemCopy
+				mgr.sessionIndex[item.SessionID] = append(mgr.sessionIndex[item.SessionID], item.ID)
+				mgr.totalSavedTokens += int64(item.Tokens - item.CompressedTokens)
+				mgr.totalAvoidedSpendUSD += item.SavedSpendUSD
 			}
 		}
 	}

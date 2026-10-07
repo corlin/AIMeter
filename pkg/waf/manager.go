@@ -2,13 +2,12 @@ package waf
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/google/uuid"
 )
@@ -45,40 +44,31 @@ func NewManager(seedPath ...string) *Manager {
 		events:   make([]*domain.WAFEvent, 0, 200),
 	}
 
-	paths := []string{"configs/waf_seed.json", "../configs/waf_seed.json", "../../configs/waf_seed.json"}
+	targetPath := "configs/waf_seed.json"
 	if len(seedPath) > 0 && seedPath[0] != "" {
-		paths = []string{seedPath[0], "../" + seedPath[0], "../../" + seedPath[0]}
+		targetPath = seedPath[0]
 	}
 
-	loaded := false
-	for _, p := range paths {
-		if data, err := os.ReadFile(p); err == nil {
-			var seed SeedConfig
-			if err := json.Unmarshal(data, &seed); err == nil {
-				for _, r := range seed.Rules {
-					m.rules.RegisterRule(r)
-				}
-				for _, b := range seed.BannedSources {
-					m.banlist.AddManualBan(b)
-				}
-				for _, evt := range seed.Events {
-					evtCopy := evt
-					m.events = append(m.events, &evtCopy)
-					m.totalInspected++
-					if evt.Action == domain.WAFActionBlock || evt.Action == domain.WAFActionBanned {
-						m.blockedAttacks++
-						m.totalAvoidedLossUSD += evt.AvoidedLossUSD
-					} else if evt.Action == domain.WAFActionSanitize {
-						m.sanitizedRequests++
-					}
-				}
-				loaded = true
-				break
+	var seed SeedConfig
+	if err := common.LoadSeedFile(targetPath, &seed); err == nil {
+		for _, r := range seed.Rules {
+			m.rules.RegisterRule(r)
+		}
+		for _, b := range seed.BannedSources {
+			m.banlist.AddManualBan(b)
+		}
+		for _, evt := range seed.Events {
+			evtCopy := evt
+			m.events = append(m.events, &evtCopy)
+			m.totalInspected++
+			if evt.Action == domain.WAFActionBlock || evt.Action == domain.WAFActionBanned {
+				m.blockedAttacks++
+				m.totalAvoidedLossUSD += evt.AvoidedLossUSD
+			} else if evt.Action == domain.WAFActionSanitize {
+				m.sanitizedRequests++
 			}
 		}
-	}
-
-	if !loaded {
+	} else {
 		m.injectBaselineSeed()
 	}
 

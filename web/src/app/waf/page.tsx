@@ -26,6 +26,8 @@ import {
   FileCode2,
   Info
 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import {
   WAFThreatCategory,
   WAFAction,
@@ -191,72 +193,57 @@ export default function WAFPage() {
   const getActionBadge = (action: WAFAction) => {
     switch (action) {
       case "block":
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30">阻断 (403 Block)</span>;
+        return <StatusBadge status="block" label="阻断 (403 Block)" variant="danger" />;
       case "banned":
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950/80 text-rose-300 border border-rose-600/40 animate-pulse">黑名单熔断 (Banned)</span>;
+        return <StatusBadge status="banned" label="黑名单熔断 (Banned)" variant="danger" className="animate-pulse" />;
       case "sanitize":
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">安全净化 (Sanitize)</span>;
+        return <StatusBadge status="sanitize" label="安全净化 (Sanitize)" variant="warning" />;
       case "allow":
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">合规放行 (Allow)</span>;
+        return <StatusBadge status="allow" label="合规放行 (Allow)" variant="success" />;
     }
   };
 
   const getSeverityBadge = (sev: WAFRuleSeverity) => {
     switch (sev) {
       case "critical":
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/30">Critical</span>;
+        return <StatusBadge status="critical" label="Critical" variant="danger" />;
       case "high":
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-orange-500/20 text-orange-400 border border-orange-500/30">High</span>;
+        return <StatusBadge status="high" label="High" variant="warning" />;
       case "medium":
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">Medium</span>;
+        return <StatusBadge status="medium" label="Medium" variant="warning" />;
       case "low":
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30">Low</span>;
+        return <StatusBadge status="low" label="Low" variant="info" />;
     }
   };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 space-y-6">
       {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500/20 via-purple-500/20 to-zinc-900 border border-red-500/30 shadow-lg shadow-red-500/10">
-              <ShieldAlert className="w-6 h-6 text-red-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-bold tracking-tight text-white">
-                  AI WAF 提示词防火墙与拒绝钱包防御中心
-                </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-                  Phase 32 LLM WAF
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400 font-medium">
-                微秒级入站嗅探 · 拦截越狱与提示词注入 · 熔断拒绝钱包 (Denial-of-Wallet) 恶意算力盗刷 · 动态自适应封禁
-              </p>
-            </div>
+      <PageHeader
+        title="AI WAF 提示词防火墙与拒绝钱包防御中心"
+        badge="Phase 32 LLM WAF"
+        badgeColor="rose"
+        description="微秒级入站嗅探 · 拦截越狱与提示词注入 · 熔断拒绝钱包 (Denial-of-Wallet) 恶意算力盗刷 · 动态自适应封禁"
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setShowRuleModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/20 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>新建防护规则</span>
+            </button>
+            <button
+              onClick={loadAllData}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 transition-all cursor-pointer"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span>刷新数据</span>
+            </button>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setShowRuleModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/20 transition-all cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>新建防护规则</span>
-          </button>
-          <button
-            onClick={loadAllData}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 transition-all cursor-pointer"
-          >
-            <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>刷新数据</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* 2. Top 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

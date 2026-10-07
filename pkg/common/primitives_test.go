@@ -53,4 +53,12 @@ func TestLoadSeedFile(t *testing.T) {
 	if data.Name != "ai-meter" || data.Version != 1 {
 		t.Fatalf("unexpected seed content: %+v", data)
 	}
+
+	bytes, err := ReadSeedBytes(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("failed to read seed bytes: %v", err)
+	}
+	if len(bytes) == 0 {
+		t.Fatalf("expected non-empty bytes")
+	}
 }

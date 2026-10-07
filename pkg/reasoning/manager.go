@@ -1,14 +1,13 @@
 package reasoning
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -34,15 +33,13 @@ func NewReasoningManager(seedPath string) *ReasoningManager {
 
 	// Try loading from file
 	if seedPath != "" {
-		if data, err := os.ReadFile(seedPath); err == nil {
-			var seed SeedDataStructure
-			if err := json.Unmarshal(data, &seed); err == nil {
-				for _, p := range seed.Policies {
-					mgr.policies[p.TenantID] = p
-				}
-				for _, t := range seed.Traces {
-					mgr.traces = append(mgr.traces, t)
-				}
+		var seed SeedDataStructure
+		if err := common.LoadSeedFile(seedPath, &seed); err == nil {
+			for _, p := range seed.Policies {
+				mgr.policies[p.TenantID] = p
+			}
+			for _, t := range seed.Traces {
+				mgr.traces = append(mgr.traces, t)
 			}
 		}
 	}

@@ -1,13 +1,12 @@
 package kvcache
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -69,13 +68,8 @@ func (m *Manager) loadSeedData(seedPath string) {
 	if seedPath == "" {
 		return
 	}
-	data, err := os.ReadFile(seedPath)
-	if err != nil {
-		return
-	}
-
 	var sd seedData
-	if err := json.Unmarshal(data, &sd); err != nil {
+	if err := common.LoadSeedFile(seedPath, &sd); err != nil {
 		return
 	}
 

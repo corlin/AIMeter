@@ -1,13 +1,12 @@
 package finetuning
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"strings"
 	"sync"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -38,32 +37,23 @@ func NewManager(seedPath ...string) *Manager {
 		jobManager:    jobMgr,
 	}
 
-	paths := []string{"configs/finetuning_seed.json", "../configs/finetuning_seed.json", "../../configs/finetuning_seed.json"}
+	targetPath := "configs/finetuning_seed.json"
 	if len(seedPath) > 0 && seedPath[0] != "" {
-		paths = []string{seedPath[0], "../" + seedPath[0], "../../" + seedPath[0]}
+		targetPath = seedPath[0]
 	}
 
-	loaded := false
-	for _, p := range paths {
-		if data, err := os.ReadFile(p); err == nil {
-			var seed SeedConfig
-			if err := json.Unmarshal(data, &seed); err == nil {
-				for _, g := range seed.GPUCatalog {
-					m.computeEngine.RegisterGPU(g)
-				}
-				for _, a := range seed.Adapters {
-					m.adapterLedger.RegisterAdapter(a)
-				}
-				for _, j := range seed.Jobs {
-					m.jobManager.RegisterExistingJob(j)
-				}
-				loaded = true
-				break
-			}
+	var seed SeedConfig
+	if err := common.LoadSeedFile(targetPath, &seed); err == nil {
+		for _, g := range seed.GPUCatalog {
+			m.computeEngine.RegisterGPU(g)
 		}
-	}
-
-	if !loaded {
+		for _, a := range seed.Adapters {
+			m.adapterLedger.RegisterAdapter(a)
+		}
+		for _, j := range seed.Jobs {
+			m.jobManager.RegisterExistingJob(j)
+		}
+	} else {
 		m.injectBaselineSeed()
 	}
 

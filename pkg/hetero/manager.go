@@ -2,13 +2,12 @@ package hetero
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/google/uuid"
 )
@@ -43,46 +42,36 @@ func NewManager(seedPath ...string) *Manager {
 		scheduler: NewScheduler(),
 	}
 
-	paths := []string{"configs/hetero_seed.json", "../configs/hetero_seed.json", "../../configs/hetero_seed.json"}
+	targetPath := "configs/hetero_seed.json"
 	if len(seedPath) > 0 && seedPath[0] != "" {
-		paths = []string{seedPath[0], "../" + seedPath[0], "../../" + seedPath[0]}
+		targetPath = seedPath[0]
 	}
 
-	loaded := false
-	for _, p := range paths {
-		if data, err := os.ReadFile(p); err == nil {
-			var seed SeedData
-			if err := json.Unmarshal(data, &seed); err == nil {
-				for _, n := range seed.Nodes {
-					nCopy := n
-					RecalculateNodeMetrics(&nCopy, 85.0)
-					m.nodes[nCopy.ID] = &nCopy
-				}
-				for _, pool := range seed.Pools {
-					pCopy := pool
-					m.pools[pCopy.ID] = &pCopy
-				}
-				for _, t := range seed.Traces {
-					tCopy := t
-					m.traces = append(m.traces, &tCopy)
-					m.totalInvocations++
-					if t.BurstStatus == domain.HeteroBurstCloud {
-						m.cloudBurstedCount++
-					} else {
-						m.localScheduledCount++
-					}
-					m.totalCostUSD += t.TotalCostUSD
-					m.totalEquivalentCloudCostUSD += t.EquivalentCloudCostUSD
-					m.totalHybridSavingsUSD += t.HybridSavingsUSD
-				}
-				loaded = true
-				break
-			}
+	var seed SeedData
+	if err := common.LoadSeedFile(targetPath, &seed); err == nil {
+		for _, n := range seed.Nodes {
+			nCopy := n
+			RecalculateNodeMetrics(&nCopy, 85.0)
+			m.nodes[nCopy.ID] = &nCopy
 		}
-	}
-
-	// Fallback baseline initialization if seed file not present
-	if !loaded {
+		for _, pool := range seed.Pools {
+			pCopy := pool
+			m.pools[pCopy.ID] = &pCopy
+		}
+		for _, t := range seed.Traces {
+			tCopy := t
+			m.traces = append(m.traces, &tCopy)
+			m.totalInvocations++
+			if t.BurstStatus == domain.HeteroBurstCloud {
+				m.cloudBurstedCount++
+			} else {
+				m.localScheduledCount++
+			}
+			m.totalCostUSD += t.TotalCostUSD
+			m.totalEquivalentCloudCostUSD += t.EquivalentCloudCostUSD
+			m.totalHybridSavingsUSD += t.HybridSavingsUSD
+		}
+	} else {
 		m.initFallback()
 	}
 

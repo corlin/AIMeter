@@ -1,15 +1,14 @@
 package flywheel
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/google/uuid"
 )
@@ -63,25 +62,8 @@ func (m *FlywheelManager) LoadSeed(filePath string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	paths := []string{filePath, "../" + filePath, "../../" + filePath}
-	var data []byte
-	var err error
-	for _, p := range paths {
-		if content, readErr := os.ReadFile(p); readErr == nil {
-			data = content
-			err = nil
-			break
-		} else {
-			err = readErr
-		}
-	}
-
-	if err != nil || len(data) == 0 {
-		return err
-	}
-
 	var seed FlywheelSeedData
-	if err := json.Unmarshal(data, &seed); err != nil {
+	if err := common.LoadSeedFile(filePath, &seed); err != nil {
 		return err
 	}
 

@@ -26,6 +26,8 @@ import {
   Activity,
   HardDrive
 } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import {
   HeteroGPUNode,
   HeteroResourcePool,
@@ -182,28 +184,28 @@ export default function HeteroPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "online":
-        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">健康运行</span>;
+        return <StatusBadge status="online" label="健康运行" variant="success" />;
       case "high_watermark":
-        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">水线告警 (&gt;85%)</span>;
+        return <StatusBadge status="high_watermark" label="水线告警 (>85%)" variant="warning" />;
       case "draining":
-        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">排空调度</span>;
+        return <StatusBadge status="draining" label="排空调度" variant="purple" />;
       default:
-        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">离线</span>;
+        return <StatusBadge status={status} label="离线" variant="neutral" />;
     }
   };
 
   const getNodeTypeBadge = (nodeType: HeteroNodeType) => {
     switch (nodeType) {
       case "bare_metal_gpu":
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">裸金属专用卡</span>;
+        return <StatusBadge status="bare_metal_gpu" label="裸金属专用卡" variant="info" />;
       case "k8s_vllm_pod":
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">K8s vLLM 实例</span>;
+        return <StatusBadge status="k8s_vllm_pod" label="K8s vLLM 实例" variant="info" />;
       case "edge_ollama":
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">边缘 Ollama 节点</span>;
+        return <StatusBadge status="edge_ollama" label="边缘 Ollama 节点" variant="success" />;
       case "cloud_serverless":
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">Serverless 弹性云池</span>;
+        return <StatusBadge status="cloud_serverless" label="Serverless 弹性云池" variant="purple" />;
       default:
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-800 text-zinc-400">{nodeType}</span>;
+        return <StatusBadge status={nodeType} label={nodeType} variant="neutral" />;
     }
   };
 
@@ -211,43 +213,31 @@ export default function HeteroPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 sm:p-8">
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-zinc-800">
-          <div>
+        <PageHeader
+          title="异构私有 GPU 算力集群与显存虚拟化控制面"
+          badge="Phase 33"
+          badgeColor="cyan"
+          description="混合推理调度 · KV-Cache 显存切片 · 预填充/解码分离 (PD Disaggregation) · 85% 水线弹性云溢出 (Cloud Bursting)"
+          actions={
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                <Server className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                  异构私有 GPU 算力集群与显存虚拟化控制面
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
-                    Phase 33
-                  </span>
-                </h1>
-                <p className="text-sm text-zinc-400 mt-1">
-                  混合推理调度 · KV-Cache 显存切片 · 预填充/解码分离 (PD Disaggregation) · 85% 水线弹性云溢出 (Cloud Bursting)
-                </p>
-              </div>
+              <button
+                onClick={loadData}
+                disabled={loading}
+                className="px-3.5 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-sm font-medium transition flex items-center gap-1.5"
+              >
+                <RotateCcw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                刷新拓扑
+              </button>
+              <button
+                onClick={() => setShowAddNodeModal(true)}
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium shadow-lg shadow-blue-500/20 transition flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                接入 GPU 节点
+              </button>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={loadData}
-              disabled={loading}
-              className="px-3.5 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-sm font-medium transition flex items-center gap-1.5"
-            >
-              <RotateCcw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              刷新拓扑
-            </button>
-            <button
-              onClick={() => setShowAddNodeModal(true)}
-              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium shadow-lg shadow-blue-500/20 transition flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              接入 GPU 节点
-            </button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Macro KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

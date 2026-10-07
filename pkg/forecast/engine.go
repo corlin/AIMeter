@@ -2,15 +2,14 @@ package forecast
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
 	alertPkg "github.com/corlin/AIMeter/pkg/alert"
 	"github.com/corlin/AIMeter/pkg/budget"
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/router"
@@ -79,20 +78,14 @@ func (e *ForecastEngine) loadSeedPolicies() {
 	e.policies["default"] = &defaultPolicy
 
 	// Attempt reading seed configuration
-	seedPaths := []string{"configs/forecast_seed.json", "../configs/forecast_seed.json", "../../configs/forecast_seed.json"}
-	for _, path := range seedPaths {
-		if data, err := os.ReadFile(path); err == nil {
-			var seeds []domain.RemediationPolicy
-			if err := json.Unmarshal(data, &seeds); err == nil {
-				for _, seed := range seeds {
-					s := seed
-					if s.UpdatedAt.IsZero() {
-						s.UpdatedAt = time.Now().UTC()
-					}
-					e.policies[s.TenantID] = &s
-				}
-				break
+	var seeds []domain.RemediationPolicy
+	if err := common.LoadSeedFile("configs/forecast_seed.json", &seeds); err == nil {
+		for _, seed := range seeds {
+			s := seed
+			if s.UpdatedAt.IsZero() {
+				s.UpdatedAt = time.Now().UTC()
 			}
+			e.policies[s.TenantID] = &s
 		}
 	}
 }

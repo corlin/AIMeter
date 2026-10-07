@@ -1,14 +1,13 @@
 package workflow
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -48,16 +47,8 @@ func NewWorkflowManager(seedPath string) *WorkflowManager {
 }
 
 func (m *WorkflowManager) loadSeed(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		data, err = os.ReadFile("../../" + path)
-		if err != nil {
-			return
-		}
-	}
-
 	var seed workflowSeedData
-	if err := json.Unmarshal(data, &seed); err != nil {
+	if err := common.LoadSeedFile(path, &seed); err != nil {
 		return
 	}
 

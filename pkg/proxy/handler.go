@@ -27,6 +27,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/quality"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reasoning"
+	"github.com/corlin/AIMeter/pkg/registry"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
@@ -88,6 +89,7 @@ type OpenAIUsage struct {
 
 // ProxyHandler handles transparent LLM reverse proxy requests
 type ProxyHandler struct {
+	reg              *registry.ControlPlaneRegistry
 	fallbackMgr      *FallbackManager
 	collectorSvc     *collector.IngestionService
 	httpClient       *http.Client

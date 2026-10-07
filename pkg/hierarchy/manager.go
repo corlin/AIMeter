@@ -1,12 +1,11 @@
 package hierarchy
 
 import (
-	"encoding/json"
 	"math"
-	"os"
 	"strings"
 	"sync"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -46,16 +45,8 @@ func NewHierarchyManager(seedPath string) *HierarchyManager {
 }
 
 func (m *HierarchyManager) loadSeed(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		data, err = os.ReadFile("../../" + path)
-		if err != nil {
-			return
-		}
-	}
-
 	var seed hierarchySeedData
-	if err := json.Unmarshal(data, &seed); err != nil {
+	if err := common.LoadSeedFile(path, &seed); err != nil {
 		return
 	}
 

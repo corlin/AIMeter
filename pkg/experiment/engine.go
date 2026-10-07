@@ -7,13 +7,13 @@ import (
 	"hash/fnv"
 	"math"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -45,13 +45,8 @@ func NewEngine(seedPath string) *Engine {
 }
 
 func (e *Engine) loadSeedFile(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
 	var list []domain.Experiment
-	if err := json.Unmarshal(data, &list); err != nil {
+	if err := common.LoadSeedFile(path, &list); err != nil {
 		return err
 	}
 

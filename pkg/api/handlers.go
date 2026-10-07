@@ -29,6 +29,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/reconcile"
+	"github.com/corlin/AIMeter/pkg/registry"
 	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
 	"github.com/corlin/AIMeter/pkg/swarm"
@@ -45,6 +46,7 @@ import (
 )
 
 type APIHandler struct {
+	reg                *registry.ControlPlaneRegistry
 	store              storage.Store
 	postgres           *storage.PostgresClient
 	rater              *rater.RatingEngine
@@ -77,6 +79,41 @@ type APIHandler struct {
 	wafManager         *waf.Manager
 	heteroManager      *hetero.Manager
 	flywheelManager    *flywheel.FlywheelManager
+}
+
+// SetRegistry binds the unified control plane registry to APIHandler
+func (h *APIHandler) SetRegistry(reg *registry.ControlPlaneRegistry) {
+	if reg == nil {
+		return
+	}
+	h.reg = reg
+	h.budgetMgr = reg.BudgetManager
+	h.slaArbiter = reg.SLAArbiter
+	h.cacheMgr = reg.CacheManager
+	h.multimodalEngine = reg.MultimodalEngine
+	h.throttlerEngine = reg.ThrottlerEngine
+	h.forecastEngine = reg.ForecastEngine
+	h.clusterCoordinator = reg.ClusterCoordinator
+	h.experimentEngine = reg.ExperimentEngine
+	h.dlpManager = reg.DLPManager
+	h.swarmManager = reg.SwarmManager
+	h.memoryManager = reg.MemoryManager
+	h.reasoningManager = reg.ReasoningManager
+	h.kvCacheManager = reg.KVCacheManager
+	h.qualityManager = reg.QualityManager
+	h.workflowManager = reg.WorkflowManager
+	h.sandboxManager = reg.SandboxManager
+	h.hierarchyManager = reg.HierarchyManager
+	h.federationManager = reg.FederationManager
+	h.finetuningManager = reg.FineTuningManager
+	h.wafManager = reg.WAFManager
+	h.heteroManager = reg.HeteroManager
+	h.flywheelManager = reg.FlywheelManager
+}
+
+// GetRegistry returns the attached control plane registry
+func (h *APIHandler) GetRegistry() *registry.ControlPlaneRegistry {
+	return h.reg
 }
 
 // SetFlywheelManager attaches a flywheel manager to the API handler

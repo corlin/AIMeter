@@ -1,13 +1,12 @@
 package sandbox
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -50,16 +49,8 @@ func NewSandboxManager(seedPath string) *SandboxManager {
 }
 
 func (m *SandboxManager) loadSeed(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		data, err = os.ReadFile("../../" + path)
-		if err != nil {
-			return
-		}
-	}
-
 	var seed sandboxSeedData
-	if err := json.Unmarshal(data, &seed); err != nil {
+	if err := common.LoadSeedFile(path, &seed); err != nil {
 		return
 	}
 

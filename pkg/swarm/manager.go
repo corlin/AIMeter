@@ -1,13 +1,12 @@
 package swarm
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
@@ -66,12 +65,8 @@ func NewManager(seedPath string) *Manager {
 }
 
 func (m *Manager) loadSeed(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
 	var seeds []domain.SwarmPolicy
-	if err := json.Unmarshal(data, &seeds); err != nil {
+	if err := common.LoadSeedFile(path, &seeds); err != nil {
 		return err
 	}
 	m.mu.Lock()

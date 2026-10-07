@@ -2,15 +2,14 @@ package cluster
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"sync"
 	"time"
 
 	alertPkg "github.com/corlin/AIMeter/pkg/alert"
 	"github.com/corlin/AIMeter/pkg/budget"
+	"github.com/corlin/AIMeter/pkg/common"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/throttler"
 	"github.com/google/uuid"
@@ -81,21 +80,15 @@ func (c *ClusterCoordinator) loadSeedTopology() {
 	c.nodes[selfNode.NodeID] = selfNode
 
 	// Attempt reading seed file
-	seedPaths := []string{"configs/cluster_seed.json", "../configs/cluster_seed.json", "../../configs/cluster_seed.json"}
-	for _, path := range seedPaths {
-		if data, err := os.ReadFile(path); err == nil {
-			var seeds []domain.ClusterNode
-			if err := json.Unmarshal(data, &seeds); err == nil {
-				for _, seed := range seeds {
-					s := seed
-					if s.RegisteredAt.IsZero() {
-						s.RegisteredAt = time.Now().UTC()
-					}
-					s.LastHeartbeatAt = time.Now().UTC()
-					c.nodes[s.NodeID] = &s
-				}
-				break
+	var seeds []domain.ClusterNode
+	if err := common.LoadSeedFile("configs/cluster_seed.json", &seeds); err == nil {
+		for _, seed := range seeds {
+			s := seed
+			if s.RegisteredAt.IsZero() {
+				s.RegisteredAt = time.Now().UTC()
 			}
+			s.LastHeartbeatAt = time.Now().UTC()
+			c.nodes[s.NodeID] = &s
 		}
 	}
 

@@ -12,33 +12,14 @@ import (
 	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/cache"
-	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/collector"
-	"github.com/corlin/AIMeter/pkg/compress"
-	"github.com/corlin/AIMeter/pkg/dlp"
-	"github.com/corlin/AIMeter/pkg/experiment"
-	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
-	"github.com/corlin/AIMeter/pkg/kvcache"
-	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
-	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/proxy"
-	"github.com/corlin/AIMeter/pkg/quality"
 	"github.com/corlin/AIMeter/pkg/rater"
-	"github.com/corlin/AIMeter/pkg/reasoning"
+	"github.com/corlin/AIMeter/pkg/registry"
 	aimeterRouter "github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
-	"github.com/corlin/AIMeter/pkg/swarm"
-	"github.com/corlin/AIMeter/pkg/throttler"
-	"github.com/corlin/AIMeter/pkg/workflow"
-	"github.com/corlin/AIMeter/pkg/sandbox"
-	"github.com/corlin/AIMeter/pkg/hierarchy"
-	"github.com/corlin/AIMeter/pkg/federation"
-	"github.com/corlin/AIMeter/pkg/finetuning"
-	"github.com/corlin/AIMeter/pkg/waf"
-	"github.com/corlin/AIMeter/pkg/hetero"
-	"github.com/corlin/AIMeter/pkg/flywheel"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -180,69 +161,11 @@ func NewServer(
 	// Phase 7: Smart Reverse Proxy Endpoints (Protected by proxy:invoke scope)
 	fbMgr := proxy.NewFallbackManager(guardSvc, nil)
 	proxyHandler := proxy.NewProxyHandler(fbMgr, collectorSvc, nil)
-	proxyHandler.SetBudgetManager(budgetMgr)
-	proxyHandler.SetSLAArbiter(slaArbiter)
-	proxyHandler.SetCacheManager(cacheMgr)
-	proxyHandler.SetRaterEngine(r)
-	mmEngine := multimodal.NewMultimodalEngine()
-	proxyHandler.SetMultimodalEngine(mmEngine)
-	handler.SetMultimodalEngine(mmEngine)
-	throttlerEngine := throttler.NewThrottlerEngine()
-	proxyHandler.SetThrottlerEngine(throttlerEngine)
-	handler.SetThrottlerEngine(throttlerEngine)
-	compressEngine := compress.NewEngine()
-	proxyHandler.SetCompressEngine(compressEngine)
-	forecastEngine := forecast.NewForecastEngine(store, budgetMgr, compressEngine, slaArbiter, throttlerEngine, handler.alertDispatcher)
-	proxyHandler.SetForecastEngine(forecastEngine)
-	handler.SetForecastEngine(forecastEngine)
-	clusterCoordinator := cluster.NewClusterCoordinator("hub-primary", "us-east-1", true, throttlerEngine, budgetMgr, handler.alertDispatcher)
-	handler.SetClusterCoordinator(clusterCoordinator)
-	proxyHandler.SetClusterCoordinator(clusterCoordinator)
-	experimentEngine := experiment.NewEngine("configs/experiments_seed.json")
-	handler.SetExperimentEngine(experimentEngine)
-	proxyHandler.SetExperimentEngine(experimentEngine)
-	dlpManager := dlp.NewManager("configs/dlp_seed.json")
-	handler.SetDLPManager(dlpManager)
-	proxyHandler.SetDLPManager(dlpManager)
-	swarmManager := swarm.NewManager("configs/swarm_seed.json")
-	handler.SetSwarmManager(swarmManager)
-	proxyHandler.SetSwarmManager(swarmManager)
-	memoryManager, _ := memory.NewMemoryManager("configs/memory_seed.json")
-	handler.SetMemoryManager(memoryManager)
-	proxyHandler.SetMemoryManager(memoryManager)
-	reasoningManager := reasoning.NewReasoningManager("configs/reasoning_seed.json")
-	handler.SetReasoningManager(reasoningManager)
-	proxyHandler.SetReasoningManager(reasoningManager)
-	kvCacheManager := kvcache.NewManager("configs/kvcache_seed.json")
-	handler.SetKVCacheManager(kvCacheManager)
-	proxyHandler.SetKVCacheManager(kvCacheManager)
-	qualityManager := quality.NewQualityManager("configs/quality_seed.json")
-	handler.SetQualityManager(qualityManager)
-	proxyHandler.SetQualityManager(qualityManager)
-	workflowManager := workflow.NewWorkflowManager("configs/workflow_seed.json")
-	handler.SetWorkflowManager(workflowManager)
-	proxyHandler.SetWorkflowManager(workflowManager)
-	sandboxManager := sandbox.NewSandboxManager("configs/sandbox_seed.json")
-	handler.SetSandboxManager(sandboxManager)
-	proxyHandler.SetSandboxManager(sandboxManager)
-	hierarchyManager := hierarchy.NewHierarchyManager("configs/hierarchy_seed.json")
-	handler.SetHierarchyManager(hierarchyManager)
-	proxyHandler.SetHierarchyManager(hierarchyManager)
-	federationManager := federation.NewFederationManager("configs/federation_seed.json")
-	handler.SetFederationManager(federationManager)
-	proxyHandler.SetFederationManager(federationManager)
-	finetuningManager := finetuning.NewManager("configs/finetuning_seed.json")
-	handler.SetFineTuningManager(finetuningManager)
-	proxyHandler.SetFineTuningManager(finetuningManager)
-	wafManager := waf.NewManager("configs/waf_seed.json")
-	handler.SetWAFManager(wafManager)
-	proxyHandler.SetWAFManager(wafManager)
-	heteroManager := hetero.NewManager("configs/hetero_seed.json")
-	handler.SetHeteroManager(heteroManager)
-	proxyHandler.SetHeteroManager(heteroManager)
-	flywheelManager, _ := flywheel.NewFlywheelManager("configs/flywheel_seed.json")
-	handler.SetFlywheelManager(flywheelManager)
-	proxyHandler.SetFlywheelManager(flywheelManager)
+
+	// Unified Control Plane Registry: instantiate and wire all 24 domain engines and managers in one line
+	reg := registry.NewDefaultRegistry(store, r, budgetMgr, handler.alertDispatcher, slaArbiter, cacheMgr)
+	handler.SetRegistry(reg)
+	proxyHandler.SetRegistry(reg)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 

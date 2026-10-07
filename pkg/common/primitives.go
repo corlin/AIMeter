@@ -6,9 +6,9 @@ import (
 	"sync"
 )
 
-// LoadSeedFile attempts to locate and deserialize a JSON seed file by searching
+// ReadSeedBytes attempts to locate and read the raw bytes of a configuration or seed file
 // across multiple candidate directory depths (current, ../, ../../, ../../../).
-func LoadSeedFile[T any](relativePath string, target *T) error {
+func ReadSeedBytes(relativePath string) ([]byte, error) {
 	candidates := []string{
 		relativePath,
 		"../" + relativePath,
@@ -19,10 +19,20 @@ func LoadSeedFile[T any](relativePath string, target *T) error {
 	for _, path := range candidates {
 		data, err := os.ReadFile(path)
 		if err == nil {
-			return json.Unmarshal(data, target)
+			return data, nil
 		}
 	}
-	return os.ErrNotExist
+	return nil, os.ErrNotExist
+}
+
+// LoadSeedFile attempts to locate and deserialize a JSON seed file by searching
+// across multiple candidate directory depths (current, ../, ../../, ../../../).
+func LoadSeedFile[T any](relativePath string, target *T) error {
+	data, err := ReadSeedBytes(relativePath)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, target)
 }
 
 // RingBuffer is a thread-safe circular buffer that keeps the most recent N items.
