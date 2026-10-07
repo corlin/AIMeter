@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
+import { TabBar } from "@/components/TabBar";
 import {
   fetchSwarmTopologies,
   fetchSwarmTopology,
@@ -465,52 +466,16 @@ export default function SwarmPage() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-zinc-800 space-x-1 sm:space-x-2">
-        <button
-          onClick={() => setActiveTab("topology")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-            activeTab === "topology"
-              ? "border-indigo-500 text-indigo-400"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Share2 className="h-4 w-4" />
-          协作拓扑图谱与归因
-        </button>
-        <button
-          onClick={() => setActiveTab("timeline")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-            activeTab === "timeline"
-              ? "border-indigo-500 text-indigo-400"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Activity className="h-4 w-4" />
-          状态机时序流水与审计 ({loops.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("policy")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-            activeTab === "policy"
-              ? "border-indigo-500 text-indigo-400"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Sliders className="h-4 w-4" />
-          死循环防卫策略
-        </button>
-        <button
-          onClick={() => setActiveTab("playground")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-            activeTab === "playground"
-              ? "border-indigo-500 text-indigo-400"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Play className="h-4 w-4" />
-          死循环演练沙箱
-        </button>
-      </div>
+      <TabBar
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: "topology", label: "协作拓扑图谱与归因", icon: <Share2 className="h-4 w-4" /> },
+          { id: "timeline", label: "状态机时序流水与审计", icon: <Activity className="h-4 w-4" />, badge: loops.length },
+          { id: "policy", label: "死循环防卫策略", icon: <Sliders className="h-4 w-4" /> },
+          { id: "playground", label: "死循环演练沙箱", icon: <Play className="h-4 w-4" /> },
+        ]}
+      />
 
       {/* Tab 1: Topology Graph & Cost Attribution */}
       {activeTab === "topology" && (

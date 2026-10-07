@@ -21,9 +21,10 @@ import {
   Check,
   ChevronRight,
   Database,
-  KeyRound
+  KeyRound,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
+import { TabBar } from "@/components/TabBar";
 import {
   fetchWorkflowStats,
   fetchWorkflowInstances,
@@ -283,41 +284,15 @@ export default function WorkflowsPage() {
       </div>
 
       {/* 3. Tab Navigation */}
-      <div className="flex border-b border-zinc-800 gap-6">
-        <button
-          onClick={() => setActiveTab("dag")}
-          className={`pb-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            activeTab === "dag"
-              ? "border-indigo-500 text-indigo-400 font-semibold"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <GitFork className="w-4 h-4" />
-          DAG 拓扑执行与检查点图谱
-        </button>
-        <button
-          onClick={() => setActiveTab("instances")}
-          className={`pb-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            activeTab === "instances"
-              ? "border-indigo-500 text-indigo-400 font-semibold"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          工作流实例审计 ({instances.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("sandbox")}
-          className={`pb-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            activeTab === "sandbox"
-              ? "border-indigo-500 text-indigo-400 font-semibold"
-              : "border-transparent text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          断点续算对比推演沙箱
-        </button>
-      </div>
+      <TabBar
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: "dag", label: "DAG 拓扑执行与检查点图谱", icon: <GitFork className="w-4 h-4" /> },
+          { id: "instances", label: "工作流实例审计", icon: <Activity className="w-4 h-4" />, badge: instances.length },
+          { id: "sandbox", label: "断点续算对比推演沙箱", icon: <Sliders className="w-4 h-4" /> },
+        ]}
+      />
 
       {/* 4. Tab 1: DAG 拓扑执行与检查点图谱 */}
       {activeTab === "dag" && (
