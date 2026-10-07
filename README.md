@@ -308,6 +308,13 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **反向代理网关零损耗全息响应头透传**：请求出站自动透传 `X-AIMeter-Compute-Node`、`X-AIMeter-VRAM-Util`、`X-AIMeter-Burst-Status`、`X-AIMeter-MFU-Score` 与 `X-AIMeter-Hybrid-Saved-USD`，异步记录审计流水。
 * **全生命周期异构算力看板与冲击沙箱**：全新一级看板 `/hetero`（4 维核心宏观 KPI、私有 GPU 节点拓扑与三段式显存切片、自适应水线与 PD 分离策略池、实时四轨物理成本审计流水表、在线调度试算器与多租户高并发冲击推演沙箱）。
 
+### 35. 合成数据生成飞轮、数据质量效价评估与 RLHF / DPO 强化学习对齐成本引擎 (Synthetic Data Flywheel & Alignment Cost Engine - Phase 34)
+* **拒绝采样与合成经济学核算模型 (`pkg/flywheel/dataset.go`)**：全面量化生成模型 Token 开销与评审模型验证开销，精确核算因质量未达标遭淘汰样本的“拒绝采样沉没开销（Rejected Sunk Cost）”，计算单对有效偏好对生产成本（Cost Per Valid Pair）。
+* **非线性信息增益效价与公允价值替代模型 (`pkg/flywheel/valuation.go`)**：自适应支持 10 分/1 分制评分归一化；基于正弦钟形曲线对偏好 Reward Margin $\Delta r$ 进行非线性信息增益价值赋权（中间高差值 $\Delta r \approx 0.5$ 时最具黄金价值，极大极小差值边际收益递减），结合人工标注替代单价评估公允价值（Fair Value USD）与飞轮资产 ROI。
+* **解耦式 DPO / PPO 显存峰值与 GPU 梯度更新开销 (`pkg/flywheel/alignment.go`)**：解耦 DPO 双模型（Policy + 冻结 Reference）与 PPO 四模型（Actor + Critic + Reward + Reference）显存占用峰值计算与 GPU 梯度更新卡时开销，支持 LoRA 降显存与 Zero-3 显存优化参数推演。
+* **线上自适应采收与代理网关全息审计透传 (`pkg/proxy/handler.go`)**：网关在非流式与流式请求完成后异步自适应执行偏好采收判定，无感透传 `X-AIMeter-Flywheel-Status`、`X-AIMeter-Flywheel-Dataset`、`X-AIMeter-Flywheel-Margin` 与 `X-AIMeter-Flywheel-Value-USD`。
+* **全生命周期飞轮控制看板与推训一体化沙箱**：全新一级看板 `/flywheel`（4 维宏观核心 KPI + 4 大深度功能 Tab：合成批次效价、DPO/PPO 训练任务管理、线上自适应采收流水、以及推训一体化回本推演沙箱）。
+
 ---
 
 ## 🖥️ Web 控制台功能看板
@@ -315,6 +322,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 | 路由 | 页面功能 | 核心指标与交互 |
 | :--- | :--- | :--- |
 | `/` | **Overview 全局大盘** | 总花费、Token 总量、缓存命中率、按模型/Agent 分布与消耗趋势 |
+| `/flywheel` | **合成数据飞轮、质量效价与 RLHF/DPO 对齐中心** | 4 维宏观 KPI（合成样本池总量与生成总成本、有效产出率与拒绝采样沉没开销、公允价值与综合收益 ROI、线上自适应采收率）、批次效价核算与偏好对标注卡片、DPO/PPO 训练开销与双/四模型显存峰值评估、线上对话自适应采收流水、以及推训一体化沙箱推演与回本周期测算 |
 | `/hetero` | **异构 GPU 算力集群与显存虚拟化控制中心** | 4 维宏观 KPI（活跃 GPU 节点与总显存容量、平均显存利用率与 85% 水线监控、综合算力效能 MFU/MBU 评分、公有云等效替代节省与弹性溢出率）、私有 GPU 节点拓扑卡片与三段式显存切片柱状图、自适应水线与预填充/解码分离策略池管理、实时四轨物理成本审计流水表（驻留/首字/解码）、在线调度决策试算器与多租户高并发冲击推演沙箱 |
 | `/waf` | **AI WAF 提示词防火墙与拒绝钱包防御中心** | 4 维宏观 KPI（入站前置安全预检量、成功阻断恶意刺探数、规避算力盗刷资损金额、自适应黑名单封禁数）、实时威胁拦截审计表（带样本审查抽屉）、动态黑名单治理与一键解封、防护规则库卡片管理（含新建特征规则弹窗）、多轮红蓝攻防推演与单次 Prompt 脆弱性即时探针沙箱 |
 | `/finetuning` | **模型微调、知识蒸馏与 LoRA 资产记账中心** | 4 维宏观 KPI（总 CapEx 投入、纳管 LoRA 数、累计推理净省、综合 ROI）、LoRA 资产矩阵与回收进度条、微调任务流水表、推训一体化 ROI 飞轮推演沙箱与新建任务/注册资产弹窗 |
@@ -497,6 +505,7 @@ AIMeter/
 │   ├── config/              # 配置加载器与环境变量注入
 │   ├── domain/              # 核心领域模型与数据结构
 │   ├── focus/               # FinOps FOCUS 1.0/1.1 标准导出器
+│   ├── flywheel/            # 合成数据生成飞轮、数据质量效价与 RLHF/DPO 对齐成本引擎 (Phase 34)
 │   ├── guard/               # 闭环防护与三态熔断器核心引擎
 │   ├── kvcache/             # 提示词前缀共享编排、Radix树拓扑、变量沉底与预热调度引擎 (Phase 25)
 │   ├── memory/              # Agent 记忆生命周期、长期上下文向量检索归因与冷热压缩归档引擎 (Phase 23)

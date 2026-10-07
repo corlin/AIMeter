@@ -1149,6 +1149,41 @@ AIMeter/
   * 前端全量构建 `npm run build` 100% 成功（34/34 静态页面编译零报错）；
   * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
 
+### Phase 34: 合成数据生成飞轮、数据质量效价评估与 RLHF / DPO 强化学习对齐成本引擎 (Synthetic Data Flywheel, Quality-to-Cost Valuation & RLHF/DPO Preference Alignment Cost Engine)
+* [x] **领域模型与种子数据体系（`pkg/domain/models.go` & `configs/flywheel_seed.json`）**：
+  * 定义核心数据结构：`FlywheelDataCategory`（`reasoning_math`, `code_repair`, `multi_turn_chat`, `safety_alignment`, `agentic_trace`）、`FlywheelAlignmentAlgorithm`（`dpo`, `ppo`, `kto`）、`FlywheelHarvestStatus`（`candidate_pooled`, `scored_accepted`, `scored_rejected`, `discarded`）、`FlywheelPreferencePair`（偏好对 ID、数据集 ID、Prompt、Chosen/Rejected 文本、打分、Margin Delta $\Delta r$、教师模型、候选倍率、创建时间）、`FlywheelDatasetBatch`（批次 ID、名称、类别、教师模型、生成候选数、入库对数、采纳率、生成开销、拒绝沉没成本、总批次成本、单对成本、平均 $\Delta r$、状态）、`FlywheelAlignmentJob`（作业 ID、算法、目标/参考模型、GPU 规格与卡数、总卡时、峰值显存、步进成本、总费用、最终 Loss、奖励增益）、`FlywheelUsageTrace`、`FlywheelStatsSummary`、`FlywheelHarvestRequest`、`FlywheelHarvestResponse`、`FlywheelSimulateTurn`、`FlywheelSimulateRequest` 与 `FlywheelSimulateResponse`；
+  * 预置种子配置：`configs/flywheel_seed.json` 包含 3 大典型偏好批次（DeepSeek-R1 数学推理、Code-DPO 代码修复、General-Chat 通用意图）、2 组高差值黄金偏好样本、2 个典型对齐训练任务（Qwen14B DPO vs Llama8B PPO）与 5 条线上采收流水。
+* [x] **纯 Go 高性能推训一体化与效价评估核心引擎（`pkg/flywheel/`）**：
+  * **批次经济学计算（`dataset.go`）**：精准核算强教师模型蒸馏 Token 开销、拒绝采样舍弃沉没开销、LLM-as-a-Judge 评测费与单对有效生产成本；
+  * **质量效价与信息增益评估（`valuation.go`）**：构建基于高斯/正弦钟形曲线的奖励差值信息增益模型，评估黄金梯度引导区间，量化偏好对替代顶级人工标注的公允公允价值；
+  * **DPO vs PPO 强化学习成本核算（`alignment.go`）**：解耦 DPO 双模型（Policy + 冻结 Ref）与 PPO 四模型（Actor + Critic + RM + Ref）显存占用峰值计算与 GPU 梯度更新卡时开销；
+  * **生命周期纳管、自适应采收与推演沙箱（`manager.go`）**：提供并发安全批次/任务/偏好对管理，200 条环形流水的生产对话自适应采收判定（`HarvestOnlineTraffic`），以及全流程推训一体化 ROI 沙箱推演（`SimulateFlywheel`）。
+* [x] **控制面 REST API 与代理网关全链路贯通（`pkg/api/` & `pkg/proxy/`）**：
+  * 暴露 10 大标准 REST 控制端点：
+    * `GET /api/v1/flywheel/stats`（宏观合成批次、拒绝沉没损耗、对齐 CapEx 与综合 ROI 大盘）
+    * `GET /api/v1/flywheel/datasets`（合成偏好批次列表）
+    * `POST /api/v1/flywheel/datasets`（新建批次并自动核算经济学）
+    * `GET /api/v1/flywheel/datasets/:id`（获取单个批次详情）
+    * `GET /api/v1/flywheel/datasets/:id/pairs`（获取批次关联偏好对样本）
+    * `GET /api/v1/flywheel/jobs`（RLHF / DPO 对齐训练作业列表）
+    * `POST /api/v1/flywheel/jobs`（发起训练作业并核算显存/卡时）
+    * `POST /api/v1/flywheel/harvest`（单次线上对话效价打分与采收测试探针）
+    * `GET /api/v1/flywheel/traces`（线上采收审计流水列表）
+    * `POST /api/v1/flywheel/simulate`（推训一体化全流程 What-If 蒙特卡洛沙箱）
+  * 反向代理网关双向协同与全息响应标头：
+    * **入站嗅探感知**：网关嗅探 `X-AIMeter-Flywheel-Harvest` 与 `X-AIMeter-Flywheel-Dataset` 标头；
+    * **出站异步采收与全息标头透传**：响应完成后非阻塞异步调用 `HarvestOnlineTraffic`，自适应回流高分样本，透传全息响应标头：`X-AIMeter-Flywheel-Status`、`X-AIMeter-Flywheel-Dataset`、`X-AIMeter-Flywheel-Margin`、`X-AIMeter-Flywheel-Value-USD`。
+* [x] **Web 控制台全新一级看板 `/flywheel`（`web/src/app/flywheel/`）**：
+  * **4 维宏观核心 KPI 卡片**：合成生成总量与入库采纳率、蒸馏与拒绝采样沉没开销、DPO/PPO 训练 CapEx 与活跃任务数、线上推理替代节省与飞轮综合 ROI；
+  * **合成批次与拒绝采样效价看板 (Datasets)**：表格化展示各批次生成量、入库对数、采纳率进度条、沉没开销与单对成本，支持查看黄金偏好对 Margin Delta $\Delta r$ 详情与快速新建批次；
+  * **DPO vs PPO 对齐训练看板 (Alignment Training)**：直观对比 Policy/Ref 双模型与四模型全状态机显存峰值拓扑，展示 GPU 卡时、步进成本与最终 Reward 增益；
+  * **线上流量自适应采收流水看板 (Harvest Stream)**：展示 200 条最新采收审计流水，集成在线对话自适应效价打分与采收测试器；
+  * **推训一体化沙箱推演 (Simulation Sandbox)**：调节种子规模、候选倍率 $N$、对齐算法、模型参数量与月均调用量，动态展现全流程 4 阶段现金流分解、回本周期与架构师选型建议。
+* [x] **严格全量质量门禁 100% 通过**：
+  * 后端全量测试 `go test -v -count=1 -race ./...` 100% 通过（0 race 警告）；
+  * 前端全量构建 `npm run build` 100% 成功（35/35 静态页面编译零报错）；
+  * 客户端 SDK `pytest -v sdks/python/tests` 13/13 100% 通过。
+
 ---
 
 

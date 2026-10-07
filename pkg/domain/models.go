@@ -3031,6 +3031,177 @@ type HeteroSimulateResponse struct {
 	ArchitectureRecommendations []string             `json:"architecture_recommendations"`
 }
 
+// =========================================================================
+// Phase 34: Synthetic Data Flywheel, Quality-to-Cost Valuation
+// & RLHF/DPO Preference Alignment Cost Engine
+// =========================================================================
+
+type FlywheelDataCategory string
+
+const (
+	FlywheelCategoryMathReasoning FlywheelDataCategory = "reasoning_math"
+	FlywheelCategoryCodeRepair    FlywheelDataCategory = "code_repair"
+	FlywheelCategoryMultiTurnChat FlywheelDataCategory = "multi_turn_chat"
+	FlywheelCategorySafetyAlign   FlywheelDataCategory = "safety_alignment"
+	FlywheelCategoryMath          FlywheelDataCategory = "reasoning_math"
+	FlywheelCategoryCoding        FlywheelDataCategory = "code_repair"
+	FlywheelCategoryAgentic       FlywheelDataCategory = "agentic_trace"
+	FlywheelCategoryChat          FlywheelDataCategory = "multi_turn_chat"
+)
+
+type FlywheelAlignmentAlgorithm string
+
+const (
+	FlywheelAlgoDPO FlywheelAlignmentAlgorithm = "dpo" // Direct Preference Optimization
+	FlywheelAlgoPPO FlywheelAlignmentAlgorithm = "ppo" // Proximal Policy Optimization
+	FlywheelAlgoKTO FlywheelAlignmentAlgorithm = "kto" // Kahneman-Tversky Optimization
+)
+
+type FlywheelHarvestStatus string
+
+const (
+	FlywheelStatusCandidatePooled FlywheelHarvestStatus = "candidate_pooled"
+	FlywheelStatusScoredAccepted  FlywheelHarvestStatus = "scored_accepted"
+	FlywheelStatusScoredRejected  FlywheelHarvestStatus = "scored_rejected"
+	FlywheelStatusDiscarded       FlywheelHarvestStatus = "discarded"
+	FlywheelStatusAccepted        FlywheelHarvestStatus = "scored_accepted"
+)
+
+// FlywheelPreferencePair represents a verified preference pair
+type FlywheelPreferencePair struct {
+	ID                 string    `json:"id"`
+	DatasetID          string    `json:"dataset_id"`
+	Prompt             string    `json:"prompt"`
+	ChosenCompletion   string    `json:"chosen_completion"`
+	RejectedCompletion string    `json:"rejected_completion"`
+	ChosenScore        float64   `json:"chosen_score"`
+	RejectedScore      float64   `json:"rejected_score"`
+	MarginDelta        float64   `json:"margin_delta"` // ChosenScore - RejectedScore
+	TeacherModel       string    `json:"teacher_model"`
+	CandidateCount     int       `json:"candidate_count"` // e.g. 4 or 8
+	CreatedAt          time.Time `json:"created_at"`
+}
+
+// FlywheelDatasetBatch aggregates synthetic preference generation & rejection sampling yield
+type FlywheelDatasetBatch struct {
+	ID                       string               `json:"id"`
+	Name                     string               `json:"name"`
+	Category                 FlywheelDataCategory `json:"category"`
+	TeacherModel             string               `json:"teacher_model"`
+	TotalGeneratedCandidates int                  `json:"total_generated_candidates"`
+	AcceptedPairsCount       int                  `json:"accepted_pairs_count"`
+	AcceptanceRatePercent    float64              `json:"acceptance_rate_percent"`
+	GenerationCostUSD        float64              `json:"generation_cost_usd"`
+	SunkRejectionCostUSD     float64              `json:"sunk_rejection_cost_usd"`
+	TotalDatasetCostUSD      float64              `json:"total_dataset_cost_usd"`
+	CostPerValidPairUSD      float64              `json:"cost_per_valid_pair_usd"`
+	AvgMarginDelta           float64              `json:"avg_margin_delta"`
+	Status                   string               `json:"status"` // "ready", "generating", "archived"
+	CreatedAt                time.Time            `json:"created_at"`
+}
+
+// FlywheelAlignmentJob models a DPO or PPO RLHF alignment training execution
+type FlywheelAlignmentJob struct {
+	ID                  string                     `json:"id"`
+	Name                string                     `json:"name"`
+	DatasetID           string                     `json:"dataset_id"`
+	TargetModel         string                     `json:"target_model"`
+	ReferenceModel      string                     `json:"reference_model"`
+	Algorithm           FlywheelAlignmentAlgorithm `json:"algorithm"` // "dpo" or "ppo"
+	GPUModel            string                     `json:"gpu_model"` // e.g. "NVIDIA H100 SXM5"
+	GPUCount            int                        `json:"gpu_count"`
+	TotalGPUHours       float64                    `json:"total_gpu_hours"`
+	PeakVRAMGB          float64                    `json:"peak_vram_gb"`
+	GradientStepCostUSD float64                    `json:"gradient_step_cost_usd"`
+	TotalJobCostUSD     float64                    `json:"total_job_cost_usd"`
+	FinalLoss           float64                    `json:"final_loss"`
+	RewardMarginGain    float64                    `json:"reward_margin_gain"`
+	Status              string                     `json:"status"` // "completed", "running", "failed"
+	CreatedAt           time.Time                  `json:"created_at"`
+}
+
+// FlywheelUsageTrace tracks an online inference query harvested or served by aligned model
+type FlywheelUsageTrace struct {
+	ID            string                `json:"id"`
+	TraceID       string                `json:"trace_id"`
+	TenantID      string                `json:"tenant_id"`
+	Prompt        string                `json:"prompt"`
+	Completion    string                `json:"completion"`
+	Harvested     bool                  `json:"harvested"`
+	HarvestStatus FlywheelHarvestStatus `json:"harvest_status"`
+	DatasetID     string                `json:"dataset_id,omitempty"`
+	PairValueUSD  float64               `json:"pair_value_usd"`
+	ModelVersion  string                `json:"model_version"` // e.g. "dpo-aligned-v2"
+	Timestamp     time.Time             `json:"timestamp"`
+}
+
+// FlywheelStatsSummary aggregates macroeconomic KPIs for the synthetic data flywheel
+type FlywheelStatsSummary struct {
+	TotalGeneratedCandidates  int     `json:"total_generated_candidates"`
+	TotalAcceptedPairs        int     `json:"total_accepted_pairs"`
+	AvgAcceptanceRatePercent  float64 `json:"avg_acceptance_rate_percent"`
+	TotalGenerationCostUSD    float64 `json:"total_generation_cost_usd"`
+	TotalSunkRejectionCostUSD float64 `json:"total_sunk_rejection_cost_usd"`
+	TotalAlignmentCapExUSD    float64 `json:"total_alignment_capex_usd"`
+	TotalOnlineInvocations    int64   `json:"total_online_invocations"`
+	TotalInferenceSavingsUSD  float64 `json:"total_inference_savings_usd"`
+	OverallFlywheelROIPercent float64 `json:"overall_flywheel_roi_percent"`
+	ActiveJobsCount           int     `json:"active_jobs_count"`
+}
+
+// FlywheelHarvestRequest evaluates an online input/output pair for flywheel storage
+type FlywheelHarvestRequest struct {
+	TenantID        string `json:"tenant_id,omitempty"`
+	Prompt          string `json:"prompt"`
+	Completion      string `json:"completion"`
+	TeacherModel    string `json:"teacher_model,omitempty"`
+	TargetDatasetID string `json:"target_dataset_id,omitempty"`
+}
+
+// FlywheelHarvestResponse returns candidate quality score and decision
+type FlywheelHarvestResponse struct {
+	Harvested             bool                  `json:"harvested"`
+	HarvestStatus         FlywheelHarvestStatus `json:"harvest_status"`
+	QualityScore          float64               `json:"quality_score"`
+	MarginDelta           float64               `json:"margin_delta"`
+	EstimatedPairValueUSD float64               `json:"estimated_pair_value_usd"`
+	DatasetID             string                `json:"dataset_id"`
+	Detail                string                `json:"detail"`
+}
+
+// FlywheelSimulateTurn records a step in multi-stage flywheel ROI simulation
+type FlywheelSimulateTurn struct {
+	StageName             string  `json:"stage_name"` // "Data Synthesis", "Rejection Filtering", "Alignment Training", "Online Serving"
+	MonthlySpendUSD       float64 `json:"monthly_spend_usd"`
+	MonthlySavingsUSD     float64 `json:"monthly_savings_usd"`
+	NetCumulativeAlphaUSD float64 `json:"net_cumulative_alpha_usd"`
+	MetricDetail          string  `json:"metric_detail"`
+}
+
+// FlywheelSimulateRequest configures What-If data flywheel simulation
+type FlywheelSimulateRequest struct {
+	SeedPromptScale          int                        `json:"seed_prompt_scale"` // e.g. 10000
+	CandidateMultiplier      int                        `json:"candidate_multiplier"` // e.g. 4 or 8
+	Algorithm                FlywheelAlignmentAlgorithm `json:"algorithm"` // dpo or ppo
+	TargetModelSize          string                     `json:"target_model_size"` // "7b", "14b", "70b"
+	MonthlyOnlineInvocations int                        `json:"monthly_online_invocations"` // e.g. 500000
+}
+
+// FlywheelSimulateResponse outputs full lifecycle ROI and recommendations
+type FlywheelSimulateResponse struct {
+	TotalSynthesisCostUSD      float64                `json:"total_synthesis_cost_usd"`
+	TotalSunkRejectionUSD      float64                `json:"total_sunk_rejection_usd"`
+	TotalAlignmentCapExUSD     float64                `json:"total_alignment_capex_usd"`
+	TotalInitialInvestmentUSD  float64                `json:"total_initial_investment_usd"`
+	MonthlyInferenceSavingsUSD float64                `json:"monthly_inference_savings_usd"`
+	BreakEvenMonths            float64                `json:"break_even_months"`
+	FirstYearNetAlphaUSD       float64                `json:"first_year_net_alpha_usd"`
+	FlywheelROIPercent         float64                `json:"flywheel_roi_percent"`
+	Stages                     []FlywheelSimulateTurn `json:"stages"`
+	ArchitectureAdvice         []string               `json:"architecture_advice"`
+}
+
+
 
 
 

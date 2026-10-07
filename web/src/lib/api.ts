@@ -166,6 +166,15 @@ import {
   HeteroDispatchResponse,
   HeteroSimulateRequest,
   HeteroSimulateResponse,
+  FlywheelDatasetBatch,
+  FlywheelPreferencePair,
+  FlywheelAlignmentJob,
+  FlywheelUsageTrace,
+  FlywheelStatsSummary,
+  FlywheelHarvestRequest,
+  FlywheelHarvestResponse,
+  FlywheelSimulateRequest,
+  FlywheelSimulateResponse,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
@@ -2538,6 +2547,140 @@ export async function simulateHeteroSandbox(req: HeteroSimulateRequest): Promise
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Failed to run simulation" }));
     throw new Error(err.error || "Failed to run simulation");
+  }
+  return await res.json();
+}
+
+// ==========================================
+// Phase 34: Synthetic Data Flywheel, Quality Valuation & RLHF/DPO Cost Engine
+// ==========================================
+
+export async function fetchFlywheelStats(): Promise<FlywheelStatsSummary> {
+  try {
+    const res = await fetch(`${API_BASE}/flywheel/stats`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch flywheel stats");
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchFlywheelStats failed:", err);
+    return {
+      total_generated_candidates: 13000,
+      total_accepted_pairs: 2300,
+      avg_acceptance_rate_percent: 17.69,
+      total_generation_cost_usd: 55.30,
+      total_sunk_rejection_cost_usd: 44.82,
+      total_alignment_capex_usd: 916.00,
+      total_online_invocations: 5,
+      total_inference_savings_usd: 28750.13,
+      overall_flywheel_roi_percent: 2859.91,
+      active_jobs_count: 0,
+    };
+  }
+}
+
+export async function fetchFlywheelDatasets(): Promise<FlywheelDatasetBatch[]> {
+  try {
+    const res = await fetch(`${API_BASE}/flywheel/datasets`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch flywheel datasets");
+    const data = await res.json();
+    return Array.isArray(data.datasets) ? data.datasets : [];
+  } catch (err) {
+    console.warn("fetchFlywheelDatasets failed:", err);
+    return [];
+  }
+}
+
+export async function createFlywheelDataset(batch: Partial<FlywheelDatasetBatch>): Promise<FlywheelDatasetBatch> {
+  const res = await fetch(`${API_BASE}/flywheel/datasets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(batch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create dataset batch" }));
+    throw new Error(err.error || "Failed to create dataset batch");
+  }
+  return await res.json();
+}
+
+export async function fetchFlywheelDataset(id: string): Promise<FlywheelDatasetBatch> {
+  const res = await fetch(`${API_BASE}/flywheel/datasets/${encodeURIComponent(id)}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch dataset batch: ${id}`);
+  }
+  return await res.json();
+}
+
+export async function fetchFlywheelPairs(datasetId: string): Promise<FlywheelPreferencePair[]> {
+  try {
+    const res = await fetch(`${API_BASE}/flywheel/datasets/${encodeURIComponent(datasetId)}/pairs`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch preference pairs");
+    const data = await res.json();
+    return Array.isArray(data.pairs) ? data.pairs : [];
+  } catch (err) {
+    console.warn("fetchFlywheelPairs failed:", err);
+    return [];
+  }
+}
+
+export async function fetchFlywheelJobs(): Promise<FlywheelAlignmentJob[]> {
+  try {
+    const res = await fetch(`${API_BASE}/flywheel/jobs`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch flywheel jobs");
+    const data = await res.json();
+    return Array.isArray(data.jobs) ? data.jobs : [];
+  } catch (err) {
+    console.warn("fetchFlywheelJobs failed:", err);
+    return [];
+  }
+}
+
+export async function createFlywheelJob(job: Partial<FlywheelAlignmentJob>): Promise<FlywheelAlignmentJob> {
+  const res = await fetch(`${API_BASE}/flywheel/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(job),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to create alignment job" }));
+    throw new Error(err.error || "Failed to create alignment job");
+  }
+  return await res.json();
+}
+
+export async function harvestFlywheelTraffic(req: FlywheelHarvestRequest): Promise<FlywheelHarvestResponse> {
+  const res = await fetch(`${API_BASE}/flywheel/harvest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to harvest online traffic" }));
+    throw new Error(err.error || "Failed to harvest online traffic");
+  }
+  return await res.json();
+}
+
+export async function fetchFlywheelTraces(limit = 50): Promise<FlywheelUsageTrace[]> {
+  try {
+    const res = await fetch(`${API_BASE}/flywheel/traces?limit=${limit}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch flywheel traces");
+    const data = await res.json();
+    return Array.isArray(data.traces) ? data.traces : [];
+  } catch (err) {
+    console.warn("fetchFlywheelTraces failed:", err);
+    return [];
+  }
+}
+
+export async function simulateFlywheel(req: FlywheelSimulateRequest): Promise<FlywheelSimulateResponse> {
+  const res = await fetch(`${API_BASE}/flywheel/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to run flywheel simulation" }));
+    throw new Error(err.error || "Failed to run flywheel simulation");
   }
   return await res.json();
 }

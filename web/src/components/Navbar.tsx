@@ -32,7 +32,8 @@ import {
   Building2,
   Coins,
   Boxes,
-  Server
+  Server,
+  RotateCw
 } from "lucide-react";
 
 export function Navbar() {
@@ -40,6 +41,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Data Flywheel", href: "/flywheel", icon: RotateCw },
     { label: "Hetero GPU", href: "/hetero", icon: Server },
     { label: "AI WAF", href: "/waf", icon: ShieldAlert },
     { label: "Fine-Tuning & LoRA", href: "/finetuning", icon: Boxes },

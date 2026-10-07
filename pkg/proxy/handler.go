@@ -40,6 +40,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/hetero"
 	"github.com/corlin/AIMeter/pkg/sandbox"
 	"github.com/corlin/AIMeter/pkg/workflow"
+	"github.com/corlin/AIMeter/pkg/flywheel"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -117,6 +118,17 @@ type ProxyHandler struct {
 	finetuningManager  *finetuning.Manager
 	wafManager         *waf.Manager
 	heteroManager      *hetero.Manager
+	flywheelManager    *flywheel.FlywheelManager
+}
+
+// SetFlywheelManager attaches a flywheel manager
+func (h *ProxyHandler) SetFlywheelManager(fm *flywheel.FlywheelManager) {
+	h.flywheelManager = fm
+}
+
+// GetFlywheelManager returns the attached flywheel manager
+func (h *ProxyHandler) GetFlywheelManager() *flywheel.FlywheelManager {
+	return h.flywheelManager
 }
 
 // SetHeteroManager attaches a heterogeneous compute manager
@@ -384,6 +396,21 @@ func (h *ProxyHandler) SetUpstreamURL(provider, url string) {
 }
 
 func extractPromptText(payload map[string]interface{}) string {
+	if msgs, ok := payload["messages"].([]domain.ChatMessage); ok && len(msgs) > 0 {
+		var sb strings.Builder
+		for _, m := range msgs {
+			if str, ok := m.Content.(string); ok && str != "" {
+				if sb.Len() > 0 {
+					sb.WriteString("\n")
+				}
+				sb.WriteString(str)
+			}
+		}
+		if sb.Len() > 0 {
+			return sb.String()
+		}
+	}
+
 	rawMsgs, ok := payload["messages"].([]interface{})
 	if !ok || len(rawMsgs) == 0 {
 		if promptStr, ok := payload["prompt"].(string); ok {
@@ -394,18 +421,21 @@ func extractPromptText(payload map[string]interface{}) string {
 
 	var sb strings.Builder
 	for _, m := range rawMsgs {
-		msgMap, ok := m.(map[string]interface{})
-		if !ok {
-			continue
+		if msgMap, ok := m.(map[string]interface{}); ok {
+			if content, ok := msgMap["content"].(string); ok {
+				if sb.Len() > 0 {
+					sb.WriteString("\n")
+				}
+				sb.WriteString(content)
+			}
+		} else if chatMsg, ok := m.(domain.ChatMessage); ok {
+			if str, ok := chatMsg.Content.(string); ok {
+				if sb.Len() > 0 {
+					sb.WriteString("\n")
+				}
+				sb.WriteString(str)
+			}
 		}
-		content, ok := msgMap["content"].(string)
-		if !ok {
-			continue
-		}
-		if sb.Len() > 0 {
-			sb.WriteString("\n")
-		}
-		sb.WriteString(content)
 	}
 	return sb.String()
 }
@@ -1902,6 +1932,35 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				}
 			}
 
+			// Phase 34: Synthetic Data Flywheel, Quality-to-Cost Valuation & Online Traffic Harvesting
+			if h.flywheelManager != nil {
+				harvestHeader := c.GetHeader("X-AIMeter-Flywheel-Harvest")
+				targetDataset := c.GetHeader("X-AIMeter-Flywheel-Dataset")
+				autoHarvest := strings.EqualFold(harvestHeader, "true") || strings.EqualFold(harvestHeader, "auto")
+
+				completionText := ""
+				if len(respData.Choices) > 0 {
+					completionText = respData.Choices[0].Message.Content
+				}
+
+				if autoHarvest && promptText != "" && completionText != "" {
+					hReq := &domain.FlywheelHarvestRequest{
+						TenantID:        tenantID,
+						Prompt:          promptText,
+						Completion:      completionText,
+						TeacherModel:    fbResult.ActualModel,
+						TargetDatasetID: targetDataset,
+					}
+					hResp, hErr := h.flywheelManager.HarvestOnlineTraffic(hReq)
+					if hErr == nil && hResp != nil {
+						c.Header("X-AIMeter-Flywheel-Status", string(hResp.HarvestStatus))
+						c.Header("X-AIMeter-Flywheel-Dataset", hResp.DatasetID)
+						c.Header("X-AIMeter-Flywheel-Margin", fmt.Sprintf("%.2f", hResp.MarginDelta))
+						c.Header("X-AIMeter-Flywheel-Value-USD", fmt.Sprintf("%.4f", hResp.EstimatedPairValueUSD))
+					}
+				}
+			}
+
 			// Async Ingestion
 			go h.recordUsage(
 				provider,
@@ -2216,6 +2275,23 @@ func (h *ProxyHandler) handleStreamingResponse(
 					c.Writer.Header().Set("X-AIMeter-Break-Even-Status", string(adapter.Status))
 					c.Writer.Header().Set("X-AIMeter-Inference-Saved-USD", fmt.Sprintf("%.4f", savedUSD))
 				}
+			}
+		}
+
+		// Phase 34: Synthetic Data Flywheel & Online Traffic Harvesting (Streaming)
+		if h.flywheelManager != nil && accumulatedContent.Len() > 0 {
+			harvestHeader := c.GetHeader("X-AIMeter-Flywheel-Harvest")
+			targetDataset := c.GetHeader("X-AIMeter-Flywheel-Dataset")
+			if strings.EqualFold(harvestHeader, "true") || strings.EqualFold(harvestHeader, "auto") {
+				go func(pText, cText, tModel, tDataset, tTenant string) {
+					_, _ = h.flywheelManager.HarvestOnlineTraffic(&domain.FlywheelHarvestRequest{
+						TenantID:        tTenant,
+						Prompt:          pText,
+						Completion:      cText,
+						TeacherModel:    tModel,
+						TargetDatasetID: tDataset,
+					})
+				}(promptText, accumulatedContent.String(), fbResult.ActualModel, targetDataset, tenantID)
 			}
 		}
 

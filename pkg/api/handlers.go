@@ -40,6 +40,7 @@ import (
 	"github.com/corlin/AIMeter/pkg/finetuning"
 	"github.com/corlin/AIMeter/pkg/waf"
 	"github.com/corlin/AIMeter/pkg/hetero"
+	"github.com/corlin/AIMeter/pkg/flywheel"
 	"github.com/gin-gonic/gin"
 )
 
@@ -75,6 +76,17 @@ type APIHandler struct {
 	finetuningManager  *finetuning.Manager
 	wafManager         *waf.Manager
 	heteroManager      *hetero.Manager
+	flywheelManager    *flywheel.FlywheelManager
+}
+
+// SetFlywheelManager attaches a flywheel manager to the API handler
+func (h *APIHandler) SetFlywheelManager(fm *flywheel.FlywheelManager) {
+	h.flywheelManager = fm
+}
+
+// GetFlywheelManager returns the attached flywheel manager
+func (h *APIHandler) GetFlywheelManager() *flywheel.FlywheelManager {
+	return h.flywheelManager
 }
 
 // SetHeteroManager attaches a heterogeneous compute manager to the API handler
@@ -3030,6 +3042,158 @@ func (h *APIHandler) SimulateHeteroSandbox(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
+
+// ==========================================
+// Phase 34: Synthetic Data Flywheel, Valuation & RLHF/DPO Handlers
+// ==========================================
+
+// GetFlywheelStats returns macroeconomic flywheels summary KPIs
+func (h *APIHandler) GetFlywheelStats(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	stats := h.flywheelManager.GetStatsSummary()
+	c.JSON(http.StatusOK, stats)
+}
+
+// ListFlywheelDatasets returns all synthetic dataset batches
+func (h *APIHandler) ListFlywheelDatasets(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	datasets := h.flywheelManager.ListBatches()
+	c.JSON(http.StatusOK, gin.H{"datasets": datasets, "total": len(datasets)})
+}
+
+// CreateFlywheelDataset creates a new synthetic dataset batch
+func (h *APIHandler) CreateFlywheelDataset(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	var batch domain.FlywheelDatasetBatch
+	if err := c.ShouldBindJSON(&batch); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	created, err := h.flywheelManager.CreateBatch(&batch)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, created)
+}
+
+// GetFlywheelDataset retrieves a single dataset batch by ID
+func (h *APIHandler) GetFlywheelDataset(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	id := c.Param("id")
+	ds, err := h.flywheelManager.GetBatch(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ds)
+}
+
+// ListFlywheelPairs returns preference pairs for a specific dataset
+func (h *APIHandler) ListFlywheelPairs(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	datasetID := c.Param("id")
+	if datasetID == "" {
+		datasetID = c.Query("dataset_id")
+	}
+	pairs := h.flywheelManager.ListPreferencePairs(datasetID)
+	c.JSON(http.StatusOK, gin.H{"pairs": pairs, "total": len(pairs)})
+}
+
+// ListFlywheelJobs returns all RLHF / DPO alignment jobs
+func (h *APIHandler) ListFlywheelJobs(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	jobs := h.flywheelManager.ListAlignmentJobs()
+	c.JSON(http.StatusOK, gin.H{"jobs": jobs, "total": len(jobs)})
+}
+
+// CreateFlywheelJob creates a new RLHF / DPO alignment training job
+func (h *APIHandler) CreateFlywheelJob(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	var job domain.FlywheelAlignmentJob
+	if err := c.ShouldBindJSON(&job); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	created, err := h.flywheelManager.CreateAlignmentJob(&job)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, created)
+}
+
+// HarvestFlywheelTraffic evaluates an online input/output pair for flywheel storage
+func (h *APIHandler) HarvestFlywheelTraffic(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	var req domain.FlywheelHarvestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.flywheelManager.HarvestOnlineTraffic(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// ListFlywheelTraces returns recent online inference / harvested usage traces
+func (h *APIHandler) ListFlywheelTraces(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, _ := strconv.Atoi(limitStr)
+	traces := h.flywheelManager.ListUsageTraces(limit)
+	c.JSON(http.StatusOK, gin.H{"traces": traces, "total": len(traces)})
+}
+
+// SimulateFlywheel runs multi-stage lifecycle What-If simulation
+func (h *APIHandler) SimulateFlywheel(c *gin.Context) {
+	if h.flywheelManager == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "flywheel manager not initialized"})
+		return
+	}
+	var req domain.FlywheelSimulateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	resp, err := h.flywheelManager.SimulateFlywheel(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 
 
 

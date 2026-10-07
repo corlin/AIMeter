@@ -2428,6 +2428,138 @@ export interface HeteroSimulateResponse {
   architecture_recommendations: string[];
 }
 
+// ==========================================
+// Phase 34: Synthetic Data Flywheel, Quality Valuation & RLHF/DPO Preference Alignment Cost Engine
+// ==========================================
+
+export type FlywheelDataCategory = "reasoning_math" | "code_repair" | "multi_turn_chat" | "safety_alignment" | "agentic_trace";
+export type FlywheelAlignmentAlgorithm = "dpo" | "ppo" | "kto";
+export type FlywheelHarvestStatus = "candidate_pooled" | "scored_accepted" | "scored_rejected" | "discarded";
+
+export interface FlywheelPreferencePair {
+  id: string;
+  dataset_id: string;
+  prompt: string;
+  chosen_completion: string;
+  rejected_completion: string;
+  chosen_score: number;
+  rejected_score: number;
+  margin_delta: number;
+  teacher_model: string;
+  candidate_count: number;
+  created_at: string;
+}
+
+export interface FlywheelDatasetBatch {
+  id: string;
+  name: string;
+  category: FlywheelDataCategory;
+  teacher_model: string;
+  total_generated_candidates: number;
+  accepted_pairs_count: number;
+  acceptance_rate_percent: number;
+  generation_cost_usd: number;
+  sunk_rejection_cost_usd: number;
+  total_dataset_cost_usd: number;
+  cost_per_valid_pair_usd: number;
+  avg_margin_delta: number;
+  status: string;
+  created_at: string;
+}
+
+export interface FlywheelAlignmentJob {
+  id: string;
+  name: string;
+  dataset_id: string;
+  target_model: string;
+  reference_model: string;
+  algorithm: FlywheelAlignmentAlgorithm;
+  gpu_model: string;
+  gpu_count: number;
+  total_gpu_hours: number;
+  peak_vram_gb: number;
+  gradient_step_cost_usd: number;
+  total_job_cost_usd: number;
+  final_loss: number;
+  reward_margin_gain: number;
+  status: string;
+  created_at: string;
+}
+
+export interface FlywheelUsageTrace {
+  id: string;
+  trace_id: string;
+  tenant_id?: string;
+  prompt: string;
+  completion: string;
+  harvested: boolean;
+  harvest_status: FlywheelHarvestStatus;
+  dataset_id?: string;
+  pair_value_usd: number;
+  model_version: string;
+  timestamp: string;
+}
+
+export interface FlywheelStatsSummary {
+  total_generated_candidates: number;
+  total_accepted_pairs: number;
+  avg_acceptance_rate_percent: number;
+  total_generation_cost_usd: number;
+  total_sunk_rejection_cost_usd: number;
+  total_alignment_capex_usd: number;
+  total_online_invocations: number;
+  total_inference_savings_usd: number;
+  overall_flywheel_roi_percent: number;
+  active_jobs_count: number;
+}
+
+export interface FlywheelHarvestRequest {
+  tenant_id?: string;
+  prompt: string;
+  completion: string;
+  teacher_model?: string;
+  target_dataset_id?: string;
+}
+
+export interface FlywheelHarvestResponse {
+  harvested: boolean;
+  harvest_status: FlywheelHarvestStatus;
+  quality_score: number;
+  margin_delta: number;
+  estimated_pair_value_usd: number;
+  dataset_id: string;
+  detail: string;
+}
+
+export interface FlywheelSimulateTurn {
+  stage_name: string;
+  monthly_spend_usd: number;
+  monthly_savings_usd: number;
+  net_cumulative_alpha_usd: number;
+  metric_detail: string;
+}
+
+export interface FlywheelSimulateRequest {
+  seed_prompt_scale: number;
+  candidate_multiplier: number;
+  algorithm: FlywheelAlignmentAlgorithm;
+  target_model_size: string;
+  monthly_online_invocations: number;
+}
+
+export interface FlywheelSimulateResponse {
+  total_synthesis_cost_usd: number;
+  total_sunk_rejection_usd: number;
+  total_alignment_capex_usd: number;
+  total_initial_investment_usd: number;
+  monthly_inference_savings_usd: number;
+  break_even_months: number;
+  first_year_net_alpha_usd: number;
+  flywheel_roi_percent: number;
+  stages: FlywheelSimulateTurn[];
+  architecture_advice: string[];
+}
+
 
 
 

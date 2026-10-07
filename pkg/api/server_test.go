@@ -2165,6 +2165,162 @@ func TestHeteroEndpoints(t *testing.T) {
 	}
 }
 
+func TestFlywheelEndpoints(t *testing.T) {
+	store := storage.NewMemoryStore()
+	server := api.NewServer(
+		8080,
+		store,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		false,
+	)
+
+	// 1. GET /api/v1/flywheel/stats
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/flywheel/stats", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/flywheel/stats, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_generated_candidates") {
+		t.Errorf("Expected total_generated_candidates in response, got: %s", w.Body.String())
+	}
+
+	// 2. GET /api/v1/flywheel/datasets
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/flywheel/datasets", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/flywheel/datasets, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "datasets") {
+		t.Errorf("Expected datasets array in response, got: %s", w.Body.String())
+	}
+
+	// 3. POST /api/v1/flywheel/datasets
+	dsJSON := `{
+		"name": "Integration Test Dataset",
+		"category": "reasoning_math",
+		"teacher_model": "deepseek-r1-671b-fp8",
+		"total_generated_candidates": 2000,
+		"accepted_pairs_count": 350
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/flywheel/datasets", strings.NewReader(dsJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/flywheel/datasets, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Integration Test Dataset") {
+		t.Errorf("Expected dataset name in response, got: %s", w.Body.String())
+	}
+
+	// 4. GET /api/v1/flywheel/datasets/:id
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/flywheel/datasets/ds-deepseek-r1-math", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/flywheel/datasets/:id, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 5. GET /api/v1/flywheel/datasets/:id/pairs
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/flywheel/datasets/ds-deepseek-r1-math/pairs", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/flywheel/datasets/:id/pairs, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "pairs") {
+		t.Errorf("Expected pairs in response, got: %s", w.Body.String())
+	}
+
+	// 6. GET /api/v1/flywheel/jobs
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/flywheel/jobs", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/flywheel/jobs, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "jobs") {
+		t.Errorf("Expected jobs in response, got: %s", w.Body.String())
+	}
+
+	// 7. POST /api/v1/flywheel/jobs
+	jobJSON := `{
+		"name": "Integration Test Job",
+		"dataset_id": "ds-deepseek-r1-math",
+		"target_model": "qwen-2.5-14b-instruct",
+		"algorithm": "dpo",
+		"gpu_model": "NVIDIA H100 SXM5 80GB",
+		"gpu_count": 8
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/flywheel/jobs", strings.NewReader(jobJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/flywheel/jobs, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Integration Test Job") {
+		t.Errorf("Expected job name in response, got: %s", w.Body.String())
+	}
+
+	// 8. POST /api/v1/flywheel/harvest
+	harvestJSON := `{
+		"prompt": "证明斐波那契数列通项公式",
+		"completion": "使用特征方程 λ^2 - λ - 1 = 0，解得特征根为 (1 ± √5)/2，由初始条件 F_0=0, F_1=1 待定系数可得 Binet 公式：F_n = (φ^n - ψ^n)/√5。",
+		"teacher_model": "deepseek-r1-671b-fp8",
+		"target_dataset_id": "ds-deepseek-r1-math"
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/flywheel/harvest", strings.NewReader(harvestJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/flywheel/harvest, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "harvested") || !strings.Contains(w.Body.String(), "quality_score") {
+		t.Errorf("Expected harvest response fields, got: %s", w.Body.String())
+	}
+
+	// 9. GET /api/v1/flywheel/traces
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/v1/flywheel/traces?limit=10", nil)
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for GET /api/v1/flywheel/traces, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "traces") {
+		t.Errorf("Expected traces in response, got: %s", w.Body.String())
+	}
+
+	// 10. POST /api/v1/flywheel/simulate
+	simJSON := `{
+		"seed_prompt_scale": 10000,
+		"candidate_multiplier": 4,
+		"algorithm": "dpo",
+		"target_model_size": "14b",
+		"monthly_online_invocations": 500000
+	}`
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/flywheel/simulate", strings.NewReader(simJSON))
+	req.Header.Set("Content-Type", "application/json")
+	server.GetRouter().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200 for POST /api/v1/flywheel/simulate, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "total_synthesis_cost_usd") || !strings.Contains(w.Body.String(), "break_even_months") {
+		t.Errorf("Expected simulation response fields, got: %s", w.Body.String())
+	}
+}
+
 
 
 
