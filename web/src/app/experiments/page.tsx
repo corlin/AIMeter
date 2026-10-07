@@ -89,7 +89,7 @@ export default function ExperimentsPage() {
     variant_b_model: string;
     variant_b_system: string;
   }>({
-    id: "exp-custom-" + Math.floor(Math.random() * 900 + 100),
+    id: "exp-custom-101",
     name: "Model Efficiency Evaluation",
     tenant_id: "default",
     split_ratio: 0.5,

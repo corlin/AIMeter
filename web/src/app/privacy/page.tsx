@@ -63,10 +63,6 @@ export default function PrivacyDLPPage() {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simResult, setSimResult] = useState<DLPSimulateResponse | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [selectedTenant]);
-
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -84,6 +80,11 @@ export default function PrivacyDLPPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, [selectedTenant]);
+
 
   const handleSavePolicy = async () => {
     if (!policy) return;

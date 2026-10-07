@@ -80,10 +80,6 @@ export default function MemoryPage() {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simResult, setSimResult] = useState<MemorySimulateResponse | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [selectedTenant]);
-
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -99,6 +95,11 @@ export default function MemoryPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, [selectedTenant]);
+
 
   const handleManualCompaction = async () => {
     const targetSession = selectedSessionId !== "all" ? selectedSessionId : "sess-multi-agent-01";

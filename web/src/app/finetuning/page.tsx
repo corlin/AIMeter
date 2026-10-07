@@ -114,11 +114,6 @@ export default function FineTuningPage() {
     }
   };
 
-  useEffect(() => {
-    loadAllData();
-    runSimulation(simForm);
-  }, []);
-
   const runSimulation = async (params: FineTuningSimulateRequest) => {
     setSimulating(true);
     try {
@@ -130,6 +125,12 @@ export default function FineTuningPage() {
       setSimulating(false);
     }
   };
+
+  useEffect(() => {
+    loadAllData();
+    runSimulation(simForm);
+  }, []);
+
 
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();

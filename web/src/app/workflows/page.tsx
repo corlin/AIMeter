@@ -91,11 +91,6 @@ export default function WorkflowsPage() {
     loadData();
   }, [selectedTenant]);
 
-  // Initial simulation load
-  useEffect(() => {
-    runSimulation();
-  }, [simFailedStep, simSunkCap]);
-
   const runSimulation = async () => {
     setIsSimulating(true);
     try {
@@ -111,6 +106,12 @@ export default function WorkflowsPage() {
       setIsSimulating(false);
     }
   };
+
+  // Initial simulation load
+  useEffect(() => {
+    runSimulation();
+  }, [simFailedStep, simSunkCap]);
+
 
   const handleResumeWorkflow = async () => {
     if (!selectedInstance) return;

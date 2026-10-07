@@ -1,5 +1,12 @@
 "use client";
 
+function generateHeartbeatMetrics() {
+  return {
+    wan_latency_ms: Math.floor(Math.random() * 20) + 15,
+    consumed_delta_usd: Number((Math.random() * 1.5).toFixed(2)),
+  };
+}
+
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Globe,
@@ -125,8 +132,7 @@ export default function ClusteringPage() {
     try {
       await heartbeatClusterNode({
         node_id: nodeId,
-        wan_latency_ms: Math.floor(Math.random() * 20) + 15,
-        consumed_delta_usd: Number((Math.random() * 1.5).toFixed(2)),
+        ...generateHeartbeatMetrics(),
       });
       await loadData();
     } catch (err) {

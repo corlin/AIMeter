@@ -92,10 +92,6 @@ export default function SandboxesPage() {
     loadData();
   }, [selectedTenant, statusFilter]);
 
-  useEffect(() => {
-    runSimulation();
-  }, [simRuntime, simDurationSec, simCpu, simRamMB, simToolName, simLLMTokens, simSessionCap]);
-
   const runSimulation = async () => {
     setIsSimulating(true);
     try {
@@ -115,6 +111,11 @@ export default function SandboxesPage() {
       setIsSimulating(false);
     }
   };
+
+  useEffect(() => {
+    runSimulation();
+  }, [simRuntime, simDurationSec, simCpu, simRamMB, simToolName, simLLMTokens, simSessionCap]);
+
 
   const handleSaveTool = async (e: React.FormEvent) => {
     e.preventDefault();

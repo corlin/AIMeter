@@ -81,10 +81,6 @@ export default function ReasoningPage() {
   const [isPruning, setIsPruning] = useState<boolean>(false);
   const [pruneResult, setPruneResult] = useState<ReasoningPruneResponse | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [selectedTenant]);
-
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -103,6 +99,11 @@ export default function ReasoningPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, [selectedTenant]);
+
 
   const handleSavePolicy = async () => {
     setIsSavingPolicy(true);

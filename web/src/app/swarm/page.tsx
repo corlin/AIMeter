@@ -76,10 +76,6 @@ export default function SwarmPage() {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simResult, setSimResult] = useState<SwarmSimulateResponse | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [selectedTenant]);
-
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -105,6 +101,11 @@ export default function SwarmPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, [selectedTenant]);
+
 
   const handleSelectSession = async (sessId: string) => {
     setSelectedSessionId(sessId);
