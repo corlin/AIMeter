@@ -16,7 +16,7 @@ import (
 )
 
 type BudgetManager struct {
-	mu              sync.RWMutex
+	mu                  sync.RWMutex
 	rules               map[uuid.UUID]*domain.BudgetRule
 	alerts              []domain.AlertEvent
 	client              *http.Client
@@ -318,5 +318,3 @@ func (m *BudgetManager) UpsertPromptCompressionPolicy(policy domain.PromptCompre
 	m.compressionPolicies[policy.TenantID] = &policy
 	return policy
 }
-
-

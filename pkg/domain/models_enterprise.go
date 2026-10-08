@@ -2,7 +2,6 @@ package domain
 
 import (
 	"time"
-
 )
 
 // Phase 18: Predictive Budget Forecasting & Automated Remediation Engine
@@ -61,16 +60,16 @@ type RemediationLogEntry struct {
 
 // RemediationPolicy controls how proactive mitigation behaves for a tenant
 type RemediationPolicy struct {
-	TenantID                 string    `json:"tenant_id"`
-	AutoPilotEnabled         bool      `json:"auto_pilot_enabled"`
-	SoftMitigateThreshold    float64   `json:"soft_mitigate_threshold"`   // default 0.80
+	TenantID                string    `json:"tenant_id"`
+	AutoPilotEnabled        bool      `json:"auto_pilot_enabled"`
+	SoftMitigateThreshold   float64   `json:"soft_mitigate_threshold"`   // default 0.80
 	ActiveThrottleThreshold float64   `json:"active_throttle_threshold"` // default 0.95
-	HardCapThreshold         float64   `json:"hard_cap_threshold"`         // default 1.00
-	AllowCompressionBoost    bool      `json:"allow_compression_boost"`
-	AllowModelDowngrade      bool      `json:"allow_model_downgrade"`
-	AllowRateLimitTighten    bool      `json:"allow_rate_limit_tighten"`
-	AllowStreamCapping       bool      `json:"allow_stream_capping"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	HardCapThreshold        float64   `json:"hard_cap_threshold"`        // default 1.00
+	AllowCompressionBoost   bool      `json:"allow_compression_boost"`
+	AllowModelDowngrade     bool      `json:"allow_model_downgrade"`
+	AllowRateLimitTighten   bool      `json:"allow_rate_limit_tighten"`
+	AllowStreamCapping      bool      `json:"allow_stream_capping"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 // RemediationStatus captures active mitigation state and savings
@@ -124,8 +123,8 @@ const (
 // ClusterNode represents a regional gateway or edge worker node
 type ClusterNode struct {
 	NodeID           string            `json:"node_id"`
-	RegionID         string            `json:"region_id"` // e.g. "us-east-1", "eu-central-1", "ap-southeast-1", "edge-global"
-	Role             string            `json:"role"`      // "hub" or "spoke"
+	RegionID         string            `json:"region_id"`    // e.g. "us-east-1", "eu-central-1", "ap-southeast-1", "edge-global"
+	Role             string            `json:"role"`         // "hub" or "spoke"
 	ClusterType      string            `json:"cluster_type"` // "k8s-pod", "vm", "edge-worker"
 	Status           ClusterNodeStatus `json:"status"`
 	EndpointURL      string            `json:"endpoint_url,omitempty"`
@@ -243,19 +242,19 @@ type HeuristicRule struct {
 
 // ExperimentEvalConfig defines evaluation methodology (Judge LLM + Rules + Feedback)
 type ExperimentEvalConfig struct {
-	EnableLLMJudge        bool            `json:"enable_llm_judge"`
-	JudgeModel            string          `json:"judge_model"`       // e.g. gpt-4o-mini, deepseek-v3
-	JudgeSampleRate       float64         `json:"judge_sample_rate"` // 0.0 - 1.0 (e.g. 0.20 = 20% sample)
-	JudgeCriteria         string          `json:"judge_criteria"`    // standard rubrics: accuracy, conciseness, instruction_following
-	EnableHeuristicRules  bool            `json:"enable_heuristic_rules"`
-	Rules                 []HeuristicRule `json:"rules"`
-	ClientFeedbackWeight  float64         `json:"client_feedback_weight"` // 0.0 - 1.0
+	EnableLLMJudge       bool            `json:"enable_llm_judge"`
+	JudgeModel           string          `json:"judge_model"`       // e.g. gpt-4o-mini, deepseek-v3
+	JudgeSampleRate      float64         `json:"judge_sample_rate"` // 0.0 - 1.0 (e.g. 0.20 = 20% sample)
+	JudgeCriteria        string          `json:"judge_criteria"`    // standard rubrics: accuracy, conciseness, instruction_following
+	EnableHeuristicRules bool            `json:"enable_heuristic_rules"`
+	Rules                []HeuristicRule `json:"rules"`
+	ClientFeedbackWeight float64         `json:"client_feedback_weight"` // 0.0 - 1.0
 }
 
 // ExperimentVariant represents a branch (A or B) in an A/B experiment
 type ExperimentVariant struct {
-	ID                     string  `json:"id"`                       // "A" or "B"
-	Name                   string  `json:"name"`                     // e.g., "Baseline GPT-4o", "Compressed DeepSeek-R1"
+	ID                     string  `json:"id"`   // "A" or "B"
+	Name                   string  `json:"name"` // e.g., "Baseline GPT-4o", "Compressed DeepSeek-R1"
 	Description            string  `json:"description"`
 	Model                  string  `json:"model"`                    // Target model name
 	SystemPromptOverride   string  `json:"system_prompt_override"`   // Injected or replaced system prompt
@@ -264,10 +263,10 @@ type ExperimentVariant struct {
 	TotalTokens            int64   `json:"total_tokens"`
 	TotalCostUSD           float64 `json:"total_cost_usd"`
 	AvgLatencyMs           float64 `json:"avg_latency_ms"`
-	AvgQualityScore        float64 `json:"avg_quality_score"`        // Normalized 1.0 - 5.0
-	SuccessCount           int64   `json:"success_count"`            // Positive user ratings or resolved tickets
-	CostPerQualityPoint    float64 `json:"cost_per_quality_point"`   // Unit economics: Cost / AvgQualityScore
-	CostPerResolution      float64 `json:"cost_per_resolution"`      // Unit economics: Cost / SuccessCount
+	AvgQualityScore        float64 `json:"avg_quality_score"`      // Normalized 1.0 - 5.0
+	SuccessCount           int64   `json:"success_count"`          // Positive user ratings or resolved tickets
+	CostPerQualityPoint    float64 `json:"cost_per_quality_point"` // Unit economics: Cost / AvgQualityScore
+	CostPerResolution      float64 `json:"cost_per_resolution"`    // Unit economics: Cost / SuccessCount
 }
 
 // Experiment represents a managed A/B evaluation suite
@@ -316,14 +315,14 @@ type ExperimentSimulateRequest struct {
 
 // ExperimentSimulateResponse returns the simulated Pareto trade-offs and win rates
 type ExperimentSimulateResponse struct {
-	ExperimentID                string            `json:"experiment_id"`
-	TotalSimulated              int               `json:"total_simulated"`
-	VariantAStats               ExperimentVariant `json:"variant_a_stats"`
-	VariantBStats               ExperimentVariant `json:"variant_b_stats"`
-	ParetoWinner                string            `json:"pareto_winner"` // "A", "B", or "tie"
-	EstimatedMonthlySavingsUSD  float64           `json:"estimated_monthly_savings_usd"`
-	ROIMultiplier               float64           `json:"roi_multiplier"`
-	Insights                    []string          `json:"insights"`
+	ExperimentID               string            `json:"experiment_id"`
+	TotalSimulated             int               `json:"total_simulated"`
+	VariantAStats              ExperimentVariant `json:"variant_a_stats"`
+	VariantBStats              ExperimentVariant `json:"variant_b_stats"`
+	ParetoWinner               string            `json:"pareto_winner"` // "A", "B", or "tie"
+	EstimatedMonthlySavingsUSD float64           `json:"estimated_monthly_savings_usd"`
+	ROIMultiplier              float64           `json:"roi_multiplier"`
+	Insights                   []string          `json:"insights"`
 }
 
 // ==========================================
@@ -362,8 +361,8 @@ type DLPPolicy struct {
 	Description     string               `json:"description,omitempty"`
 	Enabled         bool                 `json:"enabled"`
 	DefaultAction   DLPAction            `json:"default_action"`   // audit, mask, block
-	EntityActions   map[string]DLPAction `json:"entity_actions"`    // specific action per entity type
-	EnableUnmasking bool                 `json:"enable_unmasking"`  // reverse mask back to original in responses
+	EntityActions   map[string]DLPAction `json:"entity_actions"`   // specific action per entity type
+	EnableUnmasking bool                 `json:"enable_unmasking"` // reverse mask back to original in responses
 	CustomKeywords  []string             `json:"custom_keywords"`
 	CreatedAt       time.Time            `json:"created_at,omitempty"`
 	UpdatedAt       time.Time            `json:"updated_at"`
@@ -407,14 +406,14 @@ type DLPAuditLogEntry struct {
 
 // DLPStatsSummary reports macro compliance figures
 type DLPStatsSummary struct {
-	TotalScans         int64            `json:"total_scans"`
-	TotalViolations    int64            `json:"total_violations"`
-	BlockedCount       int64            `json:"blocked_count"`
-	MaskedCount        int64            `json:"masked_count"`
-	AuditedCount       int64            `json:"audited_count"`
-	AvgScanDurationUs  float64          `json:"avg_scan_duration_us"`
-	ActivePolicyCount  int              `json:"active_policy_count"`
-	ViolationsByType   map[string]int64 `json:"violations_by_type"`
+	TotalScans        int64            `json:"total_scans"`
+	TotalViolations   int64            `json:"total_violations"`
+	BlockedCount      int64            `json:"blocked_count"`
+	MaskedCount       int64            `json:"masked_count"`
+	AuditedCount      int64            `json:"audited_count"`
+	AvgScanDurationUs float64          `json:"avg_scan_duration_us"`
+	ActivePolicyCount int              `json:"active_policy_count"`
+	ViolationsByType  map[string]int64 `json:"violations_by_type"`
 }
 
 // DLPSimulateRequest feeds an interactive prompt to test DLP inspection
@@ -427,12 +426,12 @@ type DLPSimulateRequest struct {
 
 // DLPSimulateResponse returns preview of masked prompt and unmasking
 type DLPSimulateResponse struct {
-	HasViolations              bool                `json:"has_violations"`
-	ActionTaken                DLPAction           `json:"action_taken"`
-	DetectedEntities           []DLPDetectedEntity `json:"detected_entities"`
-	SanitizedText              string              `json:"sanitized_text"`
-	PlaceholderVault           map[string]string   `json:"placeholder_vault"`
-	ScanDurationUs             int64               `json:"scan_duration_us"`
+	HasViolations             bool                `json:"has_violations"`
+	ActionTaken               DLPAction           `json:"action_taken"`
+	DetectedEntities          []DLPDetectedEntity `json:"detected_entities"`
+	SanitizedText             string              `json:"sanitized_text"`
+	PlaceholderVault          map[string]string   `json:"placeholder_vault"`
+	ScanDurationUs            int64               `json:"scan_duration_us"`
 	SimulatedUnmaskedResponse string              `json:"simulated_unmasked_response,omitempty"`
 }
 
@@ -503,27 +502,27 @@ type OrgNode struct {
 
 // OrgBudgetCheckResult carries bottom-up evaluation decision
 type OrgBudgetCheckResult struct {
-	Allowed              bool        `json:"allowed"`
-	Action               OrgAction   `json:"action"`
-	BreachedNodePath     string      `json:"breached_node_path,omitempty"`
-	BreachedNodeName     string      `json:"breached_node_name,omitempty"`
-	RemainingQuotaUSD    float64     `json:"remaining_quota_usd"`
-	ParentRemainingUSD   float64     `json:"parent_remaining_usd"`
-	Reason               string      `json:"reason,omitempty"`
-	AppliedPriority      OrgPriority `json:"applied_priority"`
-	Downgraded           bool        `json:"downgraded"`
+	Allowed            bool        `json:"allowed"`
+	Action             OrgAction   `json:"action"`
+	BreachedNodePath   string      `json:"breached_node_path,omitempty"`
+	BreachedNodeName   string      `json:"breached_node_name,omitempty"`
+	RemainingQuotaUSD  float64     `json:"remaining_quota_usd"`
+	ParentRemainingUSD float64     `json:"parent_remaining_usd"`
+	Reason             string      `json:"reason,omitempty"`
+	AppliedPriority    OrgPriority `json:"applied_priority"`
+	Downgraded         bool        `json:"downgraded"`
 }
 
 // OrgStatsSummary provides macro metrics for hierarchical budget governance
 type OrgStatsSummary struct {
-	TotalNodes          int     `json:"total_nodes"`
-	TotalAllocatedUSD   float64 `json:"total_allocated_usd"`
-	TotalSpendUSD       float64 `json:"total_spend_usd"`
-	UtilizationPct      float64 `json:"utilization_pct"`
-	BreachedNodesCount  int     `json:"breached_nodes_count"`
-	WarningNodesCount   int     `json:"warning_nodes_count"`
-	P0ProtectedCount    int     `json:"p0_protected_count"`
-	MaxDepth            int     `json:"max_depth"`
+	TotalNodes         int     `json:"total_nodes"`
+	TotalAllocatedUSD  float64 `json:"total_allocated_usd"`
+	TotalSpendUSD      float64 `json:"total_spend_usd"`
+	UtilizationPct     float64 `json:"utilization_pct"`
+	BreachedNodesCount int     `json:"breached_nodes_count"`
+	WarningNodesCount  int     `json:"warning_nodes_count"`
+	P0ProtectedCount   int     `json:"p0_protected_count"`
+	MaxDepth           int     `json:"max_depth"`
 }
 
 // OrgNodeUpsertRequest payload to create or edit an org node
@@ -543,15 +542,15 @@ type OrgNodeUpsertRequest struct {
 
 // OrgScenarioTurn records turn in what-if simulation
 type OrgScenarioTurn struct {
-	ScenarioName      string      `json:"scenario_name"`
-	Description       string      `json:"description"`
-	TargetPath        string      `json:"target_path"`
-	Priority          OrgPriority `json:"priority"`
-	RequestedCostUSD  float64     `json:"requested_cost_usd"`
-	Allowed           bool        `json:"allowed"`
-	Action            OrgAction   `json:"action"`
-	BreachedNode      string      `json:"breached_node,omitempty"`
-	Reason            string      `json:"reason"`
+	ScenarioName     string      `json:"scenario_name"`
+	Description      string      `json:"description"`
+	TargetPath       string      `json:"target_path"`
+	Priority         OrgPriority `json:"priority"`
+	RequestedCostUSD float64     `json:"requested_cost_usd"`
+	Allowed          bool        `json:"allowed"`
+	Action           OrgAction   `json:"action"`
+	BreachedNode     string      `json:"breached_node,omitempty"`
+	Reason           string      `json:"reason"`
 }
 
 // OrgSimulateRequest payload for interactive what-if playground
@@ -586,11 +585,11 @@ type OrgSimulateResponse struct {
 type EscrowStatus string
 
 const (
-	EscrowStatusPending   EscrowStatus = "pending"
-	EscrowStatusReserved  EscrowStatus = "reserved"
-	EscrowStatusCleared   EscrowStatus = "cleared"
-	EscrowStatusDisputed  EscrowStatus = "disputed"
-	EscrowStatusRefunded  EscrowStatus = "refunded"
+	EscrowStatusPending  EscrowStatus = "pending"
+	EscrowStatusReserved EscrowStatus = "reserved"
+	EscrowStatusCleared  EscrowStatus = "cleared"
+	EscrowStatusDisputed EscrowStatus = "disputed"
+	EscrowStatusRefunded EscrowStatus = "refunded"
 )
 
 // FederatedTaskStatus represents state of a cross-workspace task
@@ -622,18 +621,18 @@ type FederationWorkspace struct {
 
 // EscrowVoucher records cryptographic pre-lock and 2PC settlement receipt
 type EscrowVoucher struct {
-	ID               string       `json:"id"`
-	TaskID           string       `json:"task_id"`
-	SourceWorkspace  string       `json:"source_workspace"`
-	TargetWorkspace  string       `json:"target_workspace,omitempty"`
-	BountyCapUSD     float64      `json:"bounty_cap_usd"`
-	ActualCostUSD    float64      `json:"actual_cost_usd"`
-	ClearingFeeUSD   float64      `json:"clearing_fee_usd"`
-	Status           EscrowStatus `json:"status"`
-	ProofHash        string       `json:"proof_hash,omitempty"`
-	Reason           string       `json:"reason,omitempty"`
-	ReservedAt       time.Time    `json:"reserved_at"`
-	SettledAt        *time.Time   `json:"settled_at,omitempty"`
+	ID              string       `json:"id"`
+	TaskID          string       `json:"task_id"`
+	SourceWorkspace string       `json:"source_workspace"`
+	TargetWorkspace string       `json:"target_workspace,omitempty"`
+	BountyCapUSD    float64      `json:"bounty_cap_usd"`
+	ActualCostUSD   float64      `json:"actual_cost_usd"`
+	ClearingFeeUSD  float64      `json:"clearing_fee_usd"`
+	Status          EscrowStatus `json:"status"`
+	ProofHash       string       `json:"proof_hash,omitempty"`
+	Reason          string       `json:"reason,omitempty"`
+	ReservedAt      time.Time    `json:"reserved_at"`
+	SettledAt       *time.Time   `json:"settled_at,omitempty"`
 }
 
 // FederationBid represents a proposal submitted by an Agent
@@ -651,21 +650,21 @@ type FederationBid struct {
 
 // FederatedTask records a cross-workspace collaborative bounty task
 type FederatedTask struct {
-	ID              string              `json:"id"`
-	TenantID        string              `json:"tenant_id"`
-	Title           string              `json:"title"`
-	Description     string              `json:"description"`
-	Category        string              `json:"category"` // e.g. "market_research", "code_audit", "quant_predict"
-	SourceWorkspace string              `json:"source_workspace"`
-	CreatorAgent    string              `json:"creator_agent"`
-	BountyCapUSD    float64             `json:"bounty_cap_usd"`
-	AssignedWorkspace string            `json:"assigned_workspace,omitempty"`
-	AssignedAgent   string              `json:"assigned_agent,omitempty"`
-	Status          FederatedTaskStatus `json:"status"`
-	VoucherID       string              `json:"voucher_id,omitempty"`
-	Bids            []*FederationBid    `json:"bids,omitempty"`
-	CreatedAt       time.Time           `json:"created_at"`
-	UpdatedAt       time.Time           `json:"updated_at"`
+	ID                string              `json:"id"`
+	TenantID          string              `json:"tenant_id"`
+	Title             string              `json:"title"`
+	Description       string              `json:"description"`
+	Category          string              `json:"category"` // e.g. "market_research", "code_audit", "quant_predict"
+	SourceWorkspace   string              `json:"source_workspace"`
+	CreatorAgent      string              `json:"creator_agent"`
+	BountyCapUSD      float64             `json:"bounty_cap_usd"`
+	AssignedWorkspace string              `json:"assigned_workspace,omitempty"`
+	AssignedAgent     string              `json:"assigned_agent,omitempty"`
+	Status            FederatedTaskStatus `json:"status"`
+	VoucherID         string              `json:"voucher_id,omitempty"`
+	Bids              []*FederationBid    `json:"bids,omitempty"`
+	CreatedAt         time.Time           `json:"created_at"`
+	UpdatedAt         time.Time           `json:"updated_at"`
 }
 
 // FederationStatsSummary macro clearinghouse metrics
@@ -711,38 +710,38 @@ type FederationFinalizeRequest struct {
 
 // FederationSimulateScenarioTurn turn in what-if simulation
 type FederationSimulateScenarioTurn struct {
-	StepIndex        int     `json:"step_index"`
-	PhaseName        string  `json:"phase_name"` // "reserve", "bidding", "execution", "finalize"
-	AgentRole        string  `json:"agent_role"`
-	Workspace        string  `json:"workspace"`
-	AmountUSD        float64 `json:"amount_usd"`
-	Status           string  `json:"status"`
-	Detail           string  `json:"detail"`
+	StepIndex int     `json:"step_index"`
+	PhaseName string  `json:"phase_name"` // "reserve", "bidding", "execution", "finalize"
+	AgentRole string  `json:"agent_role"`
+	Workspace string  `json:"workspace"`
+	AmountUSD float64 `json:"amount_usd"`
+	Status    string  `json:"status"`
+	Detail    string  `json:"detail"`
 }
 
 // FederationSimulateRequest payload for federation auction & clearing playground
 type FederationSimulateRequest struct {
-	TaskTitle       string  `json:"task_title"`
-	Category        string  `json:"category"`
-	SourceWorkspace string  `json:"source_workspace"`
-	BountyCapUSD    float64 `json:"bounty_cap_usd"`
-	SimulatedBidders int    `json:"simulated_bidders"`
-	SimulateDispute  bool   `json:"simulate_dispute"`
+	TaskTitle        string  `json:"task_title"`
+	Category         string  `json:"category"`
+	SourceWorkspace  string  `json:"source_workspace"`
+	BountyCapUSD     float64 `json:"bounty_cap_usd"`
+	SimulatedBidders int     `json:"simulated_bidders"`
+	SimulateDispute  bool    `json:"simulate_dispute"`
 }
 
 // FederationSimulateResponse output of federation auction & clearing playground
 type FederationSimulateResponse struct {
-	TaskID              string                           `json:"task_id"`
-	WinnerWorkspace     string                           `json:"winner_workspace"`
-	WinnerAgent         string                           `json:"winner_agent"`
-	WinningBidUSD       float64                          `json:"winning_bid_usd"`
-	ClearingFeeUSD      float64                          `json:"clearing_fee_usd"`
-	NetEarningsUSD      float64                          `json:"net_earnings_usd"`
-	EscrowVoucherID     string                           `json:"escrow_voucher_id"`
-	ProofHash           string                           `json:"proof_hash"`
-	FinalStatus         EscrowStatus                     `json:"final_status"`
-	Scenarios           []FederationSimulateScenarioTurn `json:"scenarios"`
-	FinOpsAdvice        []string                         `json:"finops_advice"`
+	TaskID          string                           `json:"task_id"`
+	WinnerWorkspace string                           `json:"winner_workspace"`
+	WinnerAgent     string                           `json:"winner_agent"`
+	WinningBidUSD   float64                          `json:"winning_bid_usd"`
+	ClearingFeeUSD  float64                          `json:"clearing_fee_usd"`
+	NetEarningsUSD  float64                          `json:"net_earnings_usd"`
+	EscrowVoucherID string                           `json:"escrow_voucher_id"`
+	ProofHash       string                           `json:"proof_hash"`
+	FinalStatus     EscrowStatus                     `json:"final_status"`
+	Scenarios       []FederationSimulateScenarioTurn `json:"scenarios"`
+	FinOpsAdvice    []string                         `json:"finops_advice"`
 }
 
 // ==========================================

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/gin-gonic/gin"

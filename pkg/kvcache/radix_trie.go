@@ -27,11 +27,11 @@ type TrieNode struct {
 
 // RadixTrie provides a thread-safe Radix Tree optimized for prompt prefix matching
 type RadixTrie struct {
-	mu           sync.RWMutex
-	root         *TrieNode
-	nodeSeq      uint64
-	blockAlign   int // Block alignment (e.g. 64 tokens for DeepSeek, 1024 for OpenAI)
-	totalNodes   int
+	mu         sync.RWMutex
+	root       *TrieNode
+	nodeSeq    uint64
+	blockAlign int // Block alignment (e.g. 64 tokens for DeepSeek, 1024 for OpenAI)
+	totalNodes int
 }
 
 // NewRadixTrie initializes a new Radix Prefix Trie

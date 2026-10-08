@@ -56,12 +56,12 @@ func TestDispatch_FeishuCardFormat(t *testing.T) {
 	})
 
 	event := alert.NotificationEvent{
-		TenantID:    "org-test",
-		WorkflowID:  "customer-service-agent",
-		EventType:   alert.EventBudgetExceeded,
-		Severity:    "critical",
-		Title:       "月度预算已被 100% 耗尽",
-		Message:     "租户 org-test 已达到 $500.00 月度预算限额，后续调用将自动拦截。",
+		TenantID:   "org-test",
+		WorkflowID: "customer-service-agent",
+		EventType:  alert.EventBudgetExceeded,
+		Severity:   "critical",
+		Title:      "月度预算已被 100% 耗尽",
+		Message:    "租户 org-test 已达到 $500.00 月度预算限额，后续调用将自动拦截。",
 		Metrics: map[string]interface{}{
 			"spent_usd": 502.40,
 			"limit_usd": 500.00,

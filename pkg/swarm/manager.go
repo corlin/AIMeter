@@ -33,13 +33,13 @@ type Manager struct {
 // NewManager initializes the Swarm Manager and loads seeds if available
 func NewManager(seedPath string) *Manager {
 	m := &Manager{
-		policies:    make(map[string]domain.SwarmPolicy),
-		graphs:      make(map[string]*Graph),
+		policies:     make(map[string]domain.SwarmPolicy),
+		graphs:       make(map[string]*Graph),
 		sessionOrder: make([]string, 0, 500),
-		maxSessions: 500,
-		loopEvents:  make([]domain.SwarmLoopEvent, 0, 1000),
-		maxEvents:   1000,
-		detector:    NewLoopDetector(),
+		maxSessions:  500,
+		loopEvents:   make([]domain.SwarmLoopEvent, 0, 1000),
+		maxEvents:    1000,
+		detector:     NewLoopDetector(),
 	}
 
 	if seedPath != "" {

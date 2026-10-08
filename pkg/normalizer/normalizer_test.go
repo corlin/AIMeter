@@ -16,9 +16,9 @@ func TestNormalizeOpenAI(t *testing.T) {
 		Provider:  "openai",
 		Model:     "gpt-4o",
 		Attributes: map[string]string{
-			"prompt_tokens":                        "1000",
-			"prompt_tokens_details.cached_tokens":  "400",
-			"completion_tokens":                    "300",
+			"prompt_tokens":                       "1000",
+			"prompt_tokens_details.cached_tokens": "400",
+			"completion_tokens":                   "300",
 			"completion_tokens_details.reasoning": "100",
 		},
 	}
@@ -56,10 +56,10 @@ func TestNormalizeAnthropic(t *testing.T) {
 		Provider:  "anthropic",
 		Model:     "claude-3-5-sonnet",
 		Attributes: map[string]string{
-			"input_tokens":                 "2000",
+			"input_tokens":                "2000",
 			"cache_read_input_tokens":     "1500",
 			"cache_creation_input_tokens": "500",
-			"output_tokens":                "800",
+			"output_tokens":               "800",
 		},
 	}
 
@@ -96,10 +96,10 @@ func TestNormalizeDeepSeek(t *testing.T) {
 		Provider:  "deepseek",
 		Model:     "deepseek-reasoner",
 		Attributes: map[string]string{
-			"prompt_tokens":                                 "5000",
-			"prompt_cache_hit_tokens":                       "3000",
-			"prompt_cache_miss_tokens":                      "2000",
-			"completion_tokens":                             "1200",
+			"prompt_tokens":                              "5000",
+			"prompt_cache_hit_tokens":                    "3000",
+			"prompt_cache_miss_tokens":                   "2000",
+			"completion_tokens":                          "1200",
 			"completion_tokens_details.reasoning_tokens": "800",
 		},
 	}

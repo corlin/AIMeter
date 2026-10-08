@@ -336,5 +336,3 @@ func EstimateTokens(content string) int {
 	}
 	return total
 }
-
-

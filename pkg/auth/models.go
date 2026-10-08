@@ -22,13 +22,13 @@ const (
 )
 
 var (
-	ErrKeyNotFound        = errors.New("api key not found")
-	ErrKeyInvalid         = errors.New("invalid api key format or credential")
-	ErrKeyExpired         = errors.New("api key has expired")
-	ErrKeySuspended       = errors.New("api key is suspended")
-	ErrKeyRevoked         = errors.New("api key has been revoked")
-	ErrForbiddenScope     = errors.New("insufficient permission: missing required scope")
-	ErrRateLimitExceeded  = errors.New("rate limit exceeded: too many requests")
+	ErrKeyNotFound       = errors.New("api key not found")
+	ErrKeyInvalid        = errors.New("invalid api key format or credential")
+	ErrKeyExpired        = errors.New("api key has expired")
+	ErrKeySuspended      = errors.New("api key is suspended")
+	ErrKeyRevoked        = errors.New("api key has been revoked")
+	ErrForbiddenScope    = errors.New("insufficient permission: missing required scope")
+	ErrRateLimitExceeded = errors.New("rate limit exceeded: too many requests")
 )
 
 // APIKey represents an enterprise credential entity.

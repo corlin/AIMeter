@@ -245,8 +245,8 @@ func TestProxyVendorRoute(t *testing.T) {
 	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":     "chatcmpl-vendor",
-			"model":  "deepseek-chat",
+			"id":    "chatcmpl-vendor",
+			"model": "deepseek-chat",
 			"choices": []map[string]interface{}{
 				{"message": map[string]string{"role": "assistant", "content": "DeepSeek answer"}},
 			},

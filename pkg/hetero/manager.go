@@ -13,9 +13,9 @@ import (
 )
 
 type SeedData struct {
-	Nodes  []domain.HeteroGPUNode     `json:"nodes"`
+	Nodes  []domain.HeteroGPUNode      `json:"nodes"`
 	Pools  []domain.HeteroResourcePool `json:"pools"`
-	Traces []domain.HeteroUsageTrace  `json:"traces"`
+	Traces []domain.HeteroUsageTrace   `json:"traces"`
 }
 
 // Manager orchestrates heterogeneous GPU nodes, resource pools, disaggregation, and metrics

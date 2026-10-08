@@ -8,21 +8,21 @@ import (
 
 // Standard Meter Types
 const (
-	MeterLLMInputToken      = "LLM.InputToken"
-	MeterLLMOutputToken     = "LLM.OutputToken"
-	MeterLLMCacheReadToken  = "LLM.CacheReadToken"
-	MeterLLMCacheWriteToken = "LLM.CacheWriteToken"
-	MeterLLMReasoningToken  = "LLM.ReasoningToken"
-	MeterImageGeneration    = "Image.Generation"
-	MeterSearchQuery        = "Search.Query"
-	MeterToolExecution      = "Tool.Execution"
+	MeterLLMInputToken          = "LLM.InputToken"
+	MeterLLMOutputToken         = "LLM.OutputToken"
+	MeterLLMCacheReadToken      = "LLM.CacheReadToken"
+	MeterLLMCacheWriteToken     = "LLM.CacheWriteToken"
+	MeterLLMReasoningToken      = "LLM.ReasoningToken"
+	MeterImageGeneration        = "Image.Generation"
+	MeterSearchQuery            = "Search.Query"
+	MeterToolExecution          = "Tool.Execution"
 	MeterAudioInputSecond       = "Audio.InputSecond"
 	MeterAudioOutputSecond      = "Audio.OutputSecond"
 	MeterAudioInputToken        = "Audio.InputToken"
 	MeterAudioOutputToken       = "Audio.OutputToken"
 	MeterVisionInputLowRes      = "Vision.Input.LowRes"
 	MeterVisionInputHighResTile = "Vision.Input.HighResTile"
-	MeterToolCodeInterpreter   = "Tool.CodeInterpreter"
+	MeterToolCodeInterpreter    = "Tool.CodeInterpreter"
 	MeterToolWebSearch          = "Tool.WebSearch"
 	MeterToolCustom             = "Tool.CustomAPI"
 	MeterGPUInferenceHour       = "GPU.InferenceHour"
@@ -122,101 +122,101 @@ type Tenant struct {
 
 // TraceTreeNode represents a node in the hierarchical execution tree of a trace
 type TraceTreeNode struct {
-	SpanID       string           `json:"span_id"`
-	ParentSpanID string           `json:"parent_span_id"`
-	SpanName     string           `json:"span_name"`
-	AgentID      string           `json:"agent_id"`
-	FeatureID    string           `json:"feature_id"`
-	Provider     string           `json:"provider"`
-	Model        string           `json:"model"`
-	LatencyMs    uint32           `json:"latency_ms"`
-	Timestamp    time.Time        `json:"timestamp"`
-	UsageMeters  []UsageEvent     `json:"usage_meters"`
-	CostItems    []CostItem       `json:"cost_items"`
-	TotalCost    float64          `json:"total_cost"`
-	TotalTokens  float64          `json:"total_tokens"`
-	Children            []*TraceTreeNode `json:"children"`
-	IsFallback          bool             `json:"is_fallback,omitempty"`
-	OriginalModel       string           `json:"original_model,omitempty"`
-	IsSelfHosted        bool             `json:"is_self_hosted,omitempty"`
-	GPUType             string           `json:"gpu_type,omitempty"`
-	GPUCount            int              `json:"gpu_count,omitempty"`
-	GPUDurationMs       uint32           `json:"gpu_duration_ms,omitempty"`
-	EquivalentTokenRate float64          `json:"equivalent_token_rate,omitempty"`
-	IsStreamCapped       bool             `json:"is_stream_capped,omitempty"`
-	CappedTokens         int              `json:"capped_tokens,omitempty"`
-	AvoidedWasteUSD      float64          `json:"avoided_waste_usd,omitempty"`
-	IsPromptCompressed   bool             `json:"is_prompt_compressed,omitempty"`
-	PromptOriginalTokens int              `json:"prompt_original_tokens,omitempty"`
-	PromptSavedTokens    int              `json:"prompt_saved_tokens,omitempty"`
-	PromptSavedUSD       float64          `json:"prompt_saved_usd,omitempty"`
-	IsSmartRouted        bool             `json:"is_smart_routed,omitempty"`
-	RoutedFromModel      string           `json:"routed_from_model,omitempty"`
-	RoutedToModel        string           `json:"routed_to_model,omitempty"`
-	RouterStrategy       string           `json:"router_strategy,omitempty"`
-	FailoverCount        int              `json:"failover_count,omitempty"`
-	IsCacheHit           bool             `json:"is_cache_hit,omitempty"`
-	CacheMatchType       string           `json:"cache_match_type,omitempty"`
-	CacheSimilarity      float64          `json:"cache_similarity,omitempty"`
-	CacheAvoidedCostUSD  float64          `json:"cache_avoided_cost_usd,omitempty"`
-	CacheAvoidedLatencyMs int64           `json:"cache_avoided_latency_ms,omitempty"`
-	HasMultimodal        bool             `json:"has_multimodal,omitempty"`
-	AudioDurationSeconds float64          `json:"audio_duration_seconds,omitempty"`
-	AudioTokens          int              `json:"audio_tokens,omitempty"`
-	ImageCount           int              `json:"image_count,omitempty"`
-	ImageTilesCount      int              `json:"image_tiles_count,omitempty"`
-	ToolCallsCount       int              `json:"tool_calls_count,omitempty"`
-	MultimodalCostUSD    float64          `json:"multimodal_cost_usd,omitempty"`
-	MultimodalDetails    *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
-	IsRateLimited        bool             `json:"is_rate_limited,omitempty"`
-	RateLimitType        string           `json:"rate_limit_type,omitempty"`
-	RateLimitQueuedMs    int              `json:"rate_limit_queued_ms,omitempty"`
+	SpanID                string                 `json:"span_id"`
+	ParentSpanID          string                 `json:"parent_span_id"`
+	SpanName              string                 `json:"span_name"`
+	AgentID               string                 `json:"agent_id"`
+	FeatureID             string                 `json:"feature_id"`
+	Provider              string                 `json:"provider"`
+	Model                 string                 `json:"model"`
+	LatencyMs             uint32                 `json:"latency_ms"`
+	Timestamp             time.Time              `json:"timestamp"`
+	UsageMeters           []UsageEvent           `json:"usage_meters"`
+	CostItems             []CostItem             `json:"cost_items"`
+	TotalCost             float64                `json:"total_cost"`
+	TotalTokens           float64                `json:"total_tokens"`
+	Children              []*TraceTreeNode       `json:"children"`
+	IsFallback            bool                   `json:"is_fallback,omitempty"`
+	OriginalModel         string                 `json:"original_model,omitempty"`
+	IsSelfHosted          bool                   `json:"is_self_hosted,omitempty"`
+	GPUType               string                 `json:"gpu_type,omitempty"`
+	GPUCount              int                    `json:"gpu_count,omitempty"`
+	GPUDurationMs         uint32                 `json:"gpu_duration_ms,omitempty"`
+	EquivalentTokenRate   float64                `json:"equivalent_token_rate,omitempty"`
+	IsStreamCapped        bool                   `json:"is_stream_capped,omitempty"`
+	CappedTokens          int                    `json:"capped_tokens,omitempty"`
+	AvoidedWasteUSD       float64                `json:"avoided_waste_usd,omitempty"`
+	IsPromptCompressed    bool                   `json:"is_prompt_compressed,omitempty"`
+	PromptOriginalTokens  int                    `json:"prompt_original_tokens,omitempty"`
+	PromptSavedTokens     int                    `json:"prompt_saved_tokens,omitempty"`
+	PromptSavedUSD        float64                `json:"prompt_saved_usd,omitempty"`
+	IsSmartRouted         bool                   `json:"is_smart_routed,omitempty"`
+	RoutedFromModel       string                 `json:"routed_from_model,omitempty"`
+	RoutedToModel         string                 `json:"routed_to_model,omitempty"`
+	RouterStrategy        string                 `json:"router_strategy,omitempty"`
+	FailoverCount         int                    `json:"failover_count,omitempty"`
+	IsCacheHit            bool                   `json:"is_cache_hit,omitempty"`
+	CacheMatchType        string                 `json:"cache_match_type,omitempty"`
+	CacheSimilarity       float64                `json:"cache_similarity,omitempty"`
+	CacheAvoidedCostUSD   float64                `json:"cache_avoided_cost_usd,omitempty"`
+	CacheAvoidedLatencyMs int64                  `json:"cache_avoided_latency_ms,omitempty"`
+	HasMultimodal         bool                   `json:"has_multimodal,omitempty"`
+	AudioDurationSeconds  float64                `json:"audio_duration_seconds,omitempty"`
+	AudioTokens           int                    `json:"audio_tokens,omitempty"`
+	ImageCount            int                    `json:"image_count,omitempty"`
+	ImageTilesCount       int                    `json:"image_tiles_count,omitempty"`
+	ToolCallsCount        int                    `json:"tool_calls_count,omitempty"`
+	MultimodalCostUSD     float64                `json:"multimodal_cost_usd,omitempty"`
+	MultimodalDetails     *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
+	IsRateLimited         bool                   `json:"is_rate_limited,omitempty"`
+	RateLimitType         string                 `json:"rate_limit_type,omitempty"`
+	RateLimitQueuedMs     int                    `json:"rate_limit_queued_ms,omitempty"`
 }
 
 // TraceDetail represents the root details of a trace and its full tree
 type TraceDetail struct {
-	TraceID              string         `json:"trace_id"`
-	TenantID             string         `json:"tenant_id"`
-	CustomerID           string         `json:"customer_id"`
-	AppID                string         `json:"app_id"`
-	WorkflowID           string         `json:"workflow_id"`
-	TotalCost            float64        `json:"total_cost"`
-	TotalTokens          float64        `json:"total_tokens"`
-	DurationMs           uint32         `json:"duration_ms"`
-	Timestamp            time.Time      `json:"timestamp"`
-	RootNode             *TraceTreeNode `json:"root_node"`
-	IsFallback           bool           `json:"is_fallback,omitempty"`
-	OriginalModel        string         `json:"original_model,omitempty"`
-	ActualModel          string         `json:"actual_model,omitempty"`
-	CostSaved            float64        `json:"cost_saved,omitempty"`
-	IsStreamCapped       bool           `json:"is_stream_capped,omitempty"`
-	CappedTokens         int            `json:"capped_tokens,omitempty"`
-	AvoidedWasteUSD      float64        `json:"avoided_waste_usd,omitempty"`
-	IsPromptCompressed   bool           `json:"is_prompt_compressed,omitempty"`
-	PromptOriginalTokens int            `json:"prompt_original_tokens,omitempty"`
-	PromptSavedTokens    int            `json:"prompt_saved_tokens,omitempty"`
-	PromptSavedUSD       float64        `json:"prompt_saved_usd,omitempty"`
-	IsSmartRouted        bool           `json:"is_smart_routed,omitempty"`
-	RoutedFromModel      string         `json:"routed_from_model,omitempty"`
-	RoutedToModel        string         `json:"routed_to_model,omitempty"`
-	RouterStrategy       string         `json:"router_strategy,omitempty"`
-	FailoverCount        int            `json:"failover_count,omitempty"`
-	IsCacheHit           bool           `json:"is_cache_hit,omitempty"`
-	CacheMatchType       string         `json:"cache_match_type,omitempty"`
-	CacheSimilarity      float64        `json:"cache_similarity,omitempty"`
-	CacheAvoidedCostUSD  float64        `json:"cache_avoided_cost_usd,omitempty"`
-	CacheAvoidedLatencyMs int64         `json:"cache_avoided_latency_ms,omitempty"`
-	HasMultimodal        bool           `json:"has_multimodal,omitempty"`
-	AudioDurationSeconds float64        `json:"audio_duration_seconds,omitempty"`
-	AudioTokens          int            `json:"audio_tokens,omitempty"`
-	ImageCount           int            `json:"image_count,omitempty"`
-	ImageTilesCount      int            `json:"image_tiles_count,omitempty"`
-	ToolCallsCount       int            `json:"tool_calls_count,omitempty"`
-	MultimodalCostUSD    float64        `json:"multimodal_cost_usd,omitempty"`
-	MultimodalDetails    *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
-	IsRateLimited        bool           `json:"is_rate_limited,omitempty"`
-	RateLimitType        string         `json:"rate_limit_type,omitempty"`
-	RateLimitQueuedMs    int            `json:"rate_limit_queued_ms,omitempty"`
+	TraceID               string                 `json:"trace_id"`
+	TenantID              string                 `json:"tenant_id"`
+	CustomerID            string                 `json:"customer_id"`
+	AppID                 string                 `json:"app_id"`
+	WorkflowID            string                 `json:"workflow_id"`
+	TotalCost             float64                `json:"total_cost"`
+	TotalTokens           float64                `json:"total_tokens"`
+	DurationMs            uint32                 `json:"duration_ms"`
+	Timestamp             time.Time              `json:"timestamp"`
+	RootNode              *TraceTreeNode         `json:"root_node"`
+	IsFallback            bool                   `json:"is_fallback,omitempty"`
+	OriginalModel         string                 `json:"original_model,omitempty"`
+	ActualModel           string                 `json:"actual_model,omitempty"`
+	CostSaved             float64                `json:"cost_saved,omitempty"`
+	IsStreamCapped        bool                   `json:"is_stream_capped,omitempty"`
+	CappedTokens          int                    `json:"capped_tokens,omitempty"`
+	AvoidedWasteUSD       float64                `json:"avoided_waste_usd,omitempty"`
+	IsPromptCompressed    bool                   `json:"is_prompt_compressed,omitempty"`
+	PromptOriginalTokens  int                    `json:"prompt_original_tokens,omitempty"`
+	PromptSavedTokens     int                    `json:"prompt_saved_tokens,omitempty"`
+	PromptSavedUSD        float64                `json:"prompt_saved_usd,omitempty"`
+	IsSmartRouted         bool                   `json:"is_smart_routed,omitempty"`
+	RoutedFromModel       string                 `json:"routed_from_model,omitempty"`
+	RoutedToModel         string                 `json:"routed_to_model,omitempty"`
+	RouterStrategy        string                 `json:"router_strategy,omitempty"`
+	FailoverCount         int                    `json:"failover_count,omitempty"`
+	IsCacheHit            bool                   `json:"is_cache_hit,omitempty"`
+	CacheMatchType        string                 `json:"cache_match_type,omitempty"`
+	CacheSimilarity       float64                `json:"cache_similarity,omitempty"`
+	CacheAvoidedCostUSD   float64                `json:"cache_avoided_cost_usd,omitempty"`
+	CacheAvoidedLatencyMs int64                  `json:"cache_avoided_latency_ms,omitempty"`
+	HasMultimodal         bool                   `json:"has_multimodal,omitempty"`
+	AudioDurationSeconds  float64                `json:"audio_duration_seconds,omitempty"`
+	AudioTokens           int                    `json:"audio_tokens,omitempty"`
+	ImageCount            int                    `json:"image_count,omitempty"`
+	ImageTilesCount       int                    `json:"image_tiles_count,omitempty"`
+	ToolCallsCount        int                    `json:"tool_calls_count,omitempty"`
+	MultimodalCostUSD     float64                `json:"multimodal_cost_usd,omitempty"`
+	MultimodalDetails     *MultimodalUsageDetail `json:"multimodal_details,omitempty"`
+	IsRateLimited         bool                   `json:"is_rate_limited,omitempty"`
+	RateLimitType         string                 `json:"rate_limit_type,omitempty"`
+	RateLimitQueuedMs     int                    `json:"rate_limit_queued_ms,omitempty"`
 }
 
 // OverviewStats provides high level aggregate metrics for the dashboard
@@ -370,7 +370,7 @@ type AnomalyEvent struct {
 	WorkflowID     string    `json:"workflow_id,omitempty"`
 	TraceID        string    `json:"trace_id,omitempty"`
 	SpanID         string    `json:"span_id,omitempty"`
-	Type           string    `json:"type"` // "runaway_loop", "spend_spike", "high_latency_waste"
+	Type           string    `json:"type"`     // "runaway_loop", "spend_spike", "high_latency_waste"
 	Severity       string    `json:"severity"` // "low", "medium", "high", "critical"
 	Title          string    `json:"title"`
 	Description    string    `json:"description"`
@@ -387,7 +387,7 @@ type CostRecommendation struct {
 	Title                      string    `json:"title"`
 	Description                string    `json:"description"`
 	EstimatedMonthlySavingsUSD float64   `json:"estimated_monthly_savings_usd"`
-	ImpactLevel                string    `json:"impact_level"` // "high", "medium", "low"
+	ImpactLevel                string    `json:"impact_level"`     // "high", "medium", "low"
 	ConfidenceScore            float64   `json:"confidence_score"` // 0.0 - 1.0
 	ActionableStep             string    `json:"actionable_step"`
 	CreatedAt                  time.Time `json:"created_at"`
@@ -414,12 +414,12 @@ type GatewayLogPayload struct {
 
 // GuardCheckRequest represents an invocation pre-check sent by SDKs or Gateways
 type GuardCheckRequest struct {
-	TenantID              string `json:"tenant_id"`
-	WorkflowID            string `json:"workflow_id,omitempty"`
-	TraceID               string `json:"trace_id,omitempty"`
-	Model                 string `json:"model"`
-	EstimatedInputTokens  int64  `json:"estimated_input_tokens,omitempty"`
-	CurrentTreeDepth      uint32 `json:"current_tree_depth,omitempty"`
+	TenantID             string `json:"tenant_id"`
+	WorkflowID           string `json:"workflow_id,omitempty"`
+	TraceID              string `json:"trace_id,omitempty"`
+	Model                string `json:"model"`
+	EstimatedInputTokens int64  `json:"estimated_input_tokens,omitempty"`
+	CurrentTreeDepth     uint32 `json:"current_tree_depth,omitempty"`
 }
 
 // GuardCheckResponse returns whether an invocation is allowed or tripped

@@ -31,11 +31,11 @@ type ModelGPUBinding struct {
 
 // GPUCostCalculationRequest represents on-the-fly hardware cost estimation
 type GPUCostCalculationRequest struct {
-	Model         string  `json:"model"`
-	GPUType       string  `json:"gpu_type"`
-	GPUCount      int     `json:"gpu_count"`
-	DurationMs    uint32  `json:"duration_ms"`
-	TotalTokens   int64   `json:"total_tokens"`
+	Model       string `json:"model"`
+	GPUType     string `json:"gpu_type"`
+	GPUCount    int    `json:"gpu_count"`
+	DurationMs  uint32 `json:"duration_ms"`
+	TotalTokens int64  `json:"total_tokens"`
 }
 
 // GPUCostCalculationResult represents output of hardware cost conversion
@@ -56,11 +56,11 @@ type GPUCostCalculationResult struct {
 
 // StreamCappingPolicy defines real-time cutoff thresholds during streaming generation
 type StreamCappingPolicy struct {
-	TenantID         string  `json:"tenant_id"`
-	MaxTokensPerReq  int     `json:"max_tokens_per_req"`   // 0 = unlimited, e.g. 4096
-	MaxCostUSDPerReq float64 `json:"max_cost_usd_per_req"` // 0.0 = unlimited, e.g. 0.05
-	CustomNotice     string  `json:"custom_notice"`        // Injected message on cutoff
-	Enabled          bool    `json:"enabled"`
+	TenantID         string    `json:"tenant_id"`
+	MaxTokensPerReq  int       `json:"max_tokens_per_req"`   // 0 = unlimited, e.g. 4096
+	MaxCostUSDPerReq float64   `json:"max_cost_usd_per_req"` // 0.0 = unlimited, e.g. 0.05
+	CustomNotice     string    `json:"custom_notice"`        // Injected message on cutoff
+	Enabled          bool      `json:"enabled"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
@@ -215,47 +215,47 @@ type RouterSimulateResponse struct {
 
 // SemanticCachePolicy defines the caching policy for a tenant
 type SemanticCachePolicy struct {
-	TenantID            string  `json:"tenant_id"`
-	Enabled             bool    `json:"enabled"`
-	SimilarityThreshold float64 `json:"similarity_threshold"` // default 0.85
-	TTLSeconds          int     `json:"ttl_seconds"`          // default 86400 (24h)
-	MaxCapacity         int     `json:"max_capacity"`         // default 5000 entries
-	MinPromptChars      int     `json:"min_prompt_chars"`     // default 10
+	TenantID            string    `json:"tenant_id"`
+	Enabled             bool      `json:"enabled"`
+	SimilarityThreshold float64   `json:"similarity_threshold"` // default 0.85
+	TTLSeconds          int       `json:"ttl_seconds"`          // default 86400 (24h)
+	MaxCapacity         int       `json:"max_capacity"`         // default 5000 entries
+	MinPromptChars      int       `json:"min_prompt_chars"`     // default 10
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // CacheEntry represents a stored response and its semantic metadata
 type CacheEntry struct {
-	ID                string    `json:"id"`
-	TenantID          string    `json:"tenant_id"`
-	Model             string    `json:"model"`
-	PromptText        string    `json:"prompt_text"`
-	PromptHash        string    `json:"prompt_hash"` // SHA-256
-	SimHash           uint64    `json:"sim_hash"`    // 64-bit SimHash
-	ResponseText      string    `json:"response_text"`
-	ResponseJSON      []byte    `json:"response_json,omitempty"`
-	InputTokens       int       `json:"input_tokens"`
-	OutputTokens      int       `json:"output_tokens"`
-	EstimatedCostUSD  float64   `json:"estimated_cost_usd"`
-	HitCount          int       `json:"hit_count"`
-	AvoidedCostUSD    float64   `json:"avoided_cost_usd"`
-	CreatedAt         time.Time `json:"created_at"`
-	ExpiresAt         time.Time `json:"expires_at"`
-	LastAccessedAt    time.Time `json:"last_accessed_at"`
-}
-
-// CacheEntrySummary is a lightweight representation for table views
-type CacheEntrySummary struct {
 	ID               string    `json:"id"`
 	TenantID         string    `json:"tenant_id"`
 	Model            string    `json:"model"`
-	PromptPreview    string    `json:"prompt_preview"`
-	ResponsePreview  string    `json:"response_preview"`
+	PromptText       string    `json:"prompt_text"`
+	PromptHash       string    `json:"prompt_hash"` // SHA-256
+	SimHash          uint64    `json:"sim_hash"`    // 64-bit SimHash
+	ResponseText     string    `json:"response_text"`
+	ResponseJSON     []byte    `json:"response_json,omitempty"`
+	InputTokens      int       `json:"input_tokens"`
+	OutputTokens     int       `json:"output_tokens"`
+	EstimatedCostUSD float64   `json:"estimated_cost_usd"`
 	HitCount         int       `json:"hit_count"`
 	AvoidedCostUSD   float64   `json:"avoided_cost_usd"`
 	CreatedAt        time.Time `json:"created_at"`
 	ExpiresAt        time.Time `json:"expires_at"`
-	TTLRemainingSec  int64     `json:"ttl_remaining_sec"`
+	LastAccessedAt   time.Time `json:"last_accessed_at"`
+}
+
+// CacheEntrySummary is a lightweight representation for table views
+type CacheEntrySummary struct {
+	ID              string    `json:"id"`
+	TenantID        string    `json:"tenant_id"`
+	Model           string    `json:"model"`
+	PromptPreview   string    `json:"prompt_preview"`
+	ResponsePreview string    `json:"response_preview"`
+	HitCount        int       `json:"hit_count"`
+	AvoidedCostUSD  float64   `json:"avoided_cost_usd"`
+	CreatedAt       time.Time `json:"created_at"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	TTLRemainingSec int64     `json:"ttl_remaining_sec"`
 }
 
 // CacheStats provides aggregated metrics for the cache dashboard
@@ -384,15 +384,15 @@ type MultimodalSimulateResponse struct {
 // RateLimitPolicy defines multidimensional limits for a tenant or specific API key
 type RateLimitPolicy struct {
 	ID              string    `json:"id"`
-	TenantID        string    `json:"tenant_id"`           // "all", "default", or specific tenant
+	TenantID        string    `json:"tenant_id"`            // "all", "default", or specific tenant
 	APIKeyID        string    `json:"api_key_id,omitempty"` // optional specific API Key override
-	Tier            string    `json:"tier"`                // "free", "standard", "enterprise", "custom"
+	Tier            string    `json:"tier"`                 // "free", "standard", "enterprise", "custom"
 	Enabled         bool      `json:"enabled"`
-	LimitRPM        int       `json:"limit_rpm"`           // Requests Per Minute
-	LimitTPM        int       `json:"limit_tpm"`           // Tokens Per Minute
-	LimitCPM        float64   `json:"limit_cpm_usd"`       // Cost USD Per Minute
-	BurstMultiplier float64   `json:"burst_multiplier"`    // e.g. 1.2 to 1.5x burst capacity
-	MaxQueueDelayMs int       `json:"max_queue_delay_ms"`  // Max queue delay before 429 (0 = no wait, e.g. 1500ms)
+	LimitRPM        int       `json:"limit_rpm"`          // Requests Per Minute
+	LimitTPM        int       `json:"limit_tpm"`          // Tokens Per Minute
+	LimitCPM        float64   `json:"limit_cpm_usd"`      // Cost USD Per Minute
+	BurstMultiplier float64   `json:"burst_multiplier"`   // e.g. 1.2 to 1.5x burst capacity
+	MaxQueueDelayMs int       `json:"max_queue_delay_ms"` // Max queue delay before 429 (0 = no wait, e.g. 1500ms)
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
@@ -443,9 +443,9 @@ type ThrottlingStepLog struct {
 type ThrottlingSimulateRequest struct {
 	Tier             string           `json:"tier"` // "free", "standard", "enterprise", "custom"
 	CustomPolicy     *RateLimitPolicy `json:"custom_policy,omitempty"`
-	BurstRequests    int              `json:"burst_requests"`      // e.g. 10 requests at once
-	TokensPerRequest int              `json:"tokens_per_request"`  // e.g. 1500 tokens
-	CostPerRequest   float64          `json:"cost_per_request_usd"`// e.g. 0.02 USD
+	BurstRequests    int              `json:"burst_requests"`       // e.g. 10 requests at once
+	TokensPerRequest int              `json:"tokens_per_request"`   // e.g. 1500 tokens
+	CostPerRequest   float64          `json:"cost_per_request_usd"` // e.g. 0.02 USD
 }
 
 // ThrottlingSimulateResponse provides simulation breakdown and timeline
@@ -508,9 +508,9 @@ type WAFRule struct {
 
 // WAFBannedSource actively blacklisted source IP or user
 type WAFBannedSource struct {
-	Key          string    `json:"key"`           // IP address, User-ID, or Tenant-ID
-	Reason       string    `json:"reason"`        // e.g. "Repeated denial-of-wallet token drain probes"
-	AttackCount  int       `json:"attack_count"`  // Number of attacks before ban
+	Key          string    `json:"key"`          // IP address, User-ID, or Tenant-ID
+	Reason       string    `json:"reason"`       // e.g. "Repeated denial-of-wallet token drain probes"
+	AttackCount  int       `json:"attack_count"` // Number of attacks before ban
 	BannedAt     time.Time `json:"banned_at"`
 	ExpiresAt    time.Time `json:"expires_at"`
 	RemainingSec int64     `json:"remaining_sec"` // Computed countdown seconds
@@ -598,13 +598,13 @@ type WAFSimulateRequest struct {
 
 // WAFSimulateResponse playground simulation outputs
 type WAFSimulateResponse struct {
-	TotalSimulated          int               `json:"total_simulated"`
-	TotalBlocked            int               `json:"total_blocked"`
-	TotalBanned             int               `json:"total_banned"`
-	CumulativeAvoidedLossUSD float64          `json:"cumulative_avoided_loss_usd"`
-	DefenseRatePercent      float64           `json:"defense_rate_percent"`
-	Scenarios               []WAFSimulateTurn `json:"scenarios"`
-	StrategicRecommendations []string         `json:"strategic_recommendations"`
+	TotalSimulated           int               `json:"total_simulated"`
+	TotalBlocked             int               `json:"total_blocked"`
+	TotalBanned              int               `json:"total_banned"`
+	CumulativeAvoidedLossUSD float64           `json:"cumulative_avoided_loss_usd"`
+	DefenseRatePercent       float64           `json:"defense_rate_percent"`
+	Scenarios                []WAFSimulateTurn `json:"scenarios"`
+	StrategicRecommendations []string          `json:"strategic_recommendations"`
 }
 
 // =========================================================================

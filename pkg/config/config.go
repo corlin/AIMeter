@@ -8,11 +8,11 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig   `yaml:"server"`
-	Database  DatabaseConfig `yaml:"database"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
 	Collector CollectorConfig `yaml:"collector"`
-	Rates     RatesConfig    `yaml:"rates"`
-	Auth      AuthConfig     `yaml:"auth"`
+	Rates     RatesConfig     `yaml:"rates"`
+	Auth      AuthConfig      `yaml:"auth"`
 }
 
 type AuthConfig struct {

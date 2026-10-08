@@ -15,12 +15,12 @@ import (
 
 type RatingEngine struct {
 	mu          sync.RWMutex
-	rates       map[string]*domain.RateEntry        // key -> rate entry
-	tenants     map[string]*domain.Tenant           // tenant_id -> tenant
+	rates       map[string]*domain.RateEntry // key -> rate entry
+	tenants     map[string]*domain.Tenant    // tenant_id -> tenant
 	defaultCur  string
 	seedLoaded  bool
-	gpuCatalog  map[string]*domain.GPUCatalogEntry  // GPU_TYPE -> entry
-	gpuBindings map[string]*domain.ModelGPUBinding  // model -> binding
+	gpuCatalog  map[string]*domain.GPUCatalogEntry // GPU_TYPE -> entry
+	gpuBindings map[string]*domain.ModelGPUBinding // model -> binding
 }
 
 func NewRatingEngine() *RatingEngine {
@@ -328,4 +328,3 @@ func (r *RatingEngine) EstimateModelCost(tenantID, provider, model string, input
 	}
 	return cost
 }
-

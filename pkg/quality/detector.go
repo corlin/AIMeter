@@ -23,7 +23,7 @@ func detectRepetition(s string, minLen, minRepeats int) bool {
 			chunk := s[i : i+l]
 			matched := true
 			for r := 1; r < minRepeats; r++ {
-				if s[i+r*l : i+(r+1)*l] != chunk {
+				if s[i+r*l:i+(r+1)*l] != chunk {
 					matched = false
 					break
 				}

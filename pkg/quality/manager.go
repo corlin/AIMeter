@@ -21,9 +21,9 @@ type QualityManager struct {
 }
 
 type qualitySeedData struct {
-	Policies []domain.QualityPolicy       `json:"policies"`
-	Vendors  []domain.VendorCredibility   `json:"vendors"`
-	Traces   []domain.QualityDriftTrace   `json:"traces"`
+	Policies []domain.QualityPolicy     `json:"policies"`
+	Vendors  []domain.VendorCredibility `json:"vendors"`
+	Traces   []domain.QualityDriftTrace `json:"traces"`
 }
 
 // NewQualityManager initializes the manager and loads optional seed data.

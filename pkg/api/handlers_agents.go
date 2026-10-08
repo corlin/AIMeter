@@ -3,15 +3,15 @@ package api
 import (
 	"net/http"
 	"strconv"
-// 	"time"
+	// 	"time"
 
-// 	"github.com/corlin/AIMeter/pkg/kvcache"
-// 	"github.com/corlin/AIMeter/pkg/memory"
+	// 	"github.com/corlin/AIMeter/pkg/kvcache"
+	// 	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/quality"
-// 	"github.com/corlin/AIMeter/pkg/reasoning"
-// 	"github.com/corlin/AIMeter/pkg/sandbox"
-// 	"github.com/corlin/AIMeter/pkg/swarm"
-// 	"github.com/corlin/AIMeter/pkg/workflow"
+	// 	"github.com/corlin/AIMeter/pkg/reasoning"
+	// 	"github.com/corlin/AIMeter/pkg/sandbox"
+	// 	"github.com/corlin/AIMeter/pkg/swarm"
+	// 	"github.com/corlin/AIMeter/pkg/workflow"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/gin-gonic/gin"
 )
@@ -169,9 +169,9 @@ func (h *APIHandler) CompactMemory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"session_id":     body.SessionID,
+		"session_id":      body.SessionID,
 		"compacted_items": len(updated),
-		"items":          updated,
+		"items":           updated,
 	})
 }
 

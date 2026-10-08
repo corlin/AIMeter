@@ -2,7 +2,6 @@ package domain
 
 import (
 	"time"
-
 )
 
 // Phase 31: Model Fine-Tuning, Distillation & LoRA Adapter Asset Engine
@@ -15,7 +14,7 @@ const (
 	FineTuningJobTypeDistillation FineTuningJobType = "distillation" // Generating synthetic data from teacher & training student
 	FineTuningJobTypeSFT          FineTuningJobType = "sft"          // Standard supervised fine-tuning
 	FineTuningJobTypeDPO          FineTuningJobType = "dpo"          // Direct preference optimization
-	FineTuningJobTypeLoRATrain    FineTuningJobType = "lora_train"    // Parameter-efficient adapter fine-tuning
+	FineTuningJobTypeLoRATrain    FineTuningJobType = "lora_train"   // Parameter-efficient adapter fine-tuning
 )
 
 // FineTuningJobStatus tracks training pipeline progression
@@ -76,11 +75,11 @@ type FineTuningJob struct {
 
 // LoRAAdapterAsset financialized adapter tracking continuous inference savings
 type LoRAAdapterAsset struct {
-	ID                   string          `json:"id"`                     // e.g. "lora-quant-sentiment-v2"
+	ID                   string          `json:"id"` // e.g. "lora-quant-sentiment-v2"
 	TenantID             string          `json:"tenant_id"`
 	Name                 string          `json:"name"`
-	BaseModel            string          `json:"base_model"`             // e.g. "Qwen/Qwen2.5-7B"
-	BenchmarkModel       string          `json:"benchmark_model"`        // e.g. "gpt-4o"
+	BaseModel            string          `json:"base_model"`      // e.g. "Qwen/Qwen2.5-7B"
+	BenchmarkModel       string          `json:"benchmark_model"` // e.g. "gpt-4o"
 	JobID                string          `json:"job_id"`
 	TotalCapExUSD        float64         `json:"total_capex_usd"`        // Total training cost to recover
 	AvgCostBenchmarkUSD  float64         `json:"avg_cost_benchmark_usd"` // e.g. $0.015 per call on gpt-4o
@@ -151,27 +150,27 @@ type FineTuningSimulateTurn struct {
 
 // FineTuningSimulateRequest payload for interactive flywheel simulation
 type FineTuningSimulateRequest struct {
-	TeacherModel       string  `json:"teacher_model"`        // e.g. "gpt-4o"
-	StudentModel       string  `json:"student_model"`        // e.g. "Qwen-2.5-7B"
-	SyntheticSamples   int     `json:"synthetic_samples"`    // e.g. 100000
-	GPUModel           string  `json:"gpu_model"`            // e.g. "NVIDIA-H100-SXM"
-	GPUCount           int     `json:"gpu_count"`            // e.g. 8
-	TrainingHours      float64 `json:"training_hours"`        // e.g. 6.0
-	MonthlyInvocations int64   `json:"monthly_invocations"`  // e.g. 500000
-	BenchmarkModel     string  `json:"benchmark_model"`      // e.g. "gpt-4o"
+	TeacherModel       string  `json:"teacher_model"`       // e.g. "gpt-4o"
+	StudentModel       string  `json:"student_model"`       // e.g. "Qwen-2.5-7B"
+	SyntheticSamples   int     `json:"synthetic_samples"`   // e.g. 100000
+	GPUModel           string  `json:"gpu_model"`           // e.g. "NVIDIA-H100-SXM"
+	GPUCount           int     `json:"gpu_count"`           // e.g. 8
+	TrainingHours      float64 `json:"training_hours"`      // e.g. 6.0
+	MonthlyInvocations int64   `json:"monthly_invocations"` // e.g. 500000
+	BenchmarkModel     string  `json:"benchmark_model"`     // e.g. "gpt-4o"
 }
 
 // FineTuningSimulateResponse response for flywheel simulation
 type FineTuningSimulateResponse struct {
-	TotalCapExUSD          float64                  `json:"total_capex_usd"`
-	SyntheticCostUSD       float64                  `json:"synthetic_cost_usd"`
-	ComputeCostUSD         float64                  `json:"compute_cost_usd"`
-	UnitSavedUSD           float64                  `json:"unit_saved_usd"`
-	BreakEvenInvocations   int64                    `json:"break_even_invocations"`
-	BreakEvenMonths        float64                  `json:"break_even_months"`
-	YearOneSavingsUSD      float64                  `json:"year_one_savings_usd"`
-	YearOneNetAlphaUSD     float64                  `json:"year_one_net_alpha_usd"`
-	Timeline               []FineTuningSimulateTurn `json:"timeline"`
+	TotalCapExUSD         float64                  `json:"total_capex_usd"`
+	SyntheticCostUSD      float64                  `json:"synthetic_cost_usd"`
+	ComputeCostUSD        float64                  `json:"compute_cost_usd"`
+	UnitSavedUSD          float64                  `json:"unit_saved_usd"`
+	BreakEvenInvocations  int64                    `json:"break_even_invocations"`
+	BreakEvenMonths       float64                  `json:"break_even_months"`
+	YearOneSavingsUSD     float64                  `json:"year_one_savings_usd"`
+	YearOneNetAlphaUSD    float64                  `json:"year_one_net_alpha_usd"`
+	Timeline              []FineTuningSimulateTurn `json:"timeline"`
 	FinOpsRecommendations []string                 `json:"finops_recommendations"`
 }
 
@@ -203,10 +202,10 @@ const (
 type HeteroBurstStatus string
 
 const (
-	HeteroBurstLocal        HeteroBurstStatus = "local_scheduled"
-	HeteroBurstCloud        HeteroBurstStatus = "cloud_bursted"
-	HeteroBurstQueued       HeteroBurstStatus = "queued_waiting"
-	HeteroBurstRejectedOOM  HeteroBurstStatus = "rejected_oom"
+	HeteroBurstLocal       HeteroBurstStatus = "local_scheduled"
+	HeteroBurstCloud       HeteroBurstStatus = "cloud_bursted"
+	HeteroBurstQueued      HeteroBurstStatus = "queued_waiting"
+	HeteroBurstRejectedOOM HeteroBurstStatus = "rejected_oom"
 )
 
 // HeteroGPUNode represents an on-premise or cloud-attached physical/virtual GPU instance
@@ -273,18 +272,18 @@ type HeteroUsageTrace struct {
 
 // HeteroStatsSummary provides global metrics on heterogeneous clusters and hybrid economics
 type HeteroStatsSummary struct {
-	TotalInvocations           int64   `json:"total_invocations"`
-	LocalScheduledCount        int64   `json:"local_scheduled_count"`
-	CloudBurstedCount          int64   `json:"cloud_bursted_count"`
-	BurstRatioPercent          float64 `json:"burst_ratio_percent"`
-	AvgVRAMUtilPercent         float64 `json:"avg_vram_util_percent"`
-	AvgMFUScore                float64 `json:"avg_mfu_score"`
-	AvgMBUScore                float64 `json:"avg_mbu_score"`
-	TotalCostUSD               float64 `json:"total_cost_usd"`
+	TotalInvocations            int64   `json:"total_invocations"`
+	LocalScheduledCount         int64   `json:"local_scheduled_count"`
+	CloudBurstedCount           int64   `json:"cloud_bursted_count"`
+	BurstRatioPercent           float64 `json:"burst_ratio_percent"`
+	AvgVRAMUtilPercent          float64 `json:"avg_vram_util_percent"`
+	AvgMFUScore                 float64 `json:"avg_mfu_score"`
+	AvgMBUScore                 float64 `json:"avg_mbu_score"`
+	TotalCostUSD                float64 `json:"total_cost_usd"`
 	TotalEquivalentCloudCostUSD float64 `json:"total_equivalent_cloud_cost_usd"`
-	TotalHybridSavingsUSD      float64 `json:"total_hybrid_savings_usd"`
-	ActiveNodesCount           int     `json:"active_nodes_count"`
-	TotalPhysicalVRAMGB        float64 `json:"total_physical_vram_gb"`
+	TotalHybridSavingsUSD       float64 `json:"total_hybrid_savings_usd"`
+	ActiveNodesCount            int     `json:"active_nodes_count"`
+	TotalPhysicalVRAMGB         float64 `json:"total_physical_vram_gb"`
 }
 
 // HeteroDispatchRequest simulates or evaluates request placement
@@ -299,16 +298,16 @@ type HeteroDispatchRequest struct {
 
 // HeteroDispatchResponse returns the scheduling decision and estimated physical costs
 type HeteroDispatchResponse struct {
-	ScheduledNodeID      string            `json:"scheduled_node_id"`
-	NodeType             HeteroNodeType    `json:"node_type"`
-	BurstStatus          HeteroBurstStatus `json:"burst_status"`
-	CurrentVRAMUtil      float64           `json:"current_vram_util"`
-	EstimatedCostUSD     float64           `json:"estimated_cost_usd"`
-	EquivalentCloudCostUSD float64         `json:"equivalent_cloud_cost_usd"`
-	PredictedSavingsUSD  float64           `json:"predicted_savings_usd"`
-	MFUScore             float64           `json:"mfu_score"`
-	MBUScore             float64           `json:"mbu_score"`
-	RoutingReason        string            `json:"routing_reason"`
+	ScheduledNodeID        string            `json:"scheduled_node_id"`
+	NodeType               HeteroNodeType    `json:"node_type"`
+	BurstStatus            HeteroBurstStatus `json:"burst_status"`
+	CurrentVRAMUtil        float64           `json:"current_vram_util"`
+	EstimatedCostUSD       float64           `json:"estimated_cost_usd"`
+	EquivalentCloudCostUSD float64           `json:"equivalent_cloud_cost_usd"`
+	PredictedSavingsUSD    float64           `json:"predicted_savings_usd"`
+	MFUScore               float64           `json:"mfu_score"`
+	MBUScore               float64           `json:"mbu_score"`
+	RoutingReason          string            `json:"routing_reason"`
 }
 
 // HeteroSimulateTurn records a step in multi-tenant concurrency simulation
@@ -498,10 +497,10 @@ type FlywheelSimulateTurn struct {
 
 // FlywheelSimulateRequest configures What-If data flywheel simulation
 type FlywheelSimulateRequest struct {
-	SeedPromptScale          int                        `json:"seed_prompt_scale"` // e.g. 10000
-	CandidateMultiplier      int                        `json:"candidate_multiplier"` // e.g. 4 or 8
-	Algorithm                FlywheelAlignmentAlgorithm `json:"algorithm"` // dpo or ppo
-	TargetModelSize          string                     `json:"target_model_size"` // "7b", "14b", "70b"
+	SeedPromptScale          int                        `json:"seed_prompt_scale"`          // e.g. 10000
+	CandidateMultiplier      int                        `json:"candidate_multiplier"`       // e.g. 4 or 8
+	Algorithm                FlywheelAlignmentAlgorithm `json:"algorithm"`                  // dpo or ppo
+	TargetModelSize          string                     `json:"target_model_size"`          // "7b", "14b", "70b"
 	MonthlyOnlineInvocations int                        `json:"monthly_online_invocations"` // e.g. 500000
 }
 
@@ -518,9 +517,3 @@ type FlywheelSimulateResponse struct {
 	Stages                     []FlywheelSimulateTurn `json:"stages"`
 	ArchitectureAdvice         []string               `json:"architecture_advice"`
 }
-
-
-
-
-
-

@@ -92,10 +92,10 @@ func TestStreamingHardCappingProxyIntegration(t *testing.T) {
 	// 2. Setup Budget Manager with strict limit of 25 tokens
 	bm := budget.NewBudgetManager()
 	bm.UpsertStreamCappingPolicy(domain.StreamCappingPolicy{
-		TenantID:         "test-org",
-		MaxTokensPerReq:  25, // Cap strictly at 25 tokens!
-		CustomNotice:     "\n\n[Budget Cap Triggered]",
-		Enabled:          true,
+		TenantID:        "test-org",
+		MaxTokensPerReq: 25, // Cap strictly at 25 tokens!
+		CustomNotice:    "\n\n[Budget Cap Triggered]",
+		Enabled:         true,
 	})
 
 	fbMgr := NewFallbackManager(nil, nil)

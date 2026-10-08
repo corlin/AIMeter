@@ -404,12 +404,12 @@ func (m *Manager) Simulate(req domain.WAFSimulateRequest) domain.WAFSimulateResp
 	}
 
 	return domain.WAFSimulateResponse{
-		TotalSimulated:          rounds,
-		TotalBlocked:            totalBlocked,
-		TotalBanned:             totalBanned,
+		TotalSimulated:           rounds,
+		TotalBlocked:             totalBlocked,
+		TotalBanned:              totalBanned,
 		CumulativeAvoidedLossUSD: math.Round(cumulativeAvoided*100) / 100,
-		DefenseRatePercent:      math.Round(defenseRate*100) / 100,
-		Scenarios:               scenarios,
+		DefenseRatePercent:       math.Round(defenseRate*100) / 100,
+		Scenarios:                scenarios,
 		StrategicRecommendations: recs,
 	}
 }

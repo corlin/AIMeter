@@ -3,12 +3,12 @@ package proxy
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/corlin/AIMeter/pkg/metrics"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
-	"github.com/corlin/AIMeter/pkg/metrics"
 
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/gin-gonic/gin"
@@ -485,4 +485,3 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 		}
 	}
 }
-

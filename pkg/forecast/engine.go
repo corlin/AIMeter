@@ -20,16 +20,16 @@ import (
 
 // ForecastEngine manages predictive spend forecasting and progressive automated remediation.
 type ForecastEngine struct {
-	mu                 sync.RWMutex
-	store              storage.Store
-	budgetMgr          *budget.BudgetManager
-	compressEngine     *compress.Engine
-	slaArbiter         *router.SLAArbiter
-	throttlerEngine    *throttler.ThrottlerEngine
-	dispatcher         *alertPkg.AlertDispatcher
-	policies           map[string]*domain.RemediationPolicy
-	statuses           map[string]*domain.RemediationStatus
-	cachedProjections  map[string]*domain.ForecastProjection
+	mu                sync.RWMutex
+	store             storage.Store
+	budgetMgr         *budget.BudgetManager
+	compressEngine    *compress.Engine
+	slaArbiter        *router.SLAArbiter
+	throttlerEngine   *throttler.ThrottlerEngine
+	dispatcher        *alertPkg.AlertDispatcher
+	policies          map[string]*domain.RemediationPolicy
+	statuses          map[string]*domain.RemediationStatus
+	cachedProjections map[string]*domain.ForecastProjection
 }
 
 // NewForecastEngine constructs a new ForecastEngine and loads seed policies.
@@ -568,7 +568,7 @@ func (e *ForecastEngine) Simulate(ctx context.Context, req domain.ForecastSimula
 			simulatedPoints = append(simulatedPoints, pt)
 		} else {
 			// Apply traffic multiplier and add-on
-			dailyDelta := (pt.PredictedSpendUSD - simCumulative) * req.TrafficMultiplier + req.DailySpendAddUSD
+			dailyDelta := (pt.PredictedSpendUSD-simCumulative)*req.TrafficMultiplier + req.DailySpendAddUSD
 			if dailyDelta < 0.5 {
 				dailyDelta = 0.5
 			}

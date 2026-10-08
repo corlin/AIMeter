@@ -15,9 +15,9 @@ import (
 type SemanticCacheManager struct {
 	mu          sync.RWMutex
 	policies    map[string]*domain.SemanticCachePolicy
-	entries     map[string]map[string]*domain.CacheEntry     // tenantID -> entryID -> CacheEntry
-	exactIndex  map[string]map[string]string                 // tenantID -> exactHash:model -> entryID
-	stats       map[string]*domain.CacheStats                // tenantID -> CacheStats
+	entries     map[string]map[string]*domain.CacheEntry // tenantID -> entryID -> CacheEntry
+	exactIndex  map[string]map[string]string             // tenantID -> exactHash:model -> entryID
+	stats       map[string]*domain.CacheStats            // tenantID -> CacheStats
 	globalStats *domain.CacheStats
 }
 

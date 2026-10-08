@@ -12,12 +12,12 @@ import (
 
 // WarmedPrefixEntry tracks the prewarmed state of a prefix
 type WarmedPrefixEntry struct {
-	PrefixHash string
-	Model      string
-	TenantID   string
+	PrefixHash   string
+	Model        string
+	TenantID     string
 	PrimedTokens int
-	WarmedAt   time.Time
-	ExpiresAt  time.Time
+	WarmedAt     time.Time
+	ExpiresAt    time.Time
 }
 
 // Prewarmer coordinates dummy probe requests to prime upstream KV cache

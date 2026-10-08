@@ -12,11 +12,11 @@ import (
 
 // Manager coordinates DLP policies, real-time scanning, remediation, audit logging, and telemetry
 type Manager struct {
-	mu           sync.RWMutex
-	policies     map[string]domain.DLPPolicy
-	auditLogs    []domain.DLPAuditLogEntry
-	maxLogs      int
-	scanner      *Scanner
+	mu        sync.RWMutex
+	policies  map[string]domain.DLPPolicy
+	auditLogs []domain.DLPAuditLogEntry
+	maxLogs   int
+	scanner   *Scanner
 
 	// Aggregated metrics
 	totalScans      atomic.Int64
@@ -225,14 +225,14 @@ func (m *Manager) GetStats(tenantID string) domain.DLPStatsSummary {
 	m.typeCountsMu.RUnlock()
 
 	return domain.DLPStatsSummary{
-		TotalScans:         totalScans,
-		TotalViolations:    totalViolations,
-		BlockedCount:       blocked,
-		MaskedCount:        masked,
-		AuditedCount:       audited,
-		AvgScanDurationUs:  avgDuration,
-		ViolationsByType:   typeBreakdown,
-		ActivePolicyCount:  len(m.policies),
+		TotalScans:        totalScans,
+		TotalViolations:   totalViolations,
+		BlockedCount:      blocked,
+		MaskedCount:       masked,
+		AuditedCount:      audited,
+		AvgScanDurationUs: avgDuration,
+		ViolationsByType:  typeBreakdown,
+		ActivePolicyCount: len(m.policies),
 	}
 }
 
@@ -263,12 +263,12 @@ func (m *Manager) Simulate(req domain.DLPSimulateRequest) domain.DLPSimulateResp
 	}
 
 	return domain.DLPSimulateResponse{
-		HasViolations:              result.HasViolations,
-		ActionTaken:                result.ActionTaken,
-		DetectedEntities:           result.DetectedEntities,
-		SanitizedText:              result.SanitizedText,
-		PlaceholderVault:           result.PlaceholderVault,
-		ScanDurationUs:             result.ScanDurationUs,
+		HasViolations:             result.HasViolations,
+		ActionTaken:               result.ActionTaken,
+		DetectedEntities:          result.DetectedEntities,
+		SanitizedText:             result.SanitizedText,
+		PlaceholderVault:          result.PlaceholderVault,
+		ScanDurationUs:            result.ScanDurationUs,
 		SimulatedUnmaskedResponse: simulatedResponse,
 	}
 }

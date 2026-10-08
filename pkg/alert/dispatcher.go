@@ -179,13 +179,13 @@ func (d *AlertDispatcher) Dispatch(ctx context.Context, event NotificationEvent)
 // TestChannel dispatches an immediate test card and returns delivery details
 func (d *AlertDispatcher) TestChannel(ctx context.Context, ch AlertChannel) DeliveryLog {
 	testEvent := NotificationEvent{
-		ID:          uuid.New().String(),
-		TenantID:    ch.TenantID,
-		WorkflowID:  "test-connectivity-flow",
-		EventType:   EventTest,
-		Severity:    "info",
-		Title:       "通道连通性测试 (Connectivity Test)",
-		Message:     fmt.Sprintf("您好！这是来自 AI Meter 的通道测试告警。当前通道 [%s]（%s）已成功建立连接，可正常接收生产事件。", ch.Name, ch.ChannelType),
+		ID:         uuid.New().String(),
+		TenantID:   ch.TenantID,
+		WorkflowID: "test-connectivity-flow",
+		EventType:  EventTest,
+		Severity:   "info",
+		Title:      "通道连通性测试 (Connectivity Test)",
+		Message:    fmt.Sprintf("您好！这是来自 AI Meter 的通道测试告警。当前通道 [%s]（%s）已成功建立连接，可正常接收生产事件。", ch.Name, ch.ChannelType),
 		Metrics: map[string]interface{}{
 			"channel_name": ch.Name,
 			"channel_type": ch.ChannelType,

@@ -161,15 +161,15 @@ func TestSandboxManagerConcurrencyAndRace(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
 				_, _ = mgr.Execute(domain.SandboxExecuteRequest{
-					TenantID:    "concur-tenant",
-					SessionID:   "sess-concur",
-					AgentRole:   "WorkerAgent",
-					Runtime:     domain.SandboxRuntimeDocker,
-					CPU:         2,
-					RAMMB:       2048,
-					DurationMs:  int64(1000 + (j * 100)),
-					ToolName:    "code_interpreter",
-					LLMCostUSD:  0.0050,
+					TenantID:   "concur-tenant",
+					SessionID:  "sess-concur",
+					AgentRole:  "WorkerAgent",
+					Runtime:    domain.SandboxRuntimeDocker,
+					CPU:        2,
+					RAMMB:      2048,
+					DurationMs: int64(1000 + (j * 100)),
+					ToolName:   "code_interpreter",
+					LLMCostUSD: 0.0050,
 				})
 
 				_ = mgr.GetStats()

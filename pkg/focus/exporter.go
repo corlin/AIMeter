@@ -26,14 +26,14 @@ func (e *FocusExporter) ConvertToFocusRecords(costItems []domain.CostItem) []dom
 		periodEnd := periodStart.AddDate(0, 1, 0).Add(-time.Nanosecond)
 
 		tagsMap := map[string]string{
-			"app_id":       item.Attribution.AppID,
-			"workflow_id":  item.Attribution.WorkflowID,
-			"agent_id":     item.Attribution.AgentID,
-			"feature_id":   item.Attribution.FeatureID,
-			"customer_id":  item.Attribution.CustomerID,
-			"environment":  item.Attribution.Environment,
-			"trace_id":     item.TraceID,
-			"span_id":      item.SpanID,
+			"app_id":      item.Attribution.AppID,
+			"workflow_id": item.Attribution.WorkflowID,
+			"agent_id":    item.Attribution.AgentID,
+			"feature_id":  item.Attribution.FeatureID,
+			"customer_id": item.Attribution.CustomerID,
+			"environment": item.Attribution.Environment,
+			"trace_id":    item.TraceID,
+			"span_id":     item.SpanID,
 		}
 		tagsJSON, _ := json.Marshal(tagsMap)
 

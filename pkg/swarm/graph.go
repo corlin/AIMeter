@@ -10,9 +10,9 @@ import (
 
 // Graph represents the dynamic directed collaboration graph for a single Swarm session
 type Graph struct {
-	mu          sync.RWMutex
-	topology    *domain.SwarmTopology
-	edgeIndex   map[string]*domain.SwarmEdge // "from->to" -> edge
+	mu        sync.RWMutex
+	topology  *domain.SwarmTopology
+	edgeIndex map[string]*domain.SwarmEdge // "from->to" -> edge
 }
 
 // NewGraph creates an empty graph for a session

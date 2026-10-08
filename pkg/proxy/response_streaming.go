@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/http"
-	"strings"
-	"time"
-	"strconv"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/metrics"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -211,10 +211,10 @@ func (h *ProxyHandler) handleStreamingResponse(
 	var mmDetail *domain.MultimodalUsageDetail
 	if h.MultimodalEngine != nil && (reqTiles > 0 || reqLowRes > 0 || reqHighRes > 0 || reqAudioSec > 0) {
 		mmDetail = &domain.MultimodalUsageDetail{
-			ImageLowResCount:   reqLowRes,
-			ImageHighResCount:  reqHighRes,
-			ImageTilesCount:    reqTiles,
-			AudioInputSeconds:  reqAudioSec,
+			ImageLowResCount:  reqLowRes,
+			ImageHighResCount: reqHighRes,
+			ImageTilesCount:   reqTiles,
+			AudioInputSeconds: reqAudioSec,
 		}
 		h.MultimodalEngine.CalculateCost(fbResult.ActualModel, mmDetail)
 		h.MultimodalEngine.RecordInvocation(mmDetail)
@@ -346,4 +346,3 @@ func (h *ProxyHandler) handleStreamingResponse(
 		)
 	}
 }
-

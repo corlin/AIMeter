@@ -12,18 +12,18 @@ import (
 
 type federationSeedData struct {
 	Workspaces []*domain.FederationWorkspace `json:"workspaces"`
-	Tasks      []*domain.FederatedTask      `json:"tasks"`
-	Vouchers   []*domain.EscrowVoucher      `json:"vouchers"`
+	Tasks      []*domain.FederatedTask       `json:"tasks"`
+	Vouchers   []*domain.EscrowVoucher       `json:"vouchers"`
 	Stats      domain.FederationStatsSummary `json:"stats"`
 }
 
 // FederationManager acts as the central clearinghouse coordinator
 type FederationManager struct {
-	mu        sync.RWMutex
-	registry  *WorkspaceRegistry
-	vault     *EscrowVault
-	auction   *TaskAuctionHouse
-	stats     domain.FederationStatsSummary
+	mu       sync.RWMutex
+	registry *WorkspaceRegistry
+	vault    *EscrowVault
+	auction  *TaskAuctionHouse
+	stats    domain.FederationStatsSummary
 }
 
 // NewFederationManager instantiates the clearinghouse coordinator

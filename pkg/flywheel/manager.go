@@ -15,10 +15,10 @@ import (
 
 // FlywheelSeedData represents the JSON layout in configs/flywheel_seed.json
 type FlywheelSeedData struct {
-	Datasets []domain.FlywheelDatasetBatch  `json:"datasets"`
+	Datasets []domain.FlywheelDatasetBatch   `json:"datasets"`
 	Pairs    []domain.FlywheelPreferencePair `json:"pairs"`
-	Jobs     []domain.FlywheelAlignmentJob  `json:"jobs"`
-	Traces   []domain.FlywheelUsageTrace    `json:"traces"`
+	Jobs     []domain.FlywheelAlignmentJob   `json:"jobs"`
+	Traces   []domain.FlywheelUsageTrace     `json:"traces"`
 }
 
 // FlywheelManager manages the synthetic data flywheel, alignments and harvesting

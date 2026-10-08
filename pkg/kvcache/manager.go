@@ -12,13 +12,13 @@ import (
 
 // Manager coordinates Radix prefix trie, canonicalization, prewarming and policy management
 type Manager struct {
-	mu             sync.RWMutex
-	trie           *RadixTrie
-	canonicalizer  *Canonicalizer
-	prewarmer      *Prewarmer
-	policies       map[string]domain.KVCachePolicy
-	traces         []*domain.KVCacheTrace
-	maxTraces      int
+	mu            sync.RWMutex
+	trie          *RadixTrie
+	canonicalizer *Canonicalizer
+	prewarmer     *Prewarmer
+	policies      map[string]domain.KVCachePolicy
+	traces        []*domain.KVCacheTrace
+	maxTraces     int
 
 	// Macro Statistics counters
 	totalRequests         int64

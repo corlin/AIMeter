@@ -8,13 +8,13 @@ import (
 
 // LoopDecision contains detection outcome and chosen remediation action
 type LoopDecision struct {
-	HasLoop             bool
-	LoopType            string   // "ping_pong", "cyclic", "total_turns_exceeded", "none"
-	LoopAgents          []string // agents locked in loop
-	Action              domain.SwarmLoopAction
-	TriggerBreakPrompt  bool
-	BreakPromptText     string
-	Reason              string
+	HasLoop            bool
+	LoopType           string   // "ping_pong", "cyclic", "total_turns_exceeded", "none"
+	LoopAgents         []string // agents locked in loop
+	Action             domain.SwarmLoopAction
+	TriggerBreakPrompt bool
+	BreakPromptText    string
+	Reason             string
 }
 
 // LoopDetector provides ultra-low latency graph & sequential pattern analysis

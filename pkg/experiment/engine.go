@@ -72,19 +72,19 @@ func (e *Engine) initDefaultExperiments() {
 		HashKey:    "session_id",
 		Variants: []domain.ExperimentVariant{
 			{
-				ID:                     "A",
-				Name:                   "Baseline: GPT-4o Flagship",
-				Description:            "Commercial general-purpose flagship model without prompt pruning",
-				Model:                  "gpt-4o",
-				SystemPromptOverride:   "You are an expert enterprise legal compliance auditor. Review the provided contract clause thoroughly.",
-				TotalRequests:          1420,
-				TotalTokens:            3280000,
-				TotalCostUSD:           32.80,
-				AvgLatencyMs:           785.4,
-				AvgQualityScore:        4.68,
-				SuccessCount:           1350,
-				CostPerQualityPoint:    7.01,
-				CostPerResolution:      0.0243,
+				ID:                   "A",
+				Name:                 "Baseline: GPT-4o Flagship",
+				Description:          "Commercial general-purpose flagship model without prompt pruning",
+				Model:                "gpt-4o",
+				SystemPromptOverride: "You are an expert enterprise legal compliance auditor. Review the provided contract clause thoroughly.",
+				TotalRequests:        1420,
+				TotalTokens:          3280000,
+				TotalCostUSD:         32.80,
+				AvgLatencyMs:         785.4,
+				AvgQualityScore:      4.68,
+				SuccessCount:         1350,
+				CostPerQualityPoint:  7.01,
+				CostPerResolution:    0.0243,
 			},
 			{
 				ID:                     "B",
@@ -480,7 +480,7 @@ func (e *Engine) RecordFeedback(fb domain.ExperimentFeedback) error {
 				if fb.Score > 0 {
 					curCount := float64(exp.Variants[i].TotalRequests)
 					if curCount > 0 {
-						exp.Variants[i].AvgQualityScore = (exp.Variants[i].AvgQualityScore*0.9) + (fb.Score * 0.1)
+						exp.Variants[i].AvgQualityScore = (exp.Variants[i].AvgQualityScore * 0.9) + (fb.Score * 0.1)
 					}
 				}
 				break

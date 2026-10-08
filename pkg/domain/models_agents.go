@@ -2,7 +2,6 @@ package domain
 
 import (
 	"time"
-
 )
 
 // Phase 22: Multi-Agent Swarm Topology & Loop Audit
@@ -148,58 +147,58 @@ const (
 
 // MemoryItem represents an atomic memory unit managed by AI Meter
 type MemoryItem struct {
-	ID               string     `json:"id"`
-	TenantID         string     `json:"tenant_id"`
-	SessionID        string     `json:"session_id"`
-	AgentName        string     `json:"agent_name"`
-	Role             string     `json:"role"` // "user", "assistant", "system", "tool"
-	Content          string     `json:"content"`
-	SummaryContent   string     `json:"summary_content,omitempty"`
-	Tier             MemoryTier `json:"tier"`
-	Tokens           int        `json:"tokens"`
-	CompressedTokens int        `json:"compressed_tokens"`
-	EstimatedSpendUSD float64   `json:"estimated_spend_usd"`
-	SavedSpendUSD    float64    `json:"saved_spend_usd"`
-	AccessCount      int        `json:"access_count"`
-	UtilityScore     float64    `json:"utility_score"` // 0.0 - 1.0, based on output token overlap
-	IsNoise          bool       `json:"is_noise"`      // true if repeatedly retrieved with 0 utility
-	HalfLifeScore    float64    `json:"half_life_score"`
-	CreatedAt        time.Time  `json:"created_at"`
-	LastAccessedAt   time.Time  `json:"last_accessed_at"`
+	ID                string     `json:"id"`
+	TenantID          string     `json:"tenant_id"`
+	SessionID         string     `json:"session_id"`
+	AgentName         string     `json:"agent_name"`
+	Role              string     `json:"role"` // "user", "assistant", "system", "tool"
+	Content           string     `json:"content"`
+	SummaryContent    string     `json:"summary_content,omitempty"`
+	Tier              MemoryTier `json:"tier"`
+	Tokens            int        `json:"tokens"`
+	CompressedTokens  int        `json:"compressed_tokens"`
+	EstimatedSpendUSD float64    `json:"estimated_spend_usd"`
+	SavedSpendUSD     float64    `json:"saved_spend_usd"`
+	AccessCount       int        `json:"access_count"`
+	UtilityScore      float64    `json:"utility_score"` // 0.0 - 1.0, based on output token overlap
+	IsNoise           bool       `json:"is_noise"`      // true if repeatedly retrieved with 0 utility
+	HalfLifeScore     float64    `json:"half_life_score"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastAccessedAt    time.Time  `json:"last_accessed_at"`
 }
 
 // MemoryPolicy configures tiering thresholds and eviction parameters
 type MemoryPolicy struct {
-	TenantID              string    `json:"tenant_id"`
-	Enabled               bool      `json:"enabled"`
-	MaxHotTurns           int       `json:"max_hot_turns"`           // e.g. 6 recent turns stay hot
-	WarmCompressionRatio  float64   `json:"warm_compression_ratio"`  // e.g. 0.25 (target 75% compression)
-	HalfLifeHours         float64   `json:"half_life_hours"`         // e.g. 24.0 hours
-	NoiseThreshold        float64   `json:"noise_threshold"`         // utility < 0.10 marked as noise
-	MinRecallUtilityPct   float64   `json:"min_recall_utility_pct"`  // e.g. 0.15
-	AutoCompaction        bool      `json:"auto_compaction"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	TenantID             string    `json:"tenant_id"`
+	Enabled              bool      `json:"enabled"`
+	MaxHotTurns          int       `json:"max_hot_turns"`          // e.g. 6 recent turns stay hot
+	WarmCompressionRatio float64   `json:"warm_compression_ratio"` // e.g. 0.25 (target 75% compression)
+	HalfLifeHours        float64   `json:"half_life_hours"`        // e.g. 24.0 hours
+	NoiseThreshold       float64   `json:"noise_threshold"`        // utility < 0.10 marked as noise
+	MinRecallUtilityPct  float64   `json:"min_recall_utility_pct"` // e.g. 0.15
+	AutoCompaction       bool      `json:"auto_compaction"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // MemoryStatsSummary provides high-level metrics for memory asset dashboard
 type MemoryStatsSummary struct {
-	TotalItems            int     `json:"total_items"`
-	HotItemsCount         int     `json:"hot_items_count"`
-	WarmItemsCount        int     `json:"warm_items_count"`
-	ColdItemsCount        int     `json:"cold_items_count"`
-	TotalTokensManaged    int     `json:"total_tokens_managed"`
-	TokensSaved           int     `json:"tokens_saved"`
-	TotalMemorySpendUSD   float64 `json:"total_memory_spend_usd"`
-	TotalAvoidedSpendUSD  float64 `json:"total_avoided_spend_usd"`
-	AvgUtilityScore       float64 `json:"avg_utility_score"`
-	IdentifiedNoiseCount  int     `json:"identified_noise_count"`
+	TotalItems           int     `json:"total_items"`
+	HotItemsCount        int     `json:"hot_items_count"`
+	WarmItemsCount       int     `json:"warm_items_count"`
+	ColdItemsCount       int     `json:"cold_items_count"`
+	TotalTokensManaged   int     `json:"total_tokens_managed"`
+	TokensSaved          int     `json:"tokens_saved"`
+	TotalMemorySpendUSD  float64 `json:"total_memory_spend_usd"`
+	TotalAvoidedSpendUSD float64 `json:"total_avoided_spend_usd"`
+	AvgUtilityScore      float64 `json:"avg_utility_score"`
+	IdentifiedNoiseCount int     `json:"identified_noise_count"`
 }
 
 // MemorySimulateRequest simulates conversation memory accumulation & tiering
 type MemorySimulateRequest struct {
 	TenantID          string        `json:"tenant_id,omitempty"`
-	ConversationTurns int           `json:"conversation_turns"` // e.g. 20 turns
-	AvgTokensPerTurn  int           `json:"avg_tokens_per_turn"`  // e.g. 450
+	ConversationTurns int           `json:"conversation_turns"`  // e.g. 20 turns
+	AvgTokensPerTurn  int           `json:"avg_tokens_per_turn"` // e.g. 450
 	Model             string        `json:"model,omitempty"`
 	PolicyOverride    *MemoryPolicy `json:"policy_override,omitempty"`
 }
@@ -218,15 +217,15 @@ type MemorySimulateTurn struct {
 
 // MemorySimulateResponse returns the simulation curves and savings
 type MemorySimulateResponse struct {
-	TotalTurns              int                  `json:"total_turns"`
-	BaselineTotalTokens     int                  `json:"baseline_total_tokens"`
-	ManagedTotalTokens      int                  `json:"managed_total_tokens"`
-	CompressionSavingsPct   float64              `json:"compression_savings_pct"`
-	BaselineSpendUSD        float64              `json:"baseline_spend_usd"`
-	ManagedSpendUSD         float64              `json:"managed_spend_usd"`
-	NetAvoidedSpendUSD      float64              `json:"net_avoided_spend_usd"`
-	TurnBreakdown           []MemorySimulateTurn `json:"turn_breakdown"`
-	Recommendations         []string             `json:"recommendations"`
+	TotalTurns            int                  `json:"total_turns"`
+	BaselineTotalTokens   int                  `json:"baseline_total_tokens"`
+	ManagedTotalTokens    int                  `json:"managed_total_tokens"`
+	CompressionSavingsPct float64              `json:"compression_savings_pct"`
+	BaselineSpendUSD      float64              `json:"baseline_spend_usd"`
+	ManagedSpendUSD       float64              `json:"managed_spend_usd"`
+	NetAvoidedSpendUSD    float64              `json:"net_avoided_spend_usd"`
+	TurnBreakdown         []MemorySimulateTurn `json:"turn_breakdown"`
+	Recommendations       []string             `json:"recommendations"`
 }
 
 // ==========================================
@@ -265,37 +264,37 @@ type CognitiveSegment struct {
 
 // ReasoningTrace represents an audited chain-of-thought event
 type ReasoningTrace struct {
-	ID                  string             `json:"id"`
-	TenantID            string             `json:"tenant_id"`
-	SessionID           string             `json:"session_id,omitempty"`
-	RequestID           string             `json:"request_id"`
-	Model               string             `json:"model"`
-	PromptPreview       string             `json:"prompt_preview"`
-	FullThinkingText    string             `json:"full_thinking_text"`
-	PrunedThinkingText  string             `json:"pruned_thinking_text,omitempty"`
-	Segments            []CognitiveSegment `json:"segments"`
-	TotalThinkingTokens int                `json:"total_thinking_tokens"`
-	PrunedThinkingTokens int               `json:"pruned_thinking_tokens"`
-	TokensSaved         int                `json:"tokens_saved"`
-	ThinkingCostUSD     float64            `json:"thinking_cost_usd"`
-	WastedCostUSD       float64            `json:"wasted_cost_usd"`
-	OscillationCount    int                `json:"oscillation_count"`
-	OscillationIndex    float64            `json:"oscillation_index"` // 0.0 - 1.0 (COI)
-	RedundancyScore     float64            `json:"redundancy_score"`  // 0.0 - 1.0
-	ActionTaken         ReasoningAction    `json:"action_taken"`
-	CreatedAt           time.Time          `json:"created_at"`
+	ID                   string             `json:"id"`
+	TenantID             string             `json:"tenant_id"`
+	SessionID            string             `json:"session_id,omitempty"`
+	RequestID            string             `json:"request_id"`
+	Model                string             `json:"model"`
+	PromptPreview        string             `json:"prompt_preview"`
+	FullThinkingText     string             `json:"full_thinking_text"`
+	PrunedThinkingText   string             `json:"pruned_thinking_text,omitempty"`
+	Segments             []CognitiveSegment `json:"segments"`
+	TotalThinkingTokens  int                `json:"total_thinking_tokens"`
+	PrunedThinkingTokens int                `json:"pruned_thinking_tokens"`
+	TokensSaved          int                `json:"tokens_saved"`
+	ThinkingCostUSD      float64            `json:"thinking_cost_usd"`
+	WastedCostUSD        float64            `json:"wasted_cost_usd"`
+	OscillationCount     int                `json:"oscillation_count"`
+	OscillationIndex     float64            `json:"oscillation_index"` // 0.0 - 1.0 (COI)
+	RedundancyScore      float64            `json:"redundancy_score"`  // 0.0 - 1.0
+	ActionTaken          ReasoningAction    `json:"action_taken"`
+	CreatedAt            time.Time          `json:"created_at"`
 }
 
 // ReasoningPolicy defines the configuration for thinking budgets and early convergence
 type ReasoningPolicy struct {
 	TenantID             string          `json:"tenant_id"`
 	Enabled              bool            `json:"enabled"`
-	MaxThinkingTokens    int             `json:"max_thinking_tokens"`    // default 4000
-	MaxOscillationTurns  int             `json:"max_oscillation_turns"`  // default 3
-	MaxRedundancyScore   float64         `json:"max_redundancy_score"`   // default 0.35
-	DefaultAction        ReasoningAction `json:"default_action"`         // "converged" or "capped"
-	AutoPruneOnStreaming bool            `json:"auto_prune_on_streaming"`// Early SSE finalization
-	AdaptiveParamInject  bool            `json:"adaptive_param_inject"`  // Adaptive max_thinking_tokens injection
+	MaxThinkingTokens    int             `json:"max_thinking_tokens"`     // default 4000
+	MaxOscillationTurns  int             `json:"max_oscillation_turns"`   // default 3
+	MaxRedundancyScore   float64         `json:"max_redundancy_score"`    // default 0.35
+	DefaultAction        ReasoningAction `json:"default_action"`          // "converged" or "capped"
+	AutoPruneOnStreaming bool            `json:"auto_prune_on_streaming"` // Early SSE finalization
+	AdaptiveParamInject  bool            `json:"adaptive_param_inject"`   // Adaptive max_thinking_tokens injection
 	UpdatedAt            time.Time       `json:"updated_at"`
 }
 
@@ -373,118 +372,118 @@ type ReasoningSimulateResponse struct {
 
 // KVCachePolicy configures prefix matching, canonicalization and prewarming per tenant
 type KVCachePolicy struct {
-	TenantID                 string    `json:"tenant_id"`
-	Enabled                  bool      `json:"enabled"`
-	EnableCanonicalization   bool      `json:"enable_canonicalization"`   // Automatically sink dynamic variables (timestamps, UUIDs) to preserve clean prefixes
-	CanonicalizePatterns     []string  `json:"canonicalize_patterns"`     // Regex patterns to detect & sink (e.g. timestamps, user session keys)
-	MinPrefixTokens          int       `json:"min_prefix_tokens"`          // Minimum length to consider as shared prefix (default 64)
-	BlockAlignmentTokens     int       `json:"block_alignment_tokens"`     // Provider chunk block size (DeepSeek=64, OpenAI=1024, Anthropic=1024)
-	AffinityRoutingEnabled   bool      `json:"affinity_routing_enabled"`   // Route requests with identical trunk prefix to the same target/worker
-	AutoPrewarmEnabled       bool      `json:"auto_prewarm_enabled"`       // Trigger lightweight 1-token dummy probes on updated system prompts
-	PrewarmProbeModel        string    `json:"prewarm_probe_model"`        // Target model for prewarming probes
-	UpdatedAt                time.Time `json:"updated_at"`
+	TenantID               string    `json:"tenant_id"`
+	Enabled                bool      `json:"enabled"`
+	EnableCanonicalization bool      `json:"enable_canonicalization"`  // Automatically sink dynamic variables (timestamps, UUIDs) to preserve clean prefixes
+	CanonicalizePatterns   []string  `json:"canonicalize_patterns"`    // Regex patterns to detect & sink (e.g. timestamps, user session keys)
+	MinPrefixTokens        int       `json:"min_prefix_tokens"`        // Minimum length to consider as shared prefix (default 64)
+	BlockAlignmentTokens   int       `json:"block_alignment_tokens"`   // Provider chunk block size (DeepSeek=64, OpenAI=1024, Anthropic=1024)
+	AffinityRoutingEnabled bool      `json:"affinity_routing_enabled"` // Route requests with identical trunk prefix to the same target/worker
+	AutoPrewarmEnabled     bool      `json:"auto_prewarm_enabled"`     // Trigger lightweight 1-token dummy probes on updated system prompts
+	PrewarmProbeModel      string    `json:"prewarm_probe_model"`      // Target model for prewarming probes
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 // KVCacheNode represents a branch in the pure-Go Radix Prefix Trie
 type KVCacheNode struct {
-	ID                string         `json:"id"`
-	PrefixHash        string         `json:"prefix_hash"`
-	PrefixPreview     string         `json:"prefix_preview"`
-	TokenCount        int            `json:"token_count"`
-	Depth             int            `json:"depth"`
-	HitCount          int64          `json:"hit_count"`
-	TenantID          string         `json:"tenant_id,omitempty"`
-	IsBlockAligned    bool           `json:"is_block_aligned"`
-	LastAccessedAt    time.Time      `json:"last_accessed_at"`
-	Children          []*KVCacheNode `json:"children,omitempty"`
+	ID             string         `json:"id"`
+	PrefixHash     string         `json:"prefix_hash"`
+	PrefixPreview  string         `json:"prefix_preview"`
+	TokenCount     int            `json:"token_count"`
+	Depth          int            `json:"depth"`
+	HitCount       int64          `json:"hit_count"`
+	TenantID       string         `json:"tenant_id,omitempty"`
+	IsBlockAligned bool           `json:"is_block_aligned"`
+	LastAccessedAt time.Time      `json:"last_accessed_at"`
+	Children       []*KVCacheNode `json:"children,omitempty"`
 }
 
 // KVCacheTrace records a single audited request's prefix cache telemetry
 type KVCacheTrace struct {
-	ID                     string    `json:"id"`
-	TenantID               string    `json:"tenant_id"`
-	RequestID              string    `json:"request_id"`
-	Model                  string    `json:"model"`
-	PromptPreview          string    `json:"prompt_preview"`
-	PromptTokens           int       `json:"prompt_tokens"`
-	ActualCachedTokens     int       `json:"actual_cached_tokens"`     // Returned by upstream provider
-	TheoreticalCachedTokens int      `json:"theoretical_cached_tokens"`// Calculated by local Radix Trie
-	ActualHitRatio         float64   `json:"actual_hit_ratio"`         // ActualCached / PromptTokens
-	TheoreticalHitRatio    float64   `json:"theoretical_hit_ratio"`    // TheoreticalCached / PromptTokens
-	CostSavedUSD           float64   `json:"cost_saved_usd"`           // (CachedTokens * (StandardRate - DiscountRate))
-	WasCanonicalized       bool      `json:"was_canonicalized"`        // True if variable sinking rescued the prefix
-	CanonicalizedBoostTokens int     `json:"canonicalized_boost_tokens"`// Extra tokens matched after sink
-	IsPrewarmed            bool      `json:"is_prewarmed"`
-	CreatedAt              time.Time `json:"created_at"`
+	ID                       string    `json:"id"`
+	TenantID                 string    `json:"tenant_id"`
+	RequestID                string    `json:"request_id"`
+	Model                    string    `json:"model"`
+	PromptPreview            string    `json:"prompt_preview"`
+	PromptTokens             int       `json:"prompt_tokens"`
+	ActualCachedTokens       int       `json:"actual_cached_tokens"`       // Returned by upstream provider
+	TheoreticalCachedTokens  int       `json:"theoretical_cached_tokens"`  // Calculated by local Radix Trie
+	ActualHitRatio           float64   `json:"actual_hit_ratio"`           // ActualCached / PromptTokens
+	TheoreticalHitRatio      float64   `json:"theoretical_hit_ratio"`      // TheoreticalCached / PromptTokens
+	CostSavedUSD             float64   `json:"cost_saved_usd"`             // (CachedTokens * (StandardRate - DiscountRate))
+	WasCanonicalized         bool      `json:"was_canonicalized"`          // True if variable sinking rescued the prefix
+	CanonicalizedBoostTokens int       `json:"canonicalized_boost_tokens"` // Extra tokens matched after sink
+	IsPrewarmed              bool      `json:"is_prewarmed"`
+	CreatedAt                time.Time `json:"created_at"`
 }
 
 // KVCacheStatsSummary reports global aggregate metrics for prefix economics dashboard
 type KVCacheStatsSummary struct {
-	TotalRequests              int64   `json:"total_requests"`
-	CachedRequestsCount        int64   `json:"cached_requests_count"`
-	TotalPromptTokens          int64   `json:"total_prompt_tokens"`
-	TotalCachedTokens          int64   `json:"total_cached_tokens"`
-	ActualHitRatio             float64 `json:"actual_hit_ratio"`
-	TheoreticalHitRatio        float64 `json:"theoretical_hit_ratio"`
-	TotalCostSavedUSD          float64 `json:"total_cost_saved_usd"`
-	CanonicalizedCount         int64   `json:"canonicalized_count"`
-	CanonicalizedSavedUSD      float64 `json:"canonicalized_saved_usd"`
-	ActivePrefixNodes          int     `json:"active_prefix_nodes"`
-	PrewarmProbesSent          int     `json:"prewarm_probes_sent"`
+	TotalRequests         int64   `json:"total_requests"`
+	CachedRequestsCount   int64   `json:"cached_requests_count"`
+	TotalPromptTokens     int64   `json:"total_prompt_tokens"`
+	TotalCachedTokens     int64   `json:"total_cached_tokens"`
+	ActualHitRatio        float64 `json:"actual_hit_ratio"`
+	TheoreticalHitRatio   float64 `json:"theoretical_hit_ratio"`
+	TotalCostSavedUSD     float64 `json:"total_cost_saved_usd"`
+	CanonicalizedCount    int64   `json:"canonicalized_count"`
+	CanonicalizedSavedUSD float64 `json:"canonicalized_saved_usd"`
+	ActivePrefixNodes     int     `json:"active_prefix_nodes"`
+	PrewarmProbesSent     int     `json:"prewarm_probes_sent"`
 }
 
 // KVCachePrewarmRequest initiates a dummy probe to prime upstream KV cache
 type KVCachePrewarmRequest struct {
-	TenantID    string `json:"tenant_id"`
-	Model       string `json:"model"`
-	PrefixText  string `json:"prefix_text"`
-	SystemRole  string `json:"system_role,omitempty"`
+	TenantID   string `json:"tenant_id"`
+	Model      string `json:"model"`
+	PrefixText string `json:"prefix_text"`
+	SystemRole string `json:"system_role,omitempty"`
 }
 
 // KVCachePrewarmResponse reports the probe latency, tokens primed and status
 type KVCachePrewarmResponse struct {
-	Success            bool    `json:"success"`
-	PrefixHash         string  `json:"prefix_hash"`
-	PrimedTokens       int     `json:"primed_tokens"`
-	ProbeLatencyMs     int64   `json:"probe_latency_ms"`
-	EstimatedCostUSD   float64 `json:"estimated_cost_usd"`
-	EstimatedTTLSeconds int    `json:"estimated_ttl_seconds"`
-	Message            string  `json:"message"`
+	Success             bool    `json:"success"`
+	PrefixHash          string  `json:"prefix_hash"`
+	PrimedTokens        int     `json:"primed_tokens"`
+	ProbeLatencyMs      int64   `json:"probe_latency_ms"`
+	EstimatedCostUSD    float64 `json:"estimated_cost_usd"`
+	EstimatedTTLSeconds int     `json:"estimated_ttl_seconds"`
+	Message             string  `json:"message"`
 }
 
 // KVCacheScenarioTurn represents a comparison scenario in the simulation playground
 type KVCacheScenarioTurn struct {
-	ScenarioName            string  `json:"scenario_name"`
-	Description             string  `json:"description"`
-	RawPromptTokens         int     `json:"raw_prompt_tokens"`
-	PollutedCachedTokens    int     `json:"polluted_cached_tokens"`     // With unoptimized dynamic timestamp
-	CanonicalizedCachedTokens int   `json:"canonicalized_cached_tokens"`// Rescued by sinking variables
-	RawCostUSD              float64 `json:"raw_cost_usd"`
-	OptimizedCostUSD        float64 `json:"optimized_cost_usd"`
-	CostSavedUSD            float64 `json:"cost_saved_usd"`
-	SavingsPct              float64 `json:"savings_pct"`
-	ExpectedTTFTReductionPct float64 `json:"expected_ttft_reduction_pct"`
+	ScenarioName              string  `json:"scenario_name"`
+	Description               string  `json:"description"`
+	RawPromptTokens           int     `json:"raw_prompt_tokens"`
+	PollutedCachedTokens      int     `json:"polluted_cached_tokens"`      // With unoptimized dynamic timestamp
+	CanonicalizedCachedTokens int     `json:"canonicalized_cached_tokens"` // Rescued by sinking variables
+	RawCostUSD                float64 `json:"raw_cost_usd"`
+	OptimizedCostUSD          float64 `json:"optimized_cost_usd"`
+	CostSavedUSD              float64 `json:"cost_saved_usd"`
+	SavingsPct                float64 `json:"savings_pct"`
+	ExpectedTTFTReductionPct  float64 `json:"expected_ttft_reduction_pct"`
 }
 
 // KVCacheSimulateRequest provides inputs for the interactive prefix playground
 type KVCacheSimulateRequest struct {
-	TenantID       string          `json:"tenant_id,omitempty"`
-	Model          string          `json:"model,omitempty"`
-	RawPromptText  string          `json:"raw_prompt_text,omitempty"`
-	PolicyOverride *KVCachePolicy  `json:"policy_override,omitempty"`
+	TenantID       string         `json:"tenant_id,omitempty"`
+	Model          string         `json:"model,omitempty"`
+	RawPromptText  string         `json:"raw_prompt_text,omitempty"`
+	PolicyOverride *KVCachePolicy `json:"policy_override,omitempty"`
 }
 
 // KVCacheSimulateResponse returns canonicalized preview and scenario comparisons
 type KVCacheSimulateResponse struct {
-	OriginalPrompt           string                `json:"original_prompt"`
-	CanonicalizedPrompt      string                `json:"canonicalized_prompt"`
-	VariablesSunk            []string              `json:"variables_sunk"`
-	OriginalTokens           int                   `json:"original_tokens"`
-	RescuedPrefixTokens      int                   `json:"rescued_prefix_tokens"`
-	EstimatedSavingsUSD      float64               `json:"estimated_savings_usd"`
-	Scenarios                []KVCacheScenarioTurn `json:"scenarios"`
-	RadixTreeSummary         string                `json:"radix_tree_summary"`
-	Recommendations          []string              `json:"recommendations"`
+	OriginalPrompt      string                `json:"original_prompt"`
+	CanonicalizedPrompt string                `json:"canonicalized_prompt"`
+	VariablesSunk       []string              `json:"variables_sunk"`
+	OriginalTokens      int                   `json:"original_tokens"`
+	RescuedPrefixTokens int                   `json:"rescued_prefix_tokens"`
+	EstimatedSavingsUSD float64               `json:"estimated_savings_usd"`
+	Scenarios           []KVCacheScenarioTurn `json:"scenarios"`
+	RadixTreeSummary    string                `json:"radix_tree_summary"`
+	Recommendations     []string              `json:"recommendations"`
 }
 
 // ==========================================
@@ -506,13 +505,13 @@ const (
 type QualityPolicy struct {
 	TenantID               string    `json:"tenant_id"`
 	EnableDetection        bool      `json:"enable_detection"`
-	EnableAutoRepair       bool      `json:"enable_auto_repair"`        // Microsecond syntax/JSON auto-repair
-	HallucinationThreshold float64   `json:"hallucination_threshold"`  // e.g. 0.40 triggers penalty, 0.75 triggers bad-debt
+	EnableAutoRepair       bool      `json:"enable_auto_repair"`      // Microsecond syntax/JSON auto-repair
+	HallucinationThreshold float64   `json:"hallucination_threshold"` // e.g. 0.40 triggers penalty, 0.75 triggers bad-debt
 	BadDebtThreshold       float64   `json:"bad_debt_threshold"`      // e.g. 0.80 triggers 100% write-off
-	RepairedCreditRate     float64   `json:"repaired_credit_rate"`     // e.g. 0.20 (20% discount compensation on repaired outputs)
-	ModeratePenaltyRate    float64   `json:"moderate_penalty_rate"`    // e.g. 0.50 (50% penalty deduction)
-	MaxRepairAttempts      int       `json:"max_repair_attempts"`      // max syntax healing passes
-	AsyncAuditSampleRate   float64   `json:"async_audit_sample_rate"`  // e.g. 0.10 (10% asynchronous deep evaluation)
+	RepairedCreditRate     float64   `json:"repaired_credit_rate"`    // e.g. 0.20 (20% discount compensation on repaired outputs)
+	ModeratePenaltyRate    float64   `json:"moderate_penalty_rate"`   // e.g. 0.50 (50% penalty deduction)
+	MaxRepairAttempts      int       `json:"max_repair_attempts"`     // max syntax healing passes
+	AsyncAuditSampleRate   float64   `json:"async_audit_sample_rate"` // e.g. 0.10 (10% asynchronous deep evaluation)
 	UpdatedAt              time.Time `json:"updated_at"`
 }
 
@@ -655,7 +654,7 @@ type WorkflowStep struct {
 	Name              string             `json:"name"`
 	AgentRole         string             `json:"agent_role"`
 	Parents           []string           `json:"parents"`            // Upstream step dependencies
-	Children          []string           `json:"children,omitempty"`  // Downstream dependents
+	Children          []string           `json:"children,omitempty"` // Downstream dependents
 	Status            WorkflowStepStatus `json:"status"`
 	InputTokens       int                `json:"input_tokens"`
 	OutputTokens      int                `json:"output_tokens"`

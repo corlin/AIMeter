@@ -358,11 +358,11 @@ func (m *WorkflowManager) Simulate(req domain.WorkflowSimulateRequest) domain.Wo
 
 	// 6 typical steps
 	stepDefinitions := []struct {
-		name      string
-		agent     string
-		costUSD   float64
-		tokens    int
-		durSec    int
+		name    string
+		agent   string
+		costUSD float64
+		tokens  int
+		durSec  int
 	}{
 		{"主体资质与多源尽调爬虫收集", "CrawlerAgent", 0.0140, 3200, 4},
 		{"工商底档与失信记录结构化对齐", "NormalizerAgent", 0.0180, 4100, 3},

@@ -11,8 +11,8 @@ import (
 
 // BanList manages dynamic blacklist of malicious IP addresses and user IDs
 type BanList struct {
-	mu           sync.RWMutex
-	banned       map[string]*domain.WAFBannedSource
+	mu            sync.RWMutex
+	banned        map[string]*domain.WAFBannedSource
 	recentAttacks map[string][]time.Time
 }
 

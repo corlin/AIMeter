@@ -15,12 +15,12 @@ import (
 
 // MemoryManager coordinates memory lifecycle, tiering, attribution, and simulation
 type MemoryManager struct {
-	mu           sync.RWMutex
-	itemSeq      uint64
-	policies     map[string]*domain.MemoryPolicy
-	items        map[string]*domain.MemoryItem
-	sessionIndex map[string][]string // sessionID -> itemIDs in temporal order
-	totalSavedTokens int64
+	mu                   sync.RWMutex
+	itemSeq              uint64
+	policies             map[string]*domain.MemoryPolicy
+	items                map[string]*domain.MemoryItem
+	sessionIndex         map[string][]string // sessionID -> itemIDs in temporal order
+	totalSavedTokens     int64
 	totalAvoidedSpendUSD float64
 }
 

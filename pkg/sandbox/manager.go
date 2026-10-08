@@ -22,8 +22,8 @@ type SandboxManager struct {
 }
 
 type sandboxSeedData struct {
-	Stats      domain.SandboxStatsSummary       `json:"stats"`
-	Tools      []domain.ToolClearingItem        `json:"tools"`
+	Stats      domain.SandboxStatsSummary      `json:"stats"`
+	Tools      []domain.ToolClearingItem       `json:"tools"`
 	Executions []domain.SandboxExecutionRecord `json:"executions"`
 }
 

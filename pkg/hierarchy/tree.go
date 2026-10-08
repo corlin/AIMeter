@@ -12,10 +12,10 @@ import (
 
 // OrgTree maintains an in-memory materialized path tree of organization nodes
 type OrgTree struct {
-	mu         sync.RWMutex
-	nodesByID  map[string]*domain.OrgNode
+	mu          sync.RWMutex
+	nodesByID   map[string]*domain.OrgNode
 	nodesByPath map[string]*domain.OrgNode
-	rootIDs    []string
+	rootIDs     []string
 }
 
 // NewOrgTree instantiates an empty tree

@@ -24,8 +24,8 @@ type CheckpointEntry struct {
 // CheckpointStore manages microsecond-level checkpoint persistence and idempotency verification.
 type CheckpointStore struct {
 	mu           sync.RWMutex
-	byKey        map[string]*CheckpointEntry        // lookup by IdempotencyKey
-	byStep       map[string]*CheckpointEntry        // lookup by "wfID:stepID"
+	byKey        map[string]*CheckpointEntry // lookup by IdempotencyKey
+	byStep       map[string]*CheckpointEntry // lookup by "wfID:stepID"
 	stepToKeyMap map[string]string
 }
 

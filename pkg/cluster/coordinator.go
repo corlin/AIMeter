@@ -272,12 +272,12 @@ func (c *ClusterCoordinator) Heartbeat(req domain.NodeHeartbeatRequest) domain.N
 	}
 
 	return domain.NodeHeartbeatResponse{
-		NodeID:                   req.NodeID,
-		Status:                   "ack",
-		GrantedLeases:            granted,
-		PolicyDeltas:             policyDeltas,
+		NodeID:                  req.NodeID,
+		Status:                  "ack",
+		GrantedLeases:           granted,
+		PolicyDeltas:            policyDeltas,
 		NextHeartbeatIntervalMs: 5000,
-		ServerTime:               time.Now().UTC(),
+		ServerTime:              time.Now().UTC(),
 	}
 }
 
