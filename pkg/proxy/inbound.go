@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/metrics"
@@ -148,6 +149,18 @@ func (h *ProxyHandler) parseInboundRequest(c *gin.Context, provider string) (*In
 	isStream, _ := payload["stream"].(bool)
 
 	tenantID := c.GetHeader("X-Tenant-ID")
+	if pinned := auth.PinnedTenant(c); pinned != "" {
+		if tenantID != "" && tenantID != pinned {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": gin.H{
+					"message": "API key is not authorized for the requested X-Tenant-ID",
+					"type":    "permission_error",
+				},
+			})
+			return nil, true
+		}
+		tenantID = pinned
+	}
 	if tenantID == "" {
 		tenantID = "default"
 	}

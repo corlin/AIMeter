@@ -11,13 +11,15 @@ import (
 // ContextResolver extracts and resolves hierarchical business attribution
 type ContextResolver struct {
 	mu         sync.RWMutex
-	spanCache  map[string]spanEntry // spanID -> spanEntry
-	traceRoots map[string]domain.AttributionContext
+	// Both caches are keyed by cacheKey(pinnedTenant, id) so span IDs chosen by
+	// one tenant can never be read or overwritten by another.
+	spanCache  map[string]spanEntry // tenant+spanID -> spanEntry
+	traceRoots map[string]domain.AttributionContext // tenant+traceID -> root context
 }
 
 type spanEntry struct {
 	parentSpanID string
-	traceID      string
+	traceKey     string
 	context      domain.AttributionContext
 	timestamp    time.Time
 }
@@ -36,9 +38,12 @@ func (r *ContextResolver) startCleanupLoop(interval time.Duration) {
 	for range ticker.C {
 		r.mu.Lock()
 		cutoff := time.Now().Add(-10 * time.Minute)
-		for spanID, entry := range r.spanCache {
+		for key, entry := range r.spanCache {
 			if entry.timestamp.Before(cutoff) {
-				delete(r.spanCache, spanID)
+				delete(r.spanCache, key)
+				if entry.parentSpanID == "" {
+					delete(r.traceRoots, entry.traceKey)
+				}
 			}
 		}
 		r.mu.Unlock()
@@ -72,13 +77,17 @@ func ParseBaggage(baggageHeader string) map[string]string {
 	return result
 }
 
-// ResolveContext merges Baggage, Span Attributes and Parent Span inheritance
+// ResolveContext merges Baggage, Span Attributes and Parent Span inheritance.
+// pinnedTenant is the authenticated tenant of the caller (empty when
+// unauthenticated or admin): it overrides any tenant claimed in baggage or
+// attributes and scopes span inheritance to that tenant.
 func (r *ContextResolver) ResolveContext(
 	traceID string,
 	spanID string,
 	parentSpanID string,
 	baggageHeader string,
 	attributes map[string]string,
+	pinnedTenant string,
 ) domain.AttributionContext {
 	ctx := domain.AttributionContext{
 		Environment: "prod",
@@ -90,16 +99,19 @@ func (r *ContextResolver) ResolveContext(
 
 	// 2. Direct Span Attributes
 	applyMap(&ctx, attributes)
+	if pinnedTenant != "" {
+		ctx.TenantID = pinnedTenant
+	}
 
 	// 3. Parent Span / Trace Root cascading inheritance
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if parentSpanID != "" {
-		if parentEntry, exists := r.spanCache[parentSpanID]; exists {
+		if parentEntry, exists := r.spanCache[cacheKey(pinnedTenant, parentSpanID)]; exists {
 			mergeContextIfEmpty(&ctx, parentEntry.context)
 		}
-	} else if traceRoot, exists := r.traceRoots[traceID]; exists {
+	} else if traceRoot, exists := r.traceRoots[cacheKey(pinnedTenant, traceID)]; exists {
 		mergeContextIfEmpty(&ctx, traceRoot)
 	}
 
@@ -126,14 +138,15 @@ func (r *ContextResolver) ResolveContext(
 
 	// Save to cache for downstream child spans
 	if spanID != "" {
-		r.spanCache[spanID] = spanEntry{
+		traceKey := cacheKey(pinnedTenant, traceID)
+		r.spanCache[cacheKey(pinnedTenant, spanID)] = spanEntry{
 			parentSpanID: parentSpanID,
-			traceID:      traceID,
+			traceKey:     traceKey,
 			context:      ctx,
 			timestamp:    time.Now(),
 		}
 		if parentSpanID == "" {
-			r.traceRoots[traceID] = ctx
+			r.traceRoots[traceKey] = ctx
 		}
 	}
 
@@ -200,4 +213,8 @@ func mergeContextIfEmpty(target *domain.AttributionContext, source domain.Attrib
 			target.Environment = source.Environment
 		}
 	}
+}
+
+func cacheKey(tenant, id string) string {
+	return tenant + "\x00" + id
 }

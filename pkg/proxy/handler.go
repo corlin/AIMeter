@@ -412,17 +412,16 @@ func (h *ProxyHandler) recordUsage(
 		TTFTMs:         ttftMs,
 		HTTPStatusCode: statusCode,
 		Attributes:     attrs,
-		Attribution: domain.AttributionContext{
-			TenantID:   tenantID,
-			AppID:      appID,
-			WorkflowID: workflowID,
-		},
 	}
+	// Record the app/workflow the proxy enforced budgets against; the tenant is
+	// pinned below so the ledger always matches the enforcement decision.
+	attrs["app_id"] = appID
+	attrs["workflow_id"] = workflowID
 
 	// Ingest asynchronously through pipeline
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	_ = ctx
-	h.collectorSvc.IngestRawInput(rawInput, baggage)
+	h.collectorSvc.IngestRawInput(rawInput, baggage, tenantID)
 }

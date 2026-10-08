@@ -59,7 +59,7 @@ func RequireConsoleAccess(svc *AuthService, enabled bool) gin.HandlerFunc {
 		if !authenticate(c, svc, scope, enabled) {
 			return
 		}
-		if !pinTenant(c, svc) {
+		if !pinTenant(c) {
 			return
 		}
 		c.Next()
@@ -67,26 +67,22 @@ func RequireConsoleAccess(svc *AuthService, enabled bool) gin.HandlerFunc {
 }
 
 // pinTenant enforces tenant isolation for authenticated non-admin keys.
-func pinTenant(c *gin.Context, svc *AuthService) bool {
-	v, ok := c.Get(ContextKeyAPIKey)
-	if !ok {
-		return true // unauthenticated permissive mode
-	}
-	key := v.(*APIKey)
-	if svc.hasScope(key.Scopes, ScopeAdminAll) {
-		return true
+func pinTenant(c *gin.Context) bool {
+	tenant := PinnedTenant(c)
+	if tenant == "" {
+		return true // unauthenticated permissive mode or admin key
 	}
 
 	q := c.Request.URL.Query()
 	for _, requested := range []string{c.Param("tenant_id"), q.Get("tenant_id")} {
-		if requested != "" && requested != key.TenantID {
+		if requested != "" && requested != tenant {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": "Forbidden: API key is not authorized for the requested tenant",
 			})
 			return false
 		}
 	}
-	q.Set("tenant_id", key.TenantID)
+	q.Set("tenant_id", tenant)
 	c.Request.URL.RawQuery = q.Encode()
 	return true
 }
@@ -153,4 +149,19 @@ func authenticate(c *gin.Context, svc *AuthService, requiredScope string, enable
 	c.Set(ContextKeyTenantID, apiKey.TenantID)
 	c.Set(ContextKeyAPIKey, apiKey)
 	return true
+}
+
+// PinnedTenant returns the tenant an authenticated non-admin key is bound to,
+// or "" when the caller is unauthenticated (permissive mode) or holds admin:*.
+// Callers must ignore any client-claimed tenant when this is non-empty.
+func PinnedTenant(c *gin.Context) string {
+	v, ok := c.Get(ContextKeyAPIKey)
+	if !ok {
+		return ""
+	}
+	key, ok := v.(*APIKey)
+	if !ok || HasScope(key.Scopes, ScopeAdminAll) {
+		return ""
+	}
+	return key.TenantID
 }

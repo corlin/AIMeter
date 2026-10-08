@@ -34,6 +34,7 @@ func TestCascadingParentSpanInheritance(t *testing.T) {
 		map[string]string{
 			"agent.name": "planner-agent",
 		},
+		"",
 	)
 
 	if rootCtx.TenantID != "enterprise-corp" || rootCtx.WorkflowID != "legal-audit" || rootCtx.AgentID != "planner-agent" {
@@ -50,6 +51,7 @@ func TestCascadingParentSpanInheritance(t *testing.T) {
 			"gen_ai.agent.name": "clause-analyzer",
 			"feature.name":      "risk-scoring",
 		},
+		"",
 	)
 
 	// Should inherit TenantID, CustomerID, WorkflowID from parent span
@@ -67,5 +69,30 @@ func TestCascadingParentSpanInheritance(t *testing.T) {
 	}
 	if childCtx.FeatureID != "risk-scoring" {
 		t.Errorf("expected child FeatureID risk-scoring, got %s", childCtx.FeatureID)
+	}
+}
+
+func TestPinnedTenantOverridesClaimsAndIsolatesInheritance(t *testing.T) {
+	resolver := NewContextResolver()
+
+	// Tenant B establishes a root span.
+	resolver.ResolveContext("trace-x", "span-b-root", "", "aimeter.tenant=tenant-b,aimeter.customer=b-secret", nil, "tenant-b")
+
+	// Tenant A claims tenant-b in baggage: the pinned tenant wins.
+	claimed := resolver.ResolveContext("trace-a", "span-a", "", "aimeter.tenant=tenant-b", nil, "tenant-a")
+	if claimed.TenantID != "tenant-a" {
+		t.Fatalf("expected pinned tenant-a, got %s", claimed.TenantID)
+	}
+
+	// Tenant A references tenant B's span IDs: nothing is inherited across tenants.
+	child := resolver.ResolveContext("trace-x", "span-a-child", "span-b-root", "", nil, "tenant-a")
+	if child.TenantID != "tenant-a" || child.CustomerID == "b-secret" {
+		t.Fatalf("cross-tenant inheritance leaked: %+v", child)
+	}
+
+	// Same-tenant inheritance still works.
+	own := resolver.ResolveContext("trace-x", "span-b-child", "span-b-root", "", nil, "tenant-b")
+	if own.CustomerID != "b-secret" {
+		t.Fatalf("expected same-tenant inheritance, got %+v", own)
 	}
 }

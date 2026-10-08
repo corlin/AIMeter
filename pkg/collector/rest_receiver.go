@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/corlin/AIMeter/pkg/attribution"
+	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/normalizer"
@@ -15,21 +16,21 @@ import (
 )
 
 type RESTUsagePayload struct {
-	Timestamp      *time.Time         `json:"timestamp,omitempty"`
-	TraceID        string             `json:"trace_id"`
-	SpanID         string             `json:"span_id"`
-	ParentSpanID   string             `json:"parent_span_id"`
-	Provider       string             `json:"provider"`
-	Model          string             `json:"model"`
-	Region         string             `json:"region"`
-	ServiceTier    string             `json:"service_tier"`
-	LatencyMs      uint32             `json:"latency_ms"`
-	TTFTMs         uint32             `json:"time_to_first_token_ms"`
-	HTTPStatusCode uint16             `json:"http_status_code"`
-	ErrorCode      string             `json:"error_code"`
-	Baggage        string             `json:"baggage"`
+	Timestamp      *time.Time                 `json:"timestamp,omitempty"`
+	TraceID        string                     `json:"trace_id"`
+	SpanID         string                     `json:"span_id"`
+	ParentSpanID   string                     `json:"parent_span_id"`
+	Provider       string                     `json:"provider"`
+	Model          string                     `json:"model"`
+	Region         string                     `json:"region"`
+	ServiceTier    string                     `json:"service_tier"`
+	LatencyMs      uint32                     `json:"latency_ms"`
+	TTFTMs         uint32                     `json:"time_to_first_token_ms"`
+	HTTPStatusCode uint16                     `json:"http_status_code"`
+	ErrorCode      string                     `json:"error_code"`
+	Baggage        string                     `json:"baggage"`
 	Attribution    *domain.AttributionContext `json:"attribution,omitempty"`
-	Attributes     map[string]string  `json:"attributes"`
+	Attributes     map[string]string          `json:"attributes"`
 }
 
 type IngestionService struct {
@@ -53,8 +54,10 @@ func NewIngestionService(
 	}
 }
 
-// IngestRawInput processes a single raw input through the pipeline
-func (s *IngestionService) IngestRawInput(input normalizer.RawUsageInput, baggage string) ([]domain.UsageEvent, []domain.CostItem) {
+// IngestRawInput processes a single raw input through the pipeline.
+// pinnedTenant (see attribution.ContextResolver.ResolveContext) is the
+// authenticated tenant; pass auth.PinnedTenant(c) from HTTP receivers.
+func (s *IngestionService) IngestRawInput(input normalizer.RawUsageInput, baggage, pinnedTenant string) ([]domain.UsageEvent, []domain.CostItem) {
 	// 1. Resolve Attribution Context
 	resolvedContext := s.resolver.ResolveContext(
 		input.TraceID,
@@ -62,6 +65,7 @@ func (s *IngestionService) IngestRawInput(input normalizer.RawUsageInput, baggag
 		input.ParentSpanID,
 		baggage,
 		input.Attributes,
+		pinnedTenant,
 	)
 	input.Attribution = resolvedContext
 
@@ -126,7 +130,7 @@ func (s *IngestionService) RegisterRESTHandler(rg *gin.RouterGroup) {
 				Attributes:     p.Attributes,
 			}
 
-			usages, _ := s.IngestRawInput(input, p.Baggage)
+			usages, _ := s.IngestRawInput(input, p.Baggage, auth.PinnedTenant(c))
 			totalIngested += len(usages)
 		}
 

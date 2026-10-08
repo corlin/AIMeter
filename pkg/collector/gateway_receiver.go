@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/domain"
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/gin-gonic/gin"
@@ -121,7 +122,7 @@ func (s *IngestionService) HandleGatewayLog(c *gin.Context) {
 		Attributes:     attrs,
 	}
 
-	usages, costs := s.IngestRawInput(input, baggageHeader)
+	usages, costs := s.IngestRawInput(input, baggageHeader, auth.PinnedTenant(c))
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":          "accepted",

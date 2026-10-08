@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/gin-gonic/gin"
 )
@@ -111,7 +112,7 @@ func (s *IngestionService) RegisterOTLPHTTPHandler(rg *gin.RouterGroup) {
 						Attributes:     spanAttrs,
 					}
 
-					usages, _ := s.IngestRawInput(input, baggageHeader)
+					usages, _ := s.IngestRawInput(input, baggageHeader, auth.PinnedTenant(c))
 					totalEvents += len(usages)
 				}
 			}

@@ -212,6 +212,11 @@ func (s *AuthService) ValidateKey(rawKey string, requiredScope string) (*APIKey,
 
 // hasScope checks if scopes include the required scope or wildcard admin:*
 func (s *AuthService) hasScope(scopes []string, required string) bool {
+	return HasScope(scopes, required)
+}
+
+// HasScope reports whether scopes grant required (admin:* grants everything).
+func HasScope(scopes []string, required string) bool {
 	for _, sc := range scopes {
 		if sc == ScopeAdminAll || sc == required {
 			return true
