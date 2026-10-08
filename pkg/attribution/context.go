@@ -10,10 +10,10 @@ import (
 
 // ContextResolver extracts and resolves hierarchical business attribution
 type ContextResolver struct {
-	mu         sync.RWMutex
+	mu sync.RWMutex
 	// Both caches are keyed by cacheKey(pinnedTenant, id) so span IDs chosen by
 	// one tenant can never be read or overwritten by another.
-	spanCache  map[string]spanEntry // tenant+spanID -> spanEntry
+	spanCache  map[string]spanEntry                 // tenant+spanID -> spanEntry
 	traceRoots map[string]domain.AttributionContext // tenant+traceID -> root context
 }
 
