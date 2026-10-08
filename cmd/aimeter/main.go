@@ -23,12 +23,12 @@ import (
 	"github.com/corlin/AIMeter/pkg/normalizer"
 	"github.com/corlin/AIMeter/pkg/rater"
 	"github.com/corlin/AIMeter/pkg/storage"
-	"github.com/google/uuid"
 )
 
 func main() {
 	configPath := flag.String("config", "configs/aimeter.yaml", "Path to config YAML file")
 	seedOnly := flag.Bool("seed-only", false, "Seed rates and exit")
+	seedDemo := flag.Bool("seed-demo", false, "Seed demo tenants, budgets, anomalies, a tripped breaker and a demo API key (never in production)")
 	flag.Parse()
 
 	log.Println("==================================================")
@@ -50,28 +50,8 @@ func main() {
 		}
 	}
 
-	// Register sample tenant discount
-	ratingEngine.UpsertTenant(domain.Tenant{
-		ID:              "org-enterprise-1",
-		Name:            "Enterprise Corp",
-		DefaultCurrency: "USD",
-		GlobalDiscount:  0.15, // 15% discount
-	})
-
-	// 2. Initialize Budget Manager & Seed Sample Budgets
+	// 2. Initialize Budget Manager
 	budgetMgr := budget.NewBudgetManager()
-	budgetMgr.UpsertBudget(domain.BudgetRule{
-		TenantID:          "org-enterprise-1",
-		MonthlyLimitUSD:   10.0,
-		WarningThreshold:  0.80,
-		CriticalThreshold: 1.00,
-	})
-	budgetMgr.UpsertBudget(domain.BudgetRule{
-		TenantID:          "org-fintech-2",
-		MonthlyLimitUSD:   5.0,
-		WarningThreshold:  0.80,
-		CriticalThreshold: 1.00,
-	})
 
 	// 3. Initialize Phase 3 Anomaly Detector & Cost Advisor
 	anomalyDetector := anomaly.NewAnomalyDetector()
@@ -89,42 +69,9 @@ func main() {
 	}
 	primaryStore := storage.NewLedgerStore(memStore, chClient)
 
-	// Seed Initial Realistic Demo Anomalies & Recommendations
-	_ = memStore.SaveAnomalyEvent(context.Background(), domain.AnomalyEvent{
-		ID:             uuid.New(),
-		TenantID:       "org-enterprise-1",
-		WorkflowID:     "contract-review-agent",
-		TraceID:        "trace-runaway-9812",
-		Type:           "runaway_loop",
-		Severity:       "critical",
-		Title:          "Agent Runaway Loop Intercepted (Depth: 16)",
-		Description:    "Autonomous agent entered a recursive evaluation loop, creating 16 nested child spans with repeated prompt context.",
-		MetricValue:    16,
-		ThresholdValue: 10,
-		TriggeredAt:    time.Now().Add(-15 * time.Minute),
-	})
-	_ = memStore.SaveAnomalyEvent(context.Background(), domain.AnomalyEvent{
-		ID:             uuid.New(),
-		TenantID:       "org-fintech-2",
-		WorkflowID:     "batch-sec-filings",
-		TraceID:        "trace-spike-4410",
-		Type:           "spend_spike",
-		Severity:       "high",
-		Title:          "Batch Spend Spike ($4.85 in single trace)",
-		Description:    "Single trace execution exceeded $1.00 safety threshold by emitting 98,000 unbudgeted tokens.",
-		MetricValue:    4.85,
-		ThresholdValue: 1.00,
-		TriggeredAt:    time.Now().Add(-42 * time.Minute),
-	})
-
 	// 5. Initialize Phase 4 Guard & Circuit Breaker Manager
 	breakerMgr := guard.NewCircuitBreakerManager(300)
 	guardSvc := guard.NewGuardService(breakerMgr, budgetMgr, primaryStore)
-
-	// Seed demo tripped breaker
-	breakerMgr.Trip("org-enterprise-1", "contract-review-agent", "Runaway loop detected: execution tree depth reached 16 (exceeded limit of 12)", 300)
-	breakerMgr.RecordBlock("org-enterprise-1", "contract-review-agent")
-	breakerMgr.RecordBlock("org-enterprise-1", "contract-review-agent")
 
 	pgClient, err := storage.NewPostgresClient(cfg.Database.Postgres.DSN)
 	if err != nil {
@@ -165,16 +112,11 @@ func main() {
 	contextResolver := attribution.NewContextResolver()
 	ingestionService := collector.NewIngestionService(normalizerInst, contextResolver, ratingEngine, batcher)
 
-	// 8. Initialize Phase 9 Auth Service & Seed Demo Keys
+	// 8. Initialize Phase 9 Auth Service
 	authSvc := auth.NewAuthService()
-	demoKey, err := authSvc.GenerateKey(auth.CreateKeyRequest{
-		TenantID:     "org-enterprise-1",
-		Name:         "Default Gateway Production Key",
-		Scopes:       []string{auth.ScopeProxyInvoke, auth.ScopeGuardCheck, auth.ScopeTelemetryWrite, auth.ScopeReadMetrics},
-		RateLimitQPS: 500,
-	})
-	if err == nil {
-		log.Printf("[INFO Auth] Demo API Key generated (Masked: %s)", demoKey.APIKey.KeyPrefix)
+
+	if *seedDemo {
+		seedDemoData(context.Background(), ratingEngine, budgetMgr, memStore, breakerMgr, authSvc, pgClient)
 	}
 
 	// Bootstrap operator key: with auth enabled, the /api/v1 control plane

@@ -37,10 +37,7 @@ func NewPostgresClient(dsn string) (*PostgresClient, error) {
 		return nil, fmt.Errorf("failed to reach postgres: %w", err)
 	}
 
-	client := &PostgresClient{pool: pool}
-	// Seed default tenants if needed
-	_ = client.SeedDefaultTenants(context.Background())
-	return client, nil
+	return &PostgresClient{pool: pool}, nil
 }
 
 func (p *PostgresClient) Ping(ctx context.Context) error {

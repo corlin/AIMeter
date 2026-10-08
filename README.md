@@ -147,6 +147,7 @@ Tenant → Customer → App → Workflow → Agent → Feature → Model → Pro
 * **极速内存验签 (<0.05ms) 与令牌桶频控**：内置高并发并发安全 LRU 缓存与独立 QPS 令牌桶限流，零 I/O 阻塞，完美坚守预检 `<2ms` 极速门禁，突增超额即刻返回 HTTP 429。
 * **细粒度最小权限作用域 (Granular Scopes)**：原生支持 `proxy:invoke`（代理调用）、`guard:check`（预检拦截）、`telemetry:write`（遥测写入）、`read:metrics`（只读账单）与 `admin:*`（超级管理），杜绝跨权限越权。
 * **独立凭证安全中心 (`/api-keys`)**：支持凭证清单审计、动态签发模态窗、一次性完整明文防盗弹窗，以及一键秒级挂起（Suspend）与吊销（Revoke）。
+* **租户隔离与启用方式**：`auth.enabled: true` 后，代理、预检、遥测与 `/api/v1` 全部要求 API Key；`/api/v1` 读操作需 `read:metrics`、写操作需 `admin:*`；非管理员 Key 被锁定在自身租户（请求其他 `tenant_id` 或 `X-Tenant-ID` 返回 403，遥测中声明的租户被忽略）。首个管理员 Key 通过环境变量 `AIMETER_ADMIN_KEY` 引导。注意：Web 控制台尚无登录流程，开启鉴权后需通过 API 访问。
 
 ### 15. 实时 Token 级流式断流与单次请求硬限额 (Streaming Token-Level Hard-Capping - Phase 12)
 * **微纳秒双轨增量估算引擎**：自研启发式多语言字词比率（中文/CJK ~1.0 Token/字，西文 ~3.8 字符/Token，耗时 `< 50ns`）结合原生 Usage Chunk 动态回填校准，流式转发零延迟阻塞。
@@ -375,7 +376,7 @@ docker compose -f deploy/docker-compose.yml up -d clickhouse postgres
 
 # 编译并启动 AI Meter 后端服务
 go build -o bin/aimeter cmd/aimeter/main.go
-./bin/aimeter --config configs/aimeter.yaml
+./bin/aimeter --config configs/aimeter.yaml --seed-demo  # --seed-demo: 注入演示租户/预算/异常/熔断数据，生产环境不要开启
 
 # 启动前端 Web 控制台
 cd web && npm run dev
