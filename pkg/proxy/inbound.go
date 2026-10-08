@@ -214,10 +214,10 @@ func (h *ProxyHandler) parseInboundRequest(c *gin.Context, provider string) (*In
 
 // handleIdempotencyReplay returns true if an idempotency replay hit was served.
 func (h *ProxyHandler) handleIdempotencyReplay(c *gin.Context, inCtx *InboundContext) bool {
-	if inCtx.IdempKey == "" || h.workflowManager == nil {
+	if inCtx.IdempKey == "" || h.WorkflowManager == nil {
 		return false
 	}
-	cp, found := h.workflowManager.LookupCheckpoint(inCtx.IdempKey)
+	cp, found := h.WorkflowManager.LookupCheckpoint(inCtx.IdempKey)
 	if !found || cp == nil {
 		return false
 	}
@@ -282,10 +282,10 @@ func (h *ProxyHandler) evaluateActiveGuard(c *gin.Context, inCtx *InboundContext
 
 // evaluateExperiment handles Prompt A/B testing overrides.
 func (h *ProxyHandler) evaluateExperiment(c *gin.Context, inCtx *InboundContext) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		return
 	}
-	activeExp, activeVariant, matched := h.experimentEngine.EvaluateRequest(inCtx.TenantID, c.Request, inCtx.ActualModel)
+	activeExp, activeVariant, matched := h.ExperimentEngine.EvaluateRequest(inCtx.TenantID, c.Request, inCtx.ActualModel)
 	if !matched || activeExp == nil || activeVariant == nil {
 		return
 	}
@@ -298,7 +298,7 @@ func (h *ProxyHandler) evaluateExperiment(c *gin.Context, inCtx *InboundContext)
 		var chatMsgs []domain.ChatMessage
 		msgBytes, err := json.Marshal(rawMsgs)
 		if err == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
-			targetModel, rewrittenMsgs := h.experimentEngine.ApplyVariantTransform(activeVariant, inCtx.ActualModel, chatMsgs)
+			targetModel, rewrittenMsgs := h.ExperimentEngine.ApplyVariantTransform(activeVariant, inCtx.ActualModel, chatMsgs)
 			inCtx.ActualModel = targetModel
 			inCtx.Model = targetModel
 			inCtx.Payload["model"] = inCtx.ActualModel
@@ -314,7 +314,7 @@ func (h *ProxyHandler) evaluateExperiment(c *gin.Context, inCtx *InboundContext)
 // evaluateWAF handles threat inspection and prompt injection defense. Returns false if blocked.
 func (h *ProxyHandler) evaluateWAF(c *gin.Context, inCtx *InboundContext) bool {
 	wafBypass := strings.EqualFold(c.GetHeader("X-AIMeter-WAF-Bypass"), "true")
-	if h.wafManager == nil || wafBypass {
+	if h.WAFManager == nil || wafBypass {
 		return true
 	}
 
@@ -340,7 +340,7 @@ func (h *ProxyHandler) evaluateWAF(c *gin.Context, inCtx *InboundContext) bool {
 		userID = c.GetHeader("X-User-ID")
 	}
 
-	wafResp, _, wErr := h.wafManager.InspectAndDecide(c.Request.Context(), inCtx.TenantID, sourceIP, userID, inCtx.SessionID, inCtx.ActualModel, promptForWAF)
+	wafResp, _, wErr := h.WAFManager.InspectAndDecide(c.Request.Context(), inCtx.TenantID, sourceIP, userID, inCtx.SessionID, inCtx.ActualModel, promptForWAF)
 	if wErr != nil || wafResp == nil {
 		return true
 	}
@@ -394,10 +394,10 @@ func (h *ProxyHandler) evaluateWAF(c *gin.Context, inCtx *InboundContext) bool {
 
 // evaluateDLP handles sensitive data masking and blocking. Returns false if blocked.
 func (h *ProxyHandler) evaluateDLP(c *gin.Context, inCtx *InboundContext) bool {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		return true
 	}
-	pol := h.dlpManager.GetPolicy(inCtx.TenantID)
+	pol := h.DLPManager.GetPolicy(inCtx.TenantID)
 	if !pol.Enabled {
 		c.Header("X-AIMeter-DLP-Action", "disabled")
 		return true
@@ -415,7 +415,7 @@ func (h *ProxyHandler) evaluateDLP(c *gin.Context, inCtx *InboundContext) bool {
 		return true
 	}
 
-	sanitized, vault, blocked, dlpResult := h.dlpManager.ScanMessages(inCtx.TenantID, inCtx.TraceID, chatMsgs)
+	sanitized, vault, blocked, dlpResult := h.DLPManager.ScanMessages(inCtx.TenantID, inCtx.TraceID, chatMsgs)
 	inCtx.DLPVault = vault
 	c.Header("X-AIMeter-DLP-Action", string(dlpResult.ActionTaken))
 	if dlpResult.HasViolations {
@@ -456,13 +456,13 @@ func (h *ProxyHandler) evaluateSwarm(c *gin.Context, inCtx *InboundContext) bool
 		parentAgent = "User"
 	}
 
-	if h.swarmManager == nil || agentName == "" {
+	if h.SwarmManager == nil || agentName == "" {
 		return true
 	}
 
 	estTokens := 1200
 	estCost := 0.018
-	_, loopDec := h.swarmManager.RecordTransition(inCtx.TenantID, inCtx.SessionID, inCtx.TraceID, parentAgent, agentName, inCtx.ActualModel, estTokens, estCost)
+	_, loopDec := h.SwarmManager.RecordTransition(inCtx.TenantID, inCtx.SessionID, inCtx.TraceID, parentAgent, agentName, inCtx.ActualModel, estTokens, estCost)
 	if !loopDec.HasLoop {
 		return true
 	}
@@ -509,12 +509,12 @@ func (h *ProxyHandler) evaluateSwarm(c *gin.Context, inCtx *InboundContext) bool
 // evaluateContextOptimizations handles Memory, Reasoning tokens, and KV-Cache canonicalization.
 func (h *ProxyHandler) evaluateContextOptimizations(c *gin.Context, inCtx *InboundContext) {
 	// Memory Lifecycle (Phase 23)
-	if h.memoryManager != nil && inCtx.SessionID != "" {
+	if h.MemoryManager != nil && inCtx.SessionID != "" {
 		if rawMsgs, ok := inCtx.Payload["messages"].([]interface{}); ok && len(rawMsgs) > 4 {
 			var chatMsgs []domain.ChatMessage
 			msgBytes, mErr := json.Marshal(rawMsgs)
 			if mErr == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
-				transformed, _, memSaved := h.memoryManager.TransformMessagesForSession(inCtx.TenantID, inCtx.SessionID, chatMsgs)
+				transformed, _, memSaved := h.MemoryManager.TransformMessagesForSession(inCtx.TenantID, inCtx.SessionID, chatMsgs)
 				if memSaved > 0 {
 					inCtx.Payload["messages"] = transformed
 					c.Header("X-AIMeter-Memory-Tokens", strconv.Itoa(memSaved))
@@ -528,8 +528,8 @@ func (h *ProxyHandler) evaluateContextOptimizations(c *gin.Context, inCtx *Inbou
 	}
 
 	// Reasoning Budget (Phase 24)
-	if h.reasoningManager != nil {
-		rPolicy := h.reasoningManager.GetPolicy(inCtx.TenantID)
+	if h.ReasoningManager != nil {
+		rPolicy := h.ReasoningManager.GetPolicy(inCtx.TenantID)
 		if rPolicy != nil && rPolicy.Enabled && rPolicy.AdaptiveParamInject {
 			if maxThinking, hasThinking := inCtx.Payload["max_thinking_tokens"].(float64); !hasThinking || int(maxThinking) > rPolicy.MaxThinkingTokens {
 				inCtx.Payload["max_thinking_tokens"] = rPolicy.MaxThinkingTokens
@@ -542,8 +542,8 @@ func (h *ProxyHandler) evaluateContextOptimizations(c *gin.Context, inCtx *Inbou
 	}
 
 	// KV-Cache Canonicalization (Phase 25)
-	if h.kvCacheManager != nil {
-		kvPolicy := h.kvCacheManager.GetPolicy(inCtx.TenantID)
+	if h.KVCacheManager != nil {
+		kvPolicy := h.KVCacheManager.GetPolicy(inCtx.TenantID)
 		if kvPolicy.Enabled && kvPolicy.EnableCanonicalization {
 			if rawMsgs, ok := inCtx.Payload["messages"].([]interface{}); ok && len(rawMsgs) > 0 {
 				var chatMsgs []domain.ChatMessage
@@ -553,7 +553,7 @@ func (h *ProxyHandler) evaluateContextOptimizations(c *gin.Context, inCtx *Inbou
 					for idx, msg := range chatMsgs {
 						if msg.Role == "system" || (idx == 0 && msg.Role == "user") {
 							if contentStr, ok := msg.Content.(string); ok && contentStr != "" {
-								clean, canon, _ := h.kvCacheManager.CanonicalizePrompt(contentStr, inCtx.TenantID)
+								clean, canon, _ := h.KVCacheManager.CanonicalizePrompt(contentStr, inCtx.TenantID)
 								if canon {
 									chatMsgs[idx].Content = clean
 									wasCanonicalized = true
@@ -578,9 +578,9 @@ func (h *ProxyHandler) evaluateContextOptimizations(c *gin.Context, inCtx *Inbou
 func (h *ProxyHandler) evaluateEnterpriseBudgets(c *gin.Context, inCtx *InboundContext) bool {
 	// Sandbox Session Budget (Phase 28)
 	sandboxBudgetStr := c.GetHeader("X-AIMeter-Sandbox-Budget")
-	if sandboxBudgetStr != "" && h.sandboxManager != nil && inCtx.SessionID != "" {
+	if sandboxBudgetStr != "" && h.SandboxManager != nil && inCtx.SessionID != "" {
 		if budgetCap, err := strconv.ParseFloat(sandboxBudgetStr, 64); err == nil && budgetCap > 0 {
-			currentSpend := h.sandboxManager.GetSessionSpend(inCtx.SessionID)
+			currentSpend := h.SandboxManager.GetSessionSpend(inCtx.SessionID)
 			if currentSpend >= budgetCap {
 				metrics.RecordProxyRequest(inCtx.Provider, inCtx.ActualModel, "429", false, time.Since(inCtx.StartTime))
 				c.Header("X-AIMeter-Sandbox-Status", string(domain.SandboxStatusBudgetBreached))
@@ -613,8 +613,8 @@ func (h *ProxyHandler) evaluateEnterpriseBudgets(c *gin.Context, inCtx *InboundC
 		orgPriority = domain.OrgPriorityP1
 	}
 
-	if orgPath != "" && h.hierarchyManager != nil {
-		checkRes := h.hierarchyManager.CheckBudget(orgPath, 0.005, orgPriority)
+	if orgPath != "" && h.HierarchyManager != nil {
+		checkRes := h.HierarchyManager.CheckBudget(orgPath, 0.005, orgPriority)
 		c.Header("X-AIMeter-Org-Path", orgPath)
 		c.Header("X-AIMeter-Org-Action", string(checkRes.Action))
 		c.Header("X-AIMeter-Org-Remaining-USD", fmt.Sprintf("%.4f", checkRes.RemainingQuotaUSD))
@@ -654,7 +654,7 @@ func (h *ProxyHandler) evaluateEnterpriseBudgets(c *gin.Context, inCtx *InboundC
 	}
 	voucherID := c.GetHeader("X-AIMeter-Escrow-Voucher-ID")
 
-	if fedWs != "" && h.federationManager != nil {
+	if fedWs != "" && h.FederationManager != nil {
 		bountyUSD := 0.05
 		if bStr := c.GetHeader("X-AIMeter-Federation-Bounty"); bStr != "" {
 			if v, err := strconv.ParseFloat(bStr, 64); err == nil && v > 0 {
@@ -663,7 +663,7 @@ func (h *ProxyHandler) evaluateEnterpriseBudgets(c *gin.Context, inCtx *InboundC
 		}
 
 		if voucherID == "" {
-			vch, err := h.federationManager.CheckAndReserveGateway(fedWs, targetWs, bountyUSD)
+			vch, err := h.FederationManager.CheckAndReserveGateway(fedWs, targetWs, bountyUSD)
 			if err != nil {
 				metrics.RecordProxyRequest(inCtx.Provider, inCtx.ActualModel, "402", false, time.Since(inCtx.StartTime))
 				c.Header("X-AIMeter-Settlement-Status", "disputed")
@@ -694,7 +694,7 @@ func (h *ProxyHandler) evaluateRoutingAndCompression(c *gin.Context, inCtx *Inbo
 		c.GetHeader("X-AIMeter-Router-Strategy") != "" ||
 		c.GetHeader("X-AIMeter-Router-Pool") != ""
 
-	if isRouterRequested && h.slaArbiter != nil {
+	if isRouterRequested && h.SLAArbiter != nil {
 		poolAlias := "router:auto"
 		if strings.HasPrefix(strings.ToLower(inCtx.ActualModel), "router:") {
 			poolAlias = inCtx.ActualModel
@@ -703,7 +703,7 @@ func (h *ProxyHandler) evaluateRoutingAndCompression(c *gin.Context, inCtx *Inbo
 		}
 
 		strategy := domain.RouterStrategy(c.GetHeader("X-AIMeter-Router-Strategy"))
-		routerPool, poolErr := h.slaArbiter.GetPool(inCtx.TenantID, poolAlias)
+		routerPool, poolErr := h.SLAArbiter.GetPool(inCtx.TenantID, poolAlias)
 		if poolErr == nil && routerPool != nil {
 			inCtx.RouterPool = routerPool
 			inputTokensEst := 1200
@@ -722,7 +722,7 @@ func (h *ProxyHandler) evaluateRoutingAndCompression(c *gin.Context, inCtx *Inbo
 				}
 			}
 
-			target, decision, selectErr := h.slaArbiter.SelectBestTarget(c.Request.Context(), routerPool, strategy, inputTokensEst, 400, nil)
+			target, decision, selectErr := h.SLAArbiter.SelectBestTarget(c.Request.Context(), routerPool, strategy, inputTokensEst, 400, nil)
 			if selectErr == nil && target != nil && decision != nil {
 				inCtx.RoutingStats.IsRouted = true
 				inCtx.RoutingStats.RequestedModel = inCtx.ActualModel
@@ -740,10 +740,10 @@ func (h *ProxyHandler) evaluateRoutingAndCompression(c *gin.Context, inCtx *Inbo
 	}
 
 	// Prompt Compression (Phase 13)
-	if h.compressEngine != nil {
+	if h.CompressEngine != nil {
 		var compPolicy domain.PromptCompressionPolicy
-		if h.budgetMgr != nil {
-			compPolicy = h.budgetMgr.GetPromptCompressionPolicy(inCtx.TenantID)
+		if h.BudgetManager != nil {
+			compPolicy = h.BudgetManager.GetPromptCompressionPolicy(inCtx.TenantID)
 		} else {
 			compPolicy = domain.PromptCompressionPolicy{
 				Enabled:             true,
@@ -766,7 +766,7 @@ func (h *ProxyHandler) evaluateRoutingAndCompression(c *gin.Context, inCtx *Inbo
 				var chatMsgs []domain.ChatMessage
 				msgBytes, err := json.Marshal(rawMsgs)
 				if err == nil && json.Unmarshal(msgBytes, &chatMsgs) == nil {
-					res := h.compressEngine.CompressMessages(chatMsgs, compPolicy)
+					res := h.CompressEngine.CompressMessages(chatMsgs, compPolicy)
 					if res.SavedTokens > 0 {
 						inCtx.CompStats.Compressed = true
 						inCtx.CompStats.OriginalTokens = res.OriginalTokens
@@ -803,13 +803,13 @@ func (h *ProxyHandler) evaluateRoutingAndCompression(c *gin.Context, inCtx *Inbo
 	}
 
 	// Multimodal request inspection (Phase 16)
-	if h.multimodalEngine != nil {
-		inCtx.ReqLowRes, inCtx.ReqHighRes, inCtx.ReqTiles, inCtx.ReqAudioSec, _ = h.multimodalEngine.InspectRequest(inCtx.BodyBytes)
+	if h.MultimodalEngine != nil {
+		inCtx.ReqLowRes, inCtx.ReqHighRes, inCtx.ReqTiles, inCtx.ReqAudioSec, _ = h.MultimodalEngine.InspectRequest(inCtx.BodyBytes)
 	}
 
 	// Stream Capping policy (Phase 12)
-	if h.budgetMgr != nil {
-		policy := h.budgetMgr.GetStreamCappingPolicy(inCtx.TenantID)
+	if h.BudgetManager != nil {
+		policy := h.BudgetManager.GetStreamCappingPolicy(inCtx.TenantID)
 		if policy.Enabled {
 			inCtx.MaxTokensLimit = policy.MaxTokensPerReq
 			inCtx.CustomNotice = policy.CustomNotice
@@ -842,11 +842,11 @@ func (h *ProxyHandler) evaluateSemanticCache(c *gin.Context, inCtx *InboundConte
 		}
 	}
 
-	if h.cacheMgr == nil || isCacheDisabled || isCacheRefresh || len(promptText) == 0 {
+	if h.CacheManager == nil || isCacheDisabled || isCacheRefresh || len(promptText) == 0 {
 		return false
 	}
 
-	cachedEntry, matchType, similarity, isHit := h.cacheMgr.Lookup(inCtx.TenantID, inCtx.ActualModel, promptText, cacheThresholdOverride)
+	cachedEntry, matchType, similarity, isHit := h.CacheManager.Lookup(inCtx.TenantID, inCtx.ActualModel, promptText, cacheThresholdOverride)
 	if !isHit || cachedEntry == nil {
 		return false
 	}
@@ -937,21 +937,21 @@ func (h *ProxyHandler) evaluateThrottling(c *gin.Context, inCtx *InboundContext)
 	}
 	inCtx.EstTotalTokens = estTokens + 300
 	inCtx.EstCost = 0.002
-	if h.raterEngine != nil {
-		inCtx.EstCost = h.raterEngine.EstimateModelCost(inCtx.TenantID, inCtx.Provider, inCtx.ActualModel, estTokens, 300)
+	if h.RaterEngine != nil {
+		inCtx.EstCost = h.RaterEngine.EstimateModelCost(inCtx.TenantID, inCtx.Provider, inCtx.ActualModel, estTokens, 300)
 	}
 	if inCtx.EstCost <= 0 {
 		inCtx.EstCost = float64(inCtx.EstTotalTokens) * 0.000003
 	}
 
-	if h.throttlerEngine == nil {
+	if h.ThrottlerEngine == nil {
 		return true
 	}
 
-	throttlingDecision := h.throttlerEngine.Evaluate(c.Request.Context(), inCtx.TenantID, inCtx.ApiKeyID, inCtx.EstTotalTokens, inCtx.EstCost)
+	throttlingDecision := h.ThrottlerEngine.Evaluate(c.Request.Context(), inCtx.TenantID, inCtx.ApiKeyID, inCtx.EstTotalTokens, inCtx.EstCost)
 	inCtx.ThrottlingDecision = throttlingDecision
 
-	policy := h.throttlerEngine.GetPolicy(inCtx.TenantID, inCtx.ApiKeyID)
+	policy := h.ThrottlerEngine.GetPolicy(inCtx.TenantID, inCtx.ApiKeyID)
 	c.Header("X-RateLimit-Limit-RPM", strconv.Itoa(policy.LimitRPM))
 	c.Header("X-RateLimit-Remaining-RPM", strconv.Itoa(throttlingDecision.RemainingRPM))
 	c.Header("X-RateLimit-Limit-TPM", strconv.Itoa(policy.LimitTPM))
@@ -960,8 +960,8 @@ func (h *ProxyHandler) evaluateThrottling(c *gin.Context, inCtx *InboundContext)
 	c.Header("X-RateLimit-Remaining-CPM", fmt.Sprintf("%.4f", throttlingDecision.RemainingCPM))
 	c.Header("X-RateLimit-Reset", strconv.FormatInt(throttlingDecision.ResetTimestamp, 10))
 
-	if h.forecastEngine != nil {
-		status := h.forecastEngine.GetStatus(inCtx.TenantID)
+	if h.ForecastEngine != nil {
+		status := h.ForecastEngine.GetStatus(inCtx.TenantID)
 		if status.CurrentLevel > domain.RemediationLevelNormal {
 			c.Header("X-AIMeter-Remediation-Level", strconv.Itoa(int(status.CurrentLevel)))
 			if len(status.ActiveActions) > 0 {
@@ -970,7 +970,7 @@ func (h *ProxyHandler) evaluateThrottling(c *gin.Context, inCtx *InboundContext)
 		}
 	}
 
-	if h.clusterCoordinator != nil {
+	if h.ClusterCoordinator != nil {
 		c.Header("X-AIMeter-Cluster-Node", "hub-primary")
 		c.Header("X-AIMeter-Cluster-Region", "us-east-1")
 	}

@@ -30,7 +30,7 @@ func TestProxyWorkflowCheckpointReplay(t *testing.T) {
 
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyH.SetWorkflowManager(wm)
+	proxyH.WorkflowManager = wm
 
 	router := gin.New()
 	router.POST("/v1/chat/completions", proxyH.HandleChatCompletions)

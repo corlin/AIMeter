@@ -65,7 +65,7 @@ func TestProxyMultimodalAndToolIntegration(t *testing.T) {
 	proxyHandler := NewProxyHandler(fallbackMgr, nil, upstreamServer.Client())
 	proxyHandler.SetUpstreamURL("openai", upstreamServer.URL)
 	mmEngine := multimodal.NewMultimodalEngine()
-	proxyHandler.SetMultimodalEngine(mmEngine)
+	proxyHandler.MultimodalEngine = mmEngine
 
 	router := gin.New()
 	router.POST("/v1/chat/completions", proxyHandler.HandleChatCompletions)

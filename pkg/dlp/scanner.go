@@ -2,7 +2,6 @@ package dlp
 
 import (
 	"fmt"
-	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -13,16 +12,16 @@ import (
 
 var (
 	// Pre-compiled regex patterns for PII & Secrets
-	reEmail       = regexp.MustCompile(`(?i)\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b`)
-	rePhoneCN     = regexp.MustCompile(`\b(?:(?:\+?86)|(?:\(\+?86\)))?(?:1[3-9]\d{9})\b`)
-	rePhoneHyphen = regexp.MustCompile(`\b1[3-9]\d{1}-\d{4}-\d{4}\b`)
-	reIDCardCN    = regexp.MustCompile(`\b[1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b`)
-	reBankCard    = regexp.MustCompile(`\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9]{2})[0-9]{12}|3[47][0-9]{13}|62[0-9]{14,17})\b`)
+	reEmail        = regexp.MustCompile(`(?i)\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b`)
+	rePhoneCN      = regexp.MustCompile(`\b(?:(?:\+?86)|(?:\(\+?86\)))?(?:1[3-9]\d{9})\b`)
+	rePhoneHyphen  = regexp.MustCompile(`\b1[3-9]\d{1}-\d{4}-\d{4}\b`)
+	reIDCardCN     = regexp.MustCompile(`\b[1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b`)
+	reBankCard     = regexp.MustCompile(`\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9]{2})[0-9]{12}|3[47][0-9]{13}|62[0-9]{14,17})\b`)
 	reAPIKeyOpenAI = regexp.MustCompile(`\bsk-(?:proj-)?[a-zA-Z0-9_-]{20,}\b`)
-	reAPIKeyAWS   = regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)
-	reJWT         = regexp.MustCompile(`\bey[a-zA-Z0-9_-]{15,}\.ey[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]{10,}\b`)
-	rePrivateIP   = regexp.MustCompile(`\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b`)
-	reConnString  = regexp.MustCompile(`(?i)\b(?:postgres|mysql|mongodb|redis):\/\/[^\s"']+\b`)
+	reAPIKeyAWS    = regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)
+	reJWT          = regexp.MustCompile(`\bey[a-zA-Z0-9_-]{15,}\.ey[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]{10,}\b`)
+	rePrivateIP    = regexp.MustCompile(`\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b`)
+	reConnString   = regexp.MustCompile(`(?i)\b(?:postgres|mysql|mongodb|redis):\/\/[^\s"']+\b`)
 )
 
 // Scanner implements high-performance zero-external-dependency PII detection
@@ -59,24 +58,6 @@ func isValidLuhn(number string) bool {
 		double = !double
 	}
 	return checksum%10 == 0
-}
-
-// Shannon entropy calculation for secret detection
-func calculateShannonEntropy(s string) float64 {
-	if len(s) == 0 {
-		return 0
-	}
-	freq := make(map[rune]float64)
-	for _, ch := range s {
-		freq[ch]++
-	}
-	var entropy float64
-	lenF := float64(len(s))
-	for _, count := range freq {
-		p := count / lenF
-		entropy -= p * math.Log2(p)
-	}
-	return entropy
 }
 
 // ScanAndRemediate performs 2-phase scanning and applies configured remediation (Block / Mask / Audit)

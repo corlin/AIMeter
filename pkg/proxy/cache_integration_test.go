@@ -56,8 +56,8 @@ func TestProxySemanticCacheIntegration(t *testing.T) {
 
 	proxyHandler := NewProxyHandler(nil, nil, mockUpstream.Client())
 	proxyHandler.SetUpstreamURL("openai", mockUpstream.URL)
-	proxyHandler.SetCacheManager(cacheMgr)
-	proxyHandler.SetRaterEngine(ratingEngine)
+	proxyHandler.CacheManager = cacheMgr
+	proxyHandler.RaterEngine = ratingEngine
 
 	r := gin.New()
 	r.POST("/v1/chat/completions", proxyHandler.HandleChatCompletions)
@@ -213,7 +213,7 @@ func TestProxySemanticCacheStreamStorage(t *testing.T) {
 	cacheMgr := cache.NewSemanticCacheManager()
 	proxyHandler := NewProxyHandler(nil, nil, mockUpstream.Client())
 	proxyHandler.SetUpstreamURL("openai", mockUpstream.URL)
-	proxyHandler.SetCacheManager(cacheMgr)
+	proxyHandler.CacheManager = cacheMgr
 
 	r := gin.New()
 	r.POST("/v1/chat/completions", proxyHandler.HandleChatCompletions)

@@ -20,14 +20,14 @@ import (
 
 // GetForecastProjections returns time-series budget projections and breach forecasts
 func (h *APIHandler) GetForecastProjections(c *gin.Context) {
-	if h.forecastEngine == nil {
+	if h.ForecastEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
 		return
 	}
 	tenantID := c.DefaultQuery("tenant_id", "default")
 	period := c.DefaultQuery("period", "current")
 
-	proj, err := h.forecastEngine.PredictTenant(c.Request.Context(), tenantID, period)
+	proj, err := h.ForecastEngine.PredictTenant(c.Request.Context(), tenantID, period)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -37,17 +37,17 @@ func (h *APIHandler) GetForecastProjections(c *gin.Context) {
 
 // GetRemediationStatuses returns current mitigation stages and audit entries
 func (h *APIHandler) GetRemediationStatuses(c *gin.Context) {
-	if h.forecastEngine == nil {
+	if h.ForecastEngine == nil {
 		c.JSON(http.StatusOK, []domain.RemediationStatus{})
 		return
 	}
 	tenantID := c.Query("tenant_id")
 	if tenantID != "" && tenantID != "all" {
-		status := h.forecastEngine.GetStatus(tenantID)
+		status := h.ForecastEngine.GetStatus(tenantID)
 		c.JSON(http.StatusOK, []domain.RemediationStatus{status})
 		return
 	}
-	statuses := h.forecastEngine.ListStatuses()
+	statuses := h.ForecastEngine.ListStatuses()
 	c.JSON(http.StatusOK, statuses)
 }
 
@@ -60,7 +60,7 @@ type ApplyRemediationRequest struct {
 
 // ApplyRemediation manually transitions or overrides a tenant's remediation stage
 func (h *APIHandler) ApplyRemediation(c *gin.Context) {
-	if h.forecastEngine == nil {
+	if h.ForecastEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
 		return
 	}
@@ -76,7 +76,7 @@ func (h *APIHandler) ApplyRemediation(c *gin.Context) {
 		req.Reason = "Manual operator intervention"
 	}
 
-	status, err := h.forecastEngine.Remediate(c.Request.Context(), req.TenantID, req.Level, req.Operator, req.Reason)
+	status, err := h.ForecastEngine.Remediate(c.Request.Context(), req.TenantID, req.Level, req.Operator, req.Reason)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -86,7 +86,7 @@ func (h *APIHandler) ApplyRemediation(c *gin.Context) {
 
 // SimulateForecast performs interactive What-If traffic surge simulations
 func (h *APIHandler) SimulateForecast(c *gin.Context) {
-	if h.forecastEngine == nil {
+	if h.ForecastEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
 		return
 	}
@@ -98,7 +98,7 @@ func (h *APIHandler) SimulateForecast(c *gin.Context) {
 	if req.TenantID == "" {
 		req.TenantID = "default"
 	}
-	resp, err := h.forecastEngine.Simulate(c.Request.Context(), req)
+	resp, err := h.ForecastEngine.Simulate(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -108,23 +108,23 @@ func (h *APIHandler) SimulateForecast(c *gin.Context) {
 
 // GetForecastPolicies lists or returns proactive mitigation policies
 func (h *APIHandler) GetForecastPolicies(c *gin.Context) {
-	if h.forecastEngine == nil {
+	if h.ForecastEngine == nil {
 		c.JSON(http.StatusOK, []domain.RemediationPolicy{})
 		return
 	}
 	tenantID := c.Query("tenant_id")
 	if tenantID != "" && tenantID != "all" {
-		p := h.forecastEngine.GetPolicy(tenantID)
+		p := h.ForecastEngine.GetPolicy(tenantID)
 		c.JSON(http.StatusOK, []domain.RemediationPolicy{p})
 		return
 	}
-	policies := h.forecastEngine.ListPolicies()
+	policies := h.ForecastEngine.ListPolicies()
 	c.JSON(http.StatusOK, policies)
 }
 
 // UpsertForecastPolicy saves or updates a tenant's proactive mitigation policy
 func (h *APIHandler) UpsertForecastPolicy(c *gin.Context) {
-	if h.forecastEngine == nil {
+	if h.ForecastEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Forecast engine not initialized"})
 		return
 	}
@@ -137,7 +137,7 @@ func (h *APIHandler) UpsertForecastPolicy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
 		return
 	}
-	h.forecastEngine.SetPolicy(policy)
+	h.ForecastEngine.SetPolicy(policy)
 	c.JSON(http.StatusOK, policy)
 }
 
@@ -147,17 +147,17 @@ func (h *APIHandler) UpsertForecastPolicy(c *gin.Context) {
 
 // GetClusterNodes returns all registered regional/edge nodes
 func (h *APIHandler) GetClusterNodes(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusOK, []domain.ClusterNode{})
 		return
 	}
-	nodes := h.clusterCoordinator.GetNodes()
+	nodes := h.ClusterCoordinator.GetNodes()
 	c.JSON(http.StatusOK, nodes)
 }
 
 // RegisterClusterNode handles node self-registration
 func (h *APIHandler) RegisterClusterNode(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
 		return
 	}
@@ -166,13 +166,13 @@ func (h *APIHandler) RegisterClusterNode(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	registered := h.clusterCoordinator.RegisterNode(node)
+	registered := h.ClusterCoordinator.RegisterNode(node)
 	c.JSON(http.StatusOK, registered)
 }
 
 // HeartbeatClusterNode processes bi-directional heartbeats, true-ups and lease grants
 func (h *APIHandler) HeartbeatClusterNode(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
 		return
 	}
@@ -185,44 +185,44 @@ func (h *APIHandler) HeartbeatClusterNode(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "node_id is required"})
 		return
 	}
-	resp := h.clusterCoordinator.Heartbeat(req)
+	resp := h.ClusterCoordinator.Heartbeat(req)
 	c.JSON(http.StatusOK, resp)
 }
 
 // GetClusterLeases returns active distributed quota slices
 func (h *APIHandler) GetClusterLeases(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusOK, []domain.QuotaLease{})
 		return
 	}
 	tenantID := c.Query("tenant_id")
-	leases := h.clusterCoordinator.GetLeases(tenantID)
+	leases := h.ClusterCoordinator.GetLeases(tenantID)
 	c.JSON(http.StatusOK, leases)
 }
 
 // RebalanceClusterLeases triggers a global quota rebalancing across healthy nodes
 func (h *APIHandler) RebalanceClusterLeases(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
 		return
 	}
-	h.clusterCoordinator.RebalanceLeases()
+	h.ClusterCoordinator.RebalanceLeases()
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Cluster quota leases rebalanced successfully"})
 }
 
 // GetClusterStats returns aggregate metrics for multi-region coordination
 func (h *APIHandler) GetClusterStats(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusOK, domain.ClusterStatsSummary{})
 		return
 	}
-	stats := h.clusterCoordinator.GetStats()
+	stats := h.ClusterCoordinator.GetStats()
 	c.JSON(http.StatusOK, stats)
 }
 
 // SimulateCluster executes a network partition and surge traffic scenario
 func (h *APIHandler) SimulateCluster(c *gin.Context) {
-	if h.clusterCoordinator == nil {
+	if h.ClusterCoordinator == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster coordinator not initialized"})
 		return
 	}
@@ -231,7 +231,7 @@ func (h *APIHandler) SimulateCluster(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp := h.clusterCoordinator.Simulate(req)
+	resp := h.ClusterCoordinator.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -241,18 +241,18 @@ func (h *APIHandler) SimulateCluster(c *gin.Context) {
 
 // ListExperiments returns all experiments for a tenant
 func (h *APIHandler) ListExperiments(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusOK, []domain.Experiment{})
 		return
 	}
 	tenantID := c.DefaultQuery("tenant_id", "default")
-	exps := h.experimentEngine.ListExperiments(tenantID)
+	exps := h.ExperimentEngine.ListExperiments(tenantID)
 	c.JSON(http.StatusOK, exps)
 }
 
 // CreateExperiment creates a new A/B experiment
 func (h *APIHandler) CreateExperiment(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
 		return
 	}
@@ -261,7 +261,7 @@ func (h *APIHandler) CreateExperiment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	saved, err := h.experimentEngine.UpsertExperiment(&exp)
+	saved, err := h.ExperimentEngine.UpsertExperiment(&exp)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -271,12 +271,12 @@ func (h *APIHandler) CreateExperiment(c *gin.Context) {
 
 // GetExperiment retrieves a single experiment by ID
 func (h *APIHandler) GetExperiment(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
 		return
 	}
 	id := c.Param("id")
-	exp, err := h.experimentEngine.GetExperiment(id)
+	exp, err := h.ExperimentEngine.GetExperiment(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -286,7 +286,7 @@ func (h *APIHandler) GetExperiment(c *gin.Context) {
 
 // UpdateExperiment updates an existing experiment
 func (h *APIHandler) UpdateExperiment(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
 		return
 	}
@@ -297,7 +297,7 @@ func (h *APIHandler) UpdateExperiment(c *gin.Context) {
 		return
 	}
 	exp.ID = id
-	saved, err := h.experimentEngine.UpsertExperiment(&exp)
+	saved, err := h.ExperimentEngine.UpsertExperiment(&exp)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -307,7 +307,7 @@ func (h *APIHandler) UpdateExperiment(c *gin.Context) {
 
 // PromoteExperimentWinner promotes winning variant to 100% traffic
 func (h *APIHandler) PromoteExperimentWinner(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
 		return
 	}
@@ -319,7 +319,7 @@ func (h *APIHandler) PromoteExperimentWinner(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	promoted, err := h.experimentEngine.PromoteWinner(id, req.WinnerVariantID)
+	promoted, err := h.ExperimentEngine.PromoteWinner(id, req.WinnerVariantID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -329,7 +329,7 @@ func (h *APIHandler) PromoteExperimentWinner(c *gin.Context) {
 
 // RecordExperimentFeedback captures user feedback/ratings
 func (h *APIHandler) RecordExperimentFeedback(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
 		return
 	}
@@ -338,7 +338,7 @@ func (h *APIHandler) RecordExperimentFeedback(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.experimentEngine.RecordFeedback(fb); err != nil {
+	if err := h.ExperimentEngine.RecordFeedback(fb); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -347,17 +347,17 @@ func (h *APIHandler) RecordExperimentFeedback(c *gin.Context) {
 
 // GetExperimentStats returns global summary metrics across experiments
 func (h *APIHandler) GetExperimentStats(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusOK, domain.ExperimentStatsSummary{})
 		return
 	}
-	stats := h.experimentEngine.GetStatsSummary()
+	stats := h.ExperimentEngine.GetStatsSummary()
 	c.JSON(http.StatusOK, stats)
 }
 
 // SimulateExperiment triggers Monte Carlo simulation and Pareto frontier calculation
 func (h *APIHandler) SimulateExperiment(c *gin.Context) {
-	if h.experimentEngine == nil {
+	if h.ExperimentEngine == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Experiment engine not initialized"})
 		return
 	}
@@ -366,7 +366,7 @@ func (h *APIHandler) SimulateExperiment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp, err := h.experimentEngine.Simulate(req)
+	resp, err := h.ExperimentEngine.Simulate(req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -380,17 +380,17 @@ func (h *APIHandler) SimulateExperiment(c *gin.Context) {
 
 // GetDLPPolicies lists all configured DLP policies
 func (h *APIHandler) GetDLPPolicies(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusOK, []domain.DLPPolicy{})
 		return
 	}
-	policies := h.dlpManager.ListPolicies()
+	policies := h.DLPManager.ListPolicies()
 	c.JSON(http.StatusOK, policies)
 }
 
 // GetDLPPolicy returns the policy for a specific tenant
 func (h *APIHandler) GetDLPPolicy(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
 		return
 	}
@@ -398,13 +398,13 @@ func (h *APIHandler) GetDLPPolicy(c *gin.Context) {
 	if tenantID == "" {
 		tenantID = "default"
 	}
-	policy := h.dlpManager.GetPolicy(tenantID)
+	policy := h.DLPManager.GetPolicy(tenantID)
 	c.JSON(http.StatusOK, policy)
 }
 
 // UpsertDLPPolicy creates or updates a DLP policy for a tenant
 func (h *APIHandler) UpsertDLPPolicy(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
 		return
 	}
@@ -413,13 +413,13 @@ func (h *APIHandler) UpsertDLPPolicy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	saved := h.dlpManager.SetPolicy(policy)
+	saved := h.DLPManager.SetPolicy(policy)
 	c.JSON(http.StatusOK, saved)
 }
 
 // DeleteDLPPolicy removes a tenant's policy configuration
 func (h *APIHandler) DeleteDLPPolicy(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
 		return
 	}
@@ -428,7 +428,7 @@ func (h *APIHandler) DeleteDLPPolicy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete default policy"})
 		return
 	}
-	deleted := h.dlpManager.DeletePolicy(tenantID)
+	deleted := h.DLPManager.DeletePolicy(tenantID)
 	if !deleted {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Policy not found for tenant"})
 		return
@@ -438,31 +438,31 @@ func (h *APIHandler) DeleteDLPPolicy(c *gin.Context) {
 
 // GetDLPLogs returns the circular buffer of sensitive data violation audit logs
 func (h *APIHandler) GetDLPLogs(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusOK, []domain.DLPAuditLogEntry{})
 		return
 	}
 	tenantID := c.Query("tenant_id")
 	limitStr := c.DefaultQuery("limit", "100")
 	limit, _ := strconv.Atoi(limitStr)
-	logs := h.dlpManager.ListAuditLogs(tenantID, limit)
+	logs := h.DLPManager.ListAuditLogs(tenantID, limit)
 	c.JSON(http.StatusOK, logs)
 }
 
 // GetDLPStats returns macro privacy & DLP statistics
 func (h *APIHandler) GetDLPStats(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusOK, domain.DLPStatsSummary{})
 		return
 	}
 	tenantID := c.Query("tenant_id")
-	stats := h.dlpManager.GetStats(tenantID)
+	stats := h.DLPManager.GetStats(tenantID)
 	c.JSON(http.StatusOK, stats)
 }
 
 // SimulateDLP performs on-the-fly privacy scanning, remediation, and reversible unmasking simulation
 func (h *APIHandler) SimulateDLP(c *gin.Context) {
-	if h.dlpManager == nil {
+	if h.DLPManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "DLP Manager not initialized"})
 		return
 	}
@@ -471,7 +471,7 @@ func (h *APIHandler) SimulateDLP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp := h.dlpManager.Simulate(req)
+	resp := h.DLPManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -481,27 +481,27 @@ func (h *APIHandler) SimulateDLP(c *gin.Context) {
 
 // GetHierarchyTree returns forest structure of organization budget nodes
 func (h *APIHandler) GetHierarchyTree(c *gin.Context) {
-	if h.hierarchyManager == nil {
+	if h.HierarchyManager == nil {
 		c.JSON(http.StatusOK, []interface{}{})
 		return
 	}
-	forest := h.hierarchyManager.GetTree()
+	forest := h.HierarchyManager.GetTree()
 	c.JSON(http.StatusOK, forest)
 }
 
 // GetHierarchyStats returns macro statistics for organization budgets
 func (h *APIHandler) GetHierarchyStats(c *gin.Context) {
-	if h.hierarchyManager == nil {
+	if h.HierarchyManager == nil {
 		c.JSON(http.StatusOK, domain.OrgStatsSummary{})
 		return
 	}
-	stats := h.hierarchyManager.GetStats()
+	stats := h.HierarchyManager.GetStats()
 	c.JSON(http.StatusOK, stats)
 }
 
 // UpsertHierarchyNode creates or updates an org node in the tree
 func (h *APIHandler) UpsertHierarchyNode(c *gin.Context) {
-	if h.hierarchyManager == nil {
+	if h.HierarchyManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "hierarchy manager not initialized"})
 		return
 	}
@@ -510,7 +510,7 @@ func (h *APIHandler) UpsertHierarchyNode(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	node, err := h.hierarchyManager.UpsertNode(req)
+	node, err := h.HierarchyManager.UpsertNode(req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -520,7 +520,7 @@ func (h *APIHandler) UpsertHierarchyNode(c *gin.Context) {
 
 // DeleteHierarchyNode removes an org node
 func (h *APIHandler) DeleteHierarchyNode(c *gin.Context) {
-	if h.hierarchyManager == nil {
+	if h.HierarchyManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "hierarchy manager not initialized"})
 		return
 	}
@@ -529,7 +529,7 @@ func (h *APIHandler) DeleteHierarchyNode(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required"})
 		return
 	}
-	if err := h.hierarchyManager.DeleteNode(id); err != nil {
+	if err := h.HierarchyManager.DeleteNode(id); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -538,7 +538,7 @@ func (h *APIHandler) DeleteHierarchyNode(c *gin.Context) {
 
 // CheckHierarchyBudget performs online precheck along the path
 func (h *APIHandler) CheckHierarchyBudget(c *gin.Context) {
-	if h.hierarchyManager == nil {
+	if h.HierarchyManager == nil {
 		c.JSON(http.StatusOK, domain.OrgBudgetCheckResult{Allowed: true, Action: domain.OrgActionAllow})
 		return
 	}
@@ -551,13 +551,13 @@ func (h *APIHandler) CheckHierarchyBudget(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result := h.hierarchyManager.CheckBudget(req.Path, req.CostUSD, req.Priority)
+	result := h.HierarchyManager.CheckBudget(req.Path, req.CostUSD, req.Priority)
 	c.JSON(http.StatusOK, result)
 }
 
 // SimulateHierarchy runs interactive what-if simulation on hierarchical budget
 func (h *APIHandler) SimulateHierarchy(c *gin.Context) {
-	if h.hierarchyManager == nil {
+	if h.HierarchyManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "hierarchy manager not initialized"})
 		return
 	}
@@ -566,7 +566,7 @@ func (h *APIHandler) SimulateHierarchy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp := h.hierarchyManager.Simulate(req)
+	resp := h.HierarchyManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -576,27 +576,27 @@ func (h *APIHandler) SimulateHierarchy(c *gin.Context) {
 
 // GetFederationStats returns macro clearinghouse metrics
 func (h *APIHandler) GetFederationStats(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusOK, domain.FederationStatsSummary{})
 		return
 	}
-	stats := h.federationManager.GetStats()
+	stats := h.FederationManager.GetStats()
 	c.JSON(http.StatusOK, stats)
 }
 
 // GetFederationWorkspaces returns list of all workspaces
 func (h *APIHandler) GetFederationWorkspaces(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusOK, []*domain.FederationWorkspace{})
 		return
 	}
-	workspaces := h.federationManager.ListWorkspaces()
+	workspaces := h.FederationManager.ListWorkspaces()
 	c.JSON(http.StatusOK, workspaces)
 }
 
 // UpsertFederationWorkspace creates or modifies a workspace
 func (h *APIHandler) UpsertFederationWorkspace(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
 		return
 	}
@@ -605,25 +605,25 @@ func (h *APIHandler) UpsertFederationWorkspace(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	res := h.federationManager.UpsertWorkspace(ws)
+	res := h.FederationManager.UpsertWorkspace(ws)
 	c.JSON(http.StatusOK, res)
 }
 
 // GetFederationTasks returns cross-workspace tasks
 func (h *APIHandler) GetFederationTasks(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusOK, []*domain.FederatedTask{})
 		return
 	}
 	category := c.Query("category")
 	status := c.Query("status")
-	tasks := h.federationManager.ListTasks(category, status)
+	tasks := h.FederationManager.ListTasks(category, status)
 	c.JSON(http.StatusOK, tasks)
 }
 
 // CreateFederationTask posts a bounty task and locks escrow
 func (h *APIHandler) CreateFederationTask(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
 		return
 	}
@@ -632,7 +632,7 @@ func (h *APIHandler) CreateFederationTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	task, voucher, err := h.federationManager.CreateTask(req)
+	task, voucher, err := h.FederationManager.CreateTask(req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -642,7 +642,7 @@ func (h *APIHandler) CreateFederationTask(c *gin.Context) {
 
 // SubmitFederationBid submits a proposal by an agent
 func (h *APIHandler) SubmitFederationBid(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
 		return
 	}
@@ -652,7 +652,7 @@ func (h *APIHandler) SubmitFederationBid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	bid, task, err := h.federationManager.SubmitBid(taskID, req)
+	bid, task, err := h.FederationManager.SubmitBid(taskID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -662,7 +662,7 @@ func (h *APIHandler) SubmitFederationBid(c *gin.Context) {
 
 // FinalizeFederationTask performs 2PC commit or refund on task completion
 func (h *APIHandler) FinalizeFederationTask(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
 		return
 	}
@@ -671,7 +671,7 @@ func (h *APIHandler) FinalizeFederationTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	voucher, err := h.federationManager.FinalizeTask(req)
+	voucher, err := h.FederationManager.FinalizeTask(req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -681,7 +681,7 @@ func (h *APIHandler) FinalizeFederationTask(c *gin.Context) {
 
 // SimulateFederation runs What-If bidding and 2PC clearing simulation
 func (h *APIHandler) SimulateFederation(c *gin.Context) {
-	if h.federationManager == nil {
+	if h.FederationManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "federation manager not initialized"})
 		return
 	}
@@ -690,7 +690,7 @@ func (h *APIHandler) SimulateFederation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resp := h.federationManager.Simulate(req)
+	resp := h.FederationManager.Simulate(req)
 	c.JSON(http.StatusOK, resp)
 }
 

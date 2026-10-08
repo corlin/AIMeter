@@ -20,7 +20,7 @@ func TestProxyHierarchyBudgetIntegration(t *testing.T) {
 	hm := hierarchy.NewHierarchyManager("configs/hierarchy_seed.json")
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyH.SetHierarchyManager(hm)
+	proxyH.HierarchyManager = hm
 
 	// 2. Mock upstream LLM server
 	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -91,9 +91,7 @@ func NewServer(
 
 	handler := NewAPIHandler(store, pg, r, budgetMgr, detector, costAdvisor, guardSvc, nil, authSvc)
 	slaArbiter := aimeterRouter.NewSLAArbiter(r)
-	handler.SetSLAArbiter(slaArbiter)
 	cacheMgr := cache.NewSemanticCacheManager()
-	handler.SetCacheManager(cacheMgr)
 
 	// Prometheus Metrics Endpoint
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -203,4 +201,3 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func (s *Server) GetRouter() *gin.Engine {
 	return s.router
 }
-

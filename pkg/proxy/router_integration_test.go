@@ -53,7 +53,7 @@ func TestProxySmartRouterIntegration(t *testing.T) {
 	raterEngine := rater.NewRatingEngine()
 	slaArbiter := router.NewSLAArbiter(raterEngine)
 	proxyHandler := NewProxyHandler(nil, nil, mockServer.Client())
-	proxyHandler.SetSLAArbiter(slaArbiter)
+	proxyHandler.SLAArbiter = slaArbiter
 	proxyHandler.SetUpstreamURL("openai", mockServer.URL)
 	proxyHandler.SetUpstreamURL("anthropic", mockServer.URL)
 	proxyHandler.SetUpstreamURL("deepseek", mockServer.URL)
@@ -126,7 +126,7 @@ func TestProxySmartRouterFailoverIntegration(t *testing.T) {
 	raterEngine := rater.NewRatingEngine()
 	slaArbiter := router.NewSLAArbiter(raterEngine)
 	proxyHandler := NewProxyHandler(nil, nil, mockServer.Client())
-	proxyHandler.SetSLAArbiter(slaArbiter)
+	proxyHandler.SLAArbiter = slaArbiter
 	proxyHandler.SetUpstreamURL("openai", mockServer.URL)
 	proxyHandler.SetUpstreamURL("anthropic", mockServer.URL)
 	proxyHandler.SetUpstreamURL("deepseek", mockServer.URL)

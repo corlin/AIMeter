@@ -51,7 +51,7 @@ func TestProxyPromptCompressionIntegration(t *testing.T) {
 	})
 
 	proxyH := NewProxyHandler(NewFallbackManager(nil, nil), nil, nil)
-	proxyH.SetBudgetManager(bm)
+	proxyH.BudgetManager = bm
 	proxyH.SetUpstreamURL("openai", mockUpstream.URL)
 
 	router := gin.New()

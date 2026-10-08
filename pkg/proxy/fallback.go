@@ -61,13 +61,6 @@ func (m *FallbackManager) GetFallbackModel(model string) (string, bool) {
 	return fb, ok
 }
 
-// SetFallbackModel adds or updates a fallback mapping
-func (m *FallbackManager) SetFallbackModel(original, fallback string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.chains[strings.ToLower(original)] = strings.ToLower(fallback)
-}
-
 // Evaluate evaluates Active Guard for the requested model, falling back if tripped and permitted
 func (m *FallbackManager) Evaluate(ctx context.Context, tenantID, workflowID, model string, disableFallback bool) (FallbackResult, error) {
 	normModel := strings.ToLower(model)

@@ -48,7 +48,7 @@ func TestProxyFineTuningLoRAIntegration(t *testing.T) {
 
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyHandler := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyHandler.SetFineTuningManager(finetuneMgr)
+	proxyHandler.FineTuningManager = finetuneMgr
 
 	server := api.NewServer(
 		8080,

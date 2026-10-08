@@ -10,35 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/corlin/AIMeter/pkg/budget"
-	"github.com/corlin/AIMeter/pkg/cache"
-	"github.com/corlin/AIMeter/pkg/cluster"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
-	"github.com/corlin/AIMeter/pkg/dlp"
 	"github.com/corlin/AIMeter/pkg/domain"
-	"github.com/corlin/AIMeter/pkg/experiment"
-	"github.com/corlin/AIMeter/pkg/forecast"
-	"github.com/corlin/AIMeter/pkg/kvcache"
-	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
 	"github.com/corlin/AIMeter/pkg/normalizer"
-	"github.com/corlin/AIMeter/pkg/quality"
-	"github.com/corlin/AIMeter/pkg/rater"
-	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/registry"
-	"github.com/corlin/AIMeter/pkg/router"
-	"github.com/corlin/AIMeter/pkg/swarm"
 	"github.com/corlin/AIMeter/pkg/throttler"
-	"github.com/corlin/AIMeter/pkg/hierarchy"
-	"github.com/corlin/AIMeter/pkg/federation"
-	"github.com/corlin/AIMeter/pkg/finetuning"
-	"github.com/corlin/AIMeter/pkg/waf"
-	"github.com/corlin/AIMeter/pkg/hetero"
-	"github.com/corlin/AIMeter/pkg/sandbox"
-	"github.com/corlin/AIMeter/pkg/workflow"
-	"github.com/corlin/AIMeter/pkg/flywheel"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -74,10 +53,10 @@ type ProxyCacheStats struct {
 
 // OpenAIUsage represents usage metrics in upstream OpenAI-compatible responses
 type OpenAIUsage struct {
-	PromptTokens            int `json:"prompt_tokens"`
-	CompletionTokens        int `json:"completion_tokens"`
-	TotalTokens             int `json:"total_tokens"`
-	PromptTokensDetails     struct {
+	PromptTokens        int `json:"prompt_tokens"`
+	CompletionTokens    int `json:"completion_tokens"`
+	TotalTokens         int `json:"total_tokens"`
+	PromptTokensDetails struct {
 		CachedTokens int `json:"cached_tokens"`
 		AudioTokens  int `json:"audio_tokens"`
 	} `json:"prompt_tokens_details"`
@@ -89,35 +68,11 @@ type OpenAIUsage struct {
 
 // ProxyHandler handles transparent LLM reverse proxy requests
 type ProxyHandler struct {
-	reg              *registry.ControlPlaneRegistry
+	*registry.ControlPlaneRegistry
 	fallbackMgr      *FallbackManager
 	collectorSvc     *collector.IngestionService
 	httpClient       *http.Client
 	defaultUpstreams map[string]string
-	budgetMgr        *budget.BudgetManager
-	compressEngine   *compress.Engine
-	slaArbiter       *router.SLAArbiter
-	cacheMgr         *cache.SemanticCacheManager
-	raterEngine      *rater.RatingEngine
-	multimodalEngine *multimodal.MultimodalEngine
-	throttlerEngine    *throttler.ThrottlerEngine
-	forecastEngine     *forecast.ForecastEngine
-	clusterCoordinator *cluster.ClusterCoordinator
-	experimentEngine   *experiment.Engine
-	dlpManager         *dlp.Manager
-	swarmManager       *swarm.Manager
-	memoryManager      *memory.MemoryManager
-	reasoningManager   *reasoning.ReasoningManager
-	kvCacheManager     *kvcache.Manager
-	qualityManager     *quality.QualityManager
-	workflowManager    *workflow.WorkflowManager
-	sandboxManager     *sandbox.SandboxManager
-	hierarchyManager   *hierarchy.HierarchyManager
-	federationManager  *federation.FederationManager
-	finetuningManager  *finetuning.Manager
-	wafManager         *waf.Manager
-	heteroManager      *hetero.Manager
-	flywheelManager    *flywheel.FlywheelManager
 }
 
 func NewProxyHandler(
@@ -137,10 +92,16 @@ func NewProxyHandler(
 		}
 	}
 
+	reg := registry.NewControlPlaneRegistry()
+	reg.CompressEngine = compress.NewEngine()
+	reg.MultimodalEngine = multimodal.NewMultimodalEngine()
+	reg.ThrottlerEngine = throttler.NewThrottlerEngine()
+
 	return &ProxyHandler{
-		fallbackMgr:  fallbackMgr,
-		collectorSvc: collectorSvc,
-		httpClient:   httpClient,
+		ControlPlaneRegistry: reg,
+		fallbackMgr:          fallbackMgr,
+		collectorSvc:         collectorSvc,
+		httpClient:           httpClient,
 		defaultUpstreams: map[string]string{
 			"openai":    "https://api.openai.com",
 			"deepseek":  "https://api.deepseek.com",
@@ -150,9 +111,6 @@ func NewProxyHandler(
 			"vllm":      "http://localhost:8000",
 			"ollama":    "http://localhost:11434",
 		},
-		compressEngine:   compress.NewEngine(),
-		multimodalEngine: multimodal.NewMultimodalEngine(),
-		throttlerEngine:  throttler.NewThrottlerEngine(),
 	}
 }
 
@@ -177,7 +135,6 @@ func (h *ProxyHandler) HandleVendorChatCompletions(c *gin.Context) {
 	}
 	h.proxyRequest(c, vendor)
 }
-
 
 func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 	inCtx, handled := h.executeInboundPipeline(c, provider)
@@ -255,12 +212,12 @@ func (h *ProxyHandler) dispatchUpstream(c *gin.Context, inCtx *InboundContext, c
 				failStatus = currResp.StatusCode
 				currResp.Body.Close()
 			}
-			if h.slaArbiter != nil {
-				h.slaArbiter.RecordEndpointResult(inCtx.Provider, inCtx.ActualModel, float64(time.Since(upstreamStart).Milliseconds()), false, failStatus)
+			if h.SLAArbiter != nil {
+				h.SLAArbiter.RecordEndpointResult(inCtx.Provider, inCtx.ActualModel, float64(time.Since(upstreamStart).Milliseconds()), false, failStatus)
 			}
 			failedTargets = append(failedTargets, fmt.Sprintf("%s:%s", inCtx.Provider, inCtx.ActualModel))
 
-			nextTgt, _, selectErr := h.slaArbiter.SelectBestTarget(c.Request.Context(), inCtx.RouterPool, inCtx.RoutingStats.Strategy, 1000, 400, failedTargets)
+			nextTgt, _, selectErr := h.SLAArbiter.SelectBestTarget(c.Request.Context(), inCtx.RouterPool, inCtx.RoutingStats.Strategy, 1000, 400, failedTargets)
 			if selectErr == nil && nextTgt != nil {
 				inCtx.RoutingStats.FailoverCount++
 				inCtx.Provider = nextTgt.Provider
@@ -295,8 +252,8 @@ func (h *ProxyHandler) dispatchUpstream(c *gin.Context, inCtx *InboundContext, c
 	roundtripDuration := time.Since(upstreamStart)
 	inCtx.UpstreamStart = upstreamStart
 
-	if h.slaArbiter != nil {
-		h.slaArbiter.RecordEndpointResult(inCtx.Provider, inCtx.ActualModel, float64(roundtripDuration.Milliseconds()), true, resp.StatusCode)
+	if h.SLAArbiter != nil {
+		h.SLAArbiter.RecordEndpointResult(inCtx.Provider, inCtx.ActualModel, float64(roundtripDuration.Milliseconds()), true, resp.StatusCode)
 	}
 	return resp, cancelUpstream, roundtripDuration, nil
 }
@@ -323,8 +280,8 @@ func (h *ProxyHandler) attachControlHeaders(c *gin.Context, inCtx *InboundContex
 	if inCtx.IdempKey != "" || (inCtx.WorkflowID != "" && inCtx.StepID != "") {
 		c.Header("X-AIMeter-Step-Replayed", "false")
 		if inCtx.WorkflowID != "" {
-		c.Header("X-AIMeter-Workflow-ID", inCtx.WorkflowID)
-		c.Header("X-AIMeter-Workflow-Status", "RUNNING")
+			c.Header("X-AIMeter-Workflow-ID", inCtx.WorkflowID)
+			c.Header("X-AIMeter-Workflow-Status", "RUNNING")
 		}
 		if inCtx.StepID != "" {
 			c.Header("X-AIMeter-Step-ID", inCtx.StepID)
@@ -469,4 +426,3 @@ func (h *ProxyHandler) recordUsage(
 	_ = ctx
 	h.collectorSvc.IngestRawInput(rawInput, baggage)
 }
-

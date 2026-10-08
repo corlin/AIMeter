@@ -69,8 +69,8 @@ func TestProxyRateLimiterAndCostThrottlerIntegration(t *testing.T) {
 	ratingEngine := rater.NewRatingEngine()
 	proxyHandler := NewProxyHandler(nil, nil, mockUpstream.Client())
 	proxyHandler.SetUpstreamURL("openai", mockUpstream.URL)
-	proxyHandler.SetRaterEngine(ratingEngine)
-	proxyHandler.SetThrottlerEngine(throttlerEngine)
+	proxyHandler.RaterEngine = ratingEngine
+	proxyHandler.ThrottlerEngine = throttlerEngine
 
 	r := gin.New()
 	r.POST("/v1/chat/completions", proxyHandler.HandleChatCompletions)
@@ -181,7 +181,7 @@ func TestProxyRateLimiterMicroQueue(t *testing.T) {
 
 	proxyHandler := NewProxyHandler(nil, nil, mockUpstream.Client())
 	proxyHandler.SetUpstreamURL("openai", mockUpstream.URL)
-	proxyHandler.SetThrottlerEngine(throttlerEngine)
+	proxyHandler.ThrottlerEngine = throttlerEngine
 
 	r := gin.New()
 	r.POST("/v1/chat/completions", proxyHandler.HandleChatCompletions)

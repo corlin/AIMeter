@@ -2,10 +2,6 @@ package flywheel
 
 import (
 	"math"
-	"time"
-
-	"github.com/corlin/AIMeter/pkg/domain"
-	"github.com/google/uuid"
 )
 
 // CalculateBatchEconomics computes generation compute cost, rejection sunk loss, and net yield
@@ -69,34 +65,4 @@ func CalculateBatchEconomics(
 	yieldRate = math.Round(yieldRate*100) / 100
 
 	return
-}
-
-// BuildPreferencePair instantiates a new preference pair with Margin Delta
-func BuildPreferencePair(
-	datasetID string,
-	prompt string,
-	chosen string,
-	rejected string,
-	chosenScore float64,
-	rejectedScore float64,
-	teacher string,
-	candidates int,
-) *domain.FlywheelPreferencePair {
-	if candidates <= 0 {
-		candidates = 4
-	}
-	delta := math.Round((chosenScore-rejectedScore)*100) / 100
-	return &domain.FlywheelPreferencePair{
-		ID:                 "pair-" + uuid.New().String()[:8],
-		DatasetID:          datasetID,
-		Prompt:             prompt,
-		ChosenCompletion:   chosen,
-		RejectedCompletion: rejected,
-		ChosenScore:        chosenScore,
-		RejectedScore:      rejectedScore,
-		MarginDelta:        delta,
-		TeacherModel:       teacher,
-		CandidateCount:     candidates,
-		CreatedAt:          time.Now().UTC(),
-	}
 }

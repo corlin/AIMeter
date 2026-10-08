@@ -20,7 +20,7 @@ func TestProxyFederationEscrowIntegration(t *testing.T) {
 	fm := federation.NewFederationManager("configs/federation_seed.json")
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyH.SetFederationManager(fm)
+	proxyH.FederationManager = fm
 
 	// 2. Mock upstream LLM server
 	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

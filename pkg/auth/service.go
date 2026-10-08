@@ -248,15 +248,3 @@ func (s *AuthService) ListKeys(tenantID string) []*APIKey {
 	}
 	return results
 }
-
-// GetKeyByID returns the key by its ID.
-func (s *AuthService) GetKeyByID(id string) (*APIKey, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	key, exists := s.keysByID[id]
-	if !exists {
-		return nil, ErrKeyNotFound
-	}
-	return key, nil
-}

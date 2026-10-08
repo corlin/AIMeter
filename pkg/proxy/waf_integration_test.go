@@ -49,7 +49,7 @@ func TestProxyWAFIntegration(t *testing.T) {
 
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyHandler := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyHandler.SetWAFManager(wafMgr)
+	proxyHandler.WAFManager = wafMgr
 
 	server := api.NewServer(
 		8080,

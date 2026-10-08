@@ -19,7 +19,7 @@ func TestProxySandboxToolClearingIntegration(t *testing.T) {
 	sm := sandbox.NewSandboxManager("")
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyH.SetSandboxManager(sm)
+	proxyH.SandboxManager = sm
 
 	// 2. Mock upstream LLM server
 	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +112,7 @@ func TestProxySandboxBudgetBreakerHardBlock(t *testing.T) {
 	sm := sandbox.NewSandboxManager("")
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
-	proxyH.SetSandboxManager(sm)
+	proxyH.SandboxManager = sm
 
 	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

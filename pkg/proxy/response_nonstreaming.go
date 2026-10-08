@@ -44,8 +44,8 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	}
 
 	// Transparent reverse pseudonymization: unmask placeholders in outbound response (Phase 21)
-	if enableUnmasking && len(dlpVault) > 0 && h.dlpManager != nil {
-		unmaskedStr := h.dlpManager.UnmaskText(string(respBody), dlpVault)
+	if enableUnmasking && len(dlpVault) > 0 && h.DLPManager != nil {
+		unmaskedStr := h.DLPManager.UnmaskText(string(respBody), dlpVault)
 		respBody = []byte(unmaskedStr)
 	}
 
@@ -57,8 +57,8 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 	metrics.RecordProxyRequest(provider, fbResult.ActualModel, statusStr, fbResult.Fallbacked, duration)
 
 	var mmDetail *domain.MultimodalUsageDetail
-	if h.multimodalEngine != nil && resp.StatusCode == http.StatusOK {
-		tools, audioOutTok, audioInTok, audioSec := h.multimodalEngine.InspectResponse(respBody)
+	if h.MultimodalEngine != nil && resp.StatusCode == http.StatusOK {
+		tools, audioOutTok, audioInTok, audioSec := h.MultimodalEngine.InspectResponse(respBody)
 		if audioSec == 0 && reqAudioSec > 0 {
 			audioSec = reqAudioSec
 		}
@@ -73,8 +73,8 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 				AudioOutputSeconds: audioSec,
 				ToolExecutions:     tools,
 			}
-			h.multimodalEngine.CalculateCost(fbResult.ActualModel, mmDetail)
-			h.multimodalEngine.RecordInvocation(mmDetail)
+			h.MultimodalEngine.CalculateCost(fbResult.ActualModel, mmDetail)
+			h.MultimodalEngine.RecordInvocation(mmDetail)
 
 			if len(tools) > 0 {
 				c.Header("X-AIMeter-Tool-Calls", strconv.Itoa(len(tools)))
@@ -102,35 +102,35 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 		}
 		if err := json.Unmarshal(respBody, &respData); err == nil && respData.Usage.TotalTokens > 0 {
 			costUSD := 0.0
-			if h.raterEngine != nil {
-				costUSD = h.raterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, respData.Usage.PromptTokens, respData.Usage.CompletionTokens)
+			if h.RaterEngine != nil {
+				costUSD = h.RaterEngine.EstimateModelCost(tenantID, provider, fbResult.ActualModel, respData.Usage.PromptTokens, respData.Usage.CompletionTokens)
 			}
 			if costUSD <= 0 {
 				costUSD = float64(respData.Usage.TotalTokens) * 0.000003
 			}
 
 			// TrueUp rate limit tokens and cost (Phase 17)
-			if h.throttlerEngine != nil {
-				h.throttlerEngine.TrueUp(tenantID, apiKeyID, respData.Usage.TotalTokens, estTotalTokens, costUSD, estCost)
+			if h.ThrottlerEngine != nil {
+				h.ThrottlerEngine.TrueUp(tenantID, apiKeyID, respData.Usage.TotalTokens, estTotalTokens, costUSD, estCost)
 			}
 
 			// Populate cache on successful response
-			if h.cacheMgr != nil && len(promptText) > 0 && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
-				h.cacheMgr.Put(tenantID, fbResult.ActualModel, promptText, respData.Choices[0].Message.Content, respBody, respData.Usage.PromptTokens, respData.Usage.CompletionTokens, costUSD, cacheTTLOverride)
+			if h.CacheManager != nil && len(promptText) > 0 && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
+				h.CacheManager.Put(tenantID, fbResult.ActualModel, promptText, respData.Choices[0].Message.Content, respBody, respData.Usage.PromptTokens, respData.Usage.CompletionTokens, costUSD, cacheTTLOverride)
 			}
 
 			// Record experiment results (Phase 20)
-			if expID := c.Writer.Header().Get("X-AIMeter-Experiment-Id"); expID != "" && h.experimentEngine != nil {
+			if expID := c.Writer.Header().Get("X-AIMeter-Experiment-Id"); expID != "" && h.ExperimentEngine != nil {
 				variantID := c.Writer.Header().Get("X-AIMeter-Variant")
 				content := ""
 				if len(respData.Choices) > 0 {
 					content = respData.Choices[0].Message.Content
 				}
 				heuristicScore := 4.5
-				if exp, err := h.experimentEngine.GetExperiment(expID); err == nil && exp != nil && len(exp.EvalConfig.Rules) > 0 {
-					heuristicScore = h.experimentEngine.EvaluateHeuristic(content, exp.EvalConfig.Rules)
+				if exp, err := h.ExperimentEngine.GetExperiment(expID); err == nil && exp != nil && len(exp.EvalConfig.Rules) > 0 {
+					heuristicScore = h.ExperimentEngine.EvaluateHeuristic(content, exp.EvalConfig.Rules)
 				}
-				h.experimentEngine.RecordResult(expID, variantID, int64(respData.Usage.TotalTokens), costUSD, float64(duration.Milliseconds()), heuristicScore, true)
+				h.ExperimentEngine.RecordResult(expID, variantID, int64(respData.Usage.TotalTokens), costUSD, float64(duration.Milliseconds()), heuristicScore, true)
 			}
 
 			// Evaluate Agent Memory Output Utilization (Phase 23)
@@ -138,12 +138,12 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			if sessID == "" {
 				sessID = c.GetHeader("X-Session-ID")
 			}
-			if h.memoryManager != nil && sessID != "" && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
-				go h.memoryManager.EvaluateSessionOutput(sessID, respData.Choices[0].Message.Content)
+			if h.MemoryManager != nil && sessID != "" && len(respData.Choices) > 0 && respData.Choices[0].Message.Content != "" {
+				go h.MemoryManager.EvaluateSessionOutput(sessID, respData.Choices[0].Message.Content)
 			}
 
 			// Audit AI Reasoning & Thinking Depth (Phase 24)
-			if h.reasoningManager != nil && len(respData.Choices) > 0 {
+			if h.ReasoningManager != nil && len(respData.Choices) > 0 {
 				rawMsg := respData.Choices[0].Message.Content
 				thinkingText := ""
 				if strings.Contains(rawMsg, "<think>") && strings.Contains(rawMsg, "</think>") {
@@ -154,7 +154,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 					}
 				}
 				if thinkingText != "" {
-					trace := h.reasoningManager.AuditThinking(tenantID, sessID, traceID, fbResult.ActualModel, promptText, thinkingText)
+					trace := h.ReasoningManager.AuditThinking(tenantID, sessID, traceID, fbResult.ActualModel, promptText, thinkingText)
 					c.Header("X-AIMeter-Reasoning-Tokens", strconv.Itoa(trace.TotalThinkingTokens))
 					c.Header("X-AIMeter-Reasoning-Cost", fmt.Sprintf("%.6f", trace.ThinkingCostUSD))
 					c.Header("X-AIMeter-Thinking-Oscillation", fmt.Sprintf("%.2f", trace.OscillationIndex))
@@ -163,7 +163,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Audit Prefix Caching & KV-Cache Economics (Phase 25)
-			if h.kvCacheManager != nil {
+			if h.KVCacheManager != nil {
 				cachedTokens := respData.Usage.PromptTokensDetails.CachedTokens
 				costSaved := 0.0
 				if cachedTokens > 0 {
@@ -182,7 +182,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 					c.Header("X-AIMeter-KVCache-Saved-USD", fmt.Sprintf("%.6f", costSaved))
 				}
 
-				h.kvCacheManager.RecordTrace(&domain.KVCacheTrace{
+				h.KVCacheManager.RecordTrace(&domain.KVCacheTrace{
 					ID:                 traceID,
 					TenantID:           tenantID,
 					RequestID:          traceID,
@@ -196,9 +196,9 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Audit Output Quality Drift, Hallucination & Robustness Guard (Phase 26)
-			if h.qualityManager != nil && len(respData.Choices) > 0 {
+			if h.QualityManager != nil && len(respData.Choices) > 0 {
 				rawOutput := respData.Choices[0].Message.Content
-				_, qTrace := h.qualityManager.InspectAndProcess(
+				_, qTrace := h.QualityManager.InspectAndProcess(
 					c.Request.Context(),
 					traceID,
 					tenantID,
@@ -218,7 +218,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Phase 27: Save Step Checkpoint on Successful Output
-			if h.workflowManager != nil {
+			if h.WorkflowManager != nil {
 				iKey := c.GetHeader("X-AIMeter-Idempotency-Key")
 				sID := c.GetHeader("X-AIMeter-Step-ID")
 				wfID := c.GetHeader("X-AIMeter-Workflow-ID")
@@ -226,7 +226,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 					wfID = c.GetHeader("X-Workflow-ID")
 				}
 				if iKey != "" {
-					h.workflowManager.SaveCheckpoint(
+					h.WorkflowManager.SaveCheckpoint(
 						wfID,
 						sID,
 						iKey,
@@ -240,7 +240,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Phase 28: Clear Agent Sandbox Compute & Tool Micro-transactions
-			if h.sandboxManager != nil {
+			if h.SandboxManager != nil {
 				sbxRuntime := c.GetHeader("X-AIMeter-Sandbox-Runtime")
 				toolName := c.GetHeader("X-AIMeter-Tool-Name")
 				sbxEnabled := strings.EqualFold(c.GetHeader("X-AIMeter-Sandbox-Enabled"), "true")
@@ -320,7 +320,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 						CodeSnippet:   codeSnippet,
 					}
 
-					sbxRes, execErr := h.sandboxManager.Execute(sbxReq)
+					sbxRes, execErr := h.SandboxManager.Execute(sbxReq)
 					if execErr == nil {
 						c.Header("X-AIMeter-Sandbox-Cost", fmt.Sprintf("%.6f", sbxRes.Record.ComputeCostUSD))
 						c.Header("X-AIMeter-Tool-Cost", fmt.Sprintf("%.6f", sbxRes.Record.ToolCostUSD))
@@ -334,24 +334,24 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Phase 29: Hierarchy Org Tree Cascading Accounting
-			if h.hierarchyManager != nil {
+			if h.HierarchyManager != nil {
 				orgPath := c.GetHeader("X-AIMeter-Org-Path")
 				if orgPath == "" {
 					orgPath = c.GetHeader("X-Org-Path")
 				}
 				if orgPath != "" && costUSD > 0 {
-					h.hierarchyManager.RecordSpend(orgPath, costUSD)
+					h.HierarchyManager.RecordSpend(orgPath, costUSD)
 				}
 			}
 
 			// Phase 30: Multi-Agent Federation Escrow 2PC Settlement
-			if h.federationManager != nil {
+			if h.FederationManager != nil {
 				voucherID := c.Writer.Header().Get("X-AIMeter-Escrow-Voucher-ID")
 				if voucherID == "" {
 					voucherID = c.GetHeader("X-AIMeter-Escrow-Voucher-ID")
 				}
 				if voucherID != "" && costUSD > 0 {
-					if finalVch, err := h.federationManager.RecordGatewaySettlement(voucherID, costUSD, promptText); err == nil && finalVch != nil {
+					if finalVch, err := h.FederationManager.RecordGatewaySettlement(voucherID, costUSD, promptText); err == nil && finalVch != nil {
 						c.Header("X-AIMeter-Settlement-Status", string(finalVch.Status))
 						c.Header("X-AIMeter-Settled-Amount-USD", fmt.Sprintf("%.6f", finalVch.ActualCostUSD))
 						c.Header("X-AIMeter-Clearing-Fee-USD", fmt.Sprintf("%.6f", finalVch.ClearingFeeUSD))
@@ -361,11 +361,11 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Phase 31: LoRA Adapter Inference Savings & Break-Even Audit
-			if h.finetuningManager != nil {
+			if h.FineTuningManager != nil {
 				adapterID := c.GetHeader("X-AIMeter-Adapter-ID")
 				if adapterID != "" {
 					benchmarkModel := c.GetHeader("X-AIMeter-Benchmark-Model")
-					savedUSD, adapter, err := h.finetuningManager.AuditInferenceSavings(adapterID, benchmarkModel, fbResult.ActualModel, costUSD)
+					savedUSD, adapter, err := h.FineTuningManager.AuditInferenceSavings(adapterID, benchmarkModel, fbResult.ActualModel, costUSD)
 					if err == nil && adapter != nil {
 						c.Header("X-AIMeter-Adapter-ID", adapter.ID)
 						c.Header("X-AIMeter-Adapter-ROI", fmt.Sprintf("%.2f%%", adapter.ROIPercent))
@@ -376,7 +376,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Phase 33: Heterogeneous Compute Cluster Scheduling, VRAM Virtualization & Economics
-			if h.heteroManager != nil {
+			if h.HeteroManager != nil {
 				requestedPhase := domain.HeteroPhase(c.GetHeader("X-AIMeter-Hetero-Phase"))
 				if requestedPhase == "" {
 					if respData.Usage.PromptTokens > 0 && respData.Usage.CompletionTokens == 0 {
@@ -396,7 +396,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 					RequestedPhase:            requestedPhase,
 				}
 
-				hResp, hErr := h.heteroManager.Dispatch(c.Request.Context(), hReq)
+				hResp, hErr := h.HeteroManager.Dispatch(c.Request.Context(), hReq)
 				if hErr == nil && hResp != nil {
 					c.Header("X-AIMeter-Compute-Node", hResp.ScheduledNodeID)
 					c.Header("X-AIMeter-VRAM-Util", fmt.Sprintf("%.1f%%", hResp.CurrentVRAMUtil))
@@ -404,7 +404,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 					c.Header("X-AIMeter-MFU-Score", fmt.Sprintf("%.1f%%", hResp.MFUScore))
 					c.Header("X-AIMeter-Hybrid-Saved-USD", fmt.Sprintf("%.6f", hResp.PredictedSavingsUSD))
 
-					h.heteroManager.RecordTrace(&domain.HeteroUsageTrace{
+					h.HeteroManager.RecordTrace(&domain.HeteroUsageTrace{
 						TraceID:                traceID,
 						TenantID:               tenantID,
 						Model:                  fbResult.ActualModel,
@@ -427,7 +427,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 			}
 
 			// Phase 34: Synthetic Data Flywheel, Quality-to-Cost Valuation & Online Traffic Harvesting
-			if h.flywheelManager != nil {
+			if h.FlywheelManager != nil {
 				harvestHeader := c.GetHeader("X-AIMeter-Flywheel-Harvest")
 				targetDataset := c.GetHeader("X-AIMeter-Flywheel-Dataset")
 				autoHarvest := strings.EqualFold(harvestHeader, "true") || strings.EqualFold(harvestHeader, "auto")
@@ -445,7 +445,7 @@ func (h *ProxyHandler) handleNonStreamingResponse(
 						TeacherModel:    fbResult.ActualModel,
 						TargetDatasetID: targetDataset,
 					}
-					hResp, hErr := h.flywheelManager.HarvestOnlineTraffic(hReq)
+					hResp, hErr := h.FlywheelManager.HarvestOnlineTraffic(hReq)
 					if hErr == nil && hResp != nil {
 						c.Header("X-AIMeter-Flywheel-Status", string(hResp.HarvestStatus))
 						c.Header("X-AIMeter-Flywheel-Dataset", hResp.DatasetID)

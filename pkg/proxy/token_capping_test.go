@@ -100,7 +100,7 @@ func TestStreamingHardCappingProxyIntegration(t *testing.T) {
 
 	fbMgr := NewFallbackManager(nil, nil)
 	proxyHandler := NewProxyHandler(fbMgr, nil, nil)
-	proxyHandler.SetBudgetManager(bm)
+	proxyHandler.BudgetManager = bm
 	proxyHandler.SetUpstreamURL("openai", upstreamServer.URL)
 
 	router := gin.New()

@@ -12,108 +12,41 @@ import (
 	"github.com/corlin/AIMeter/pkg/anomaly"
 	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/budget"
-	"github.com/corlin/AIMeter/pkg/cache"
-	"github.com/corlin/AIMeter/pkg/cluster"
-// 	"github.com/corlin/AIMeter/pkg/compress"
-	"github.com/corlin/AIMeter/pkg/dlp"
+
+	// 	"github.com/corlin/AIMeter/pkg/compress"
+
 	"github.com/corlin/AIMeter/pkg/domain"
-	"github.com/corlin/AIMeter/pkg/experiment"
 	"github.com/corlin/AIMeter/pkg/focus"
-	"github.com/corlin/AIMeter/pkg/forecast"
 	"github.com/corlin/AIMeter/pkg/guard"
-	"github.com/corlin/AIMeter/pkg/kvcache"
-	"github.com/corlin/AIMeter/pkg/memory"
 	"github.com/corlin/AIMeter/pkg/metrics"
 	"github.com/corlin/AIMeter/pkg/multimodal"
-	"github.com/corlin/AIMeter/pkg/quality"
 	"github.com/corlin/AIMeter/pkg/rater"
-	"github.com/corlin/AIMeter/pkg/reasoning"
 	"github.com/corlin/AIMeter/pkg/reconcile"
 	"github.com/corlin/AIMeter/pkg/registry"
-	"github.com/corlin/AIMeter/pkg/router"
 	"github.com/corlin/AIMeter/pkg/storage"
-	"github.com/corlin/AIMeter/pkg/swarm"
-	"github.com/corlin/AIMeter/pkg/throttler"
-	"github.com/corlin/AIMeter/pkg/workflow"
-	"github.com/corlin/AIMeter/pkg/sandbox"
-	"github.com/corlin/AIMeter/pkg/hierarchy"
-	"github.com/corlin/AIMeter/pkg/federation"
-	"github.com/corlin/AIMeter/pkg/finetuning"
-	"github.com/corlin/AIMeter/pkg/waf"
-	"github.com/corlin/AIMeter/pkg/hetero"
-	"github.com/corlin/AIMeter/pkg/flywheel"
 	"github.com/gin-gonic/gin"
 )
 
+// APIHandler serves the REST control plane. Domain engines and managers are
+// promoted from the embedded registry (e.g. h.BudgetManager, h.WAFManager).
 type APIHandler struct {
-	reg                *registry.ControlPlaneRegistry
-	store              storage.Store
-	postgres           *storage.PostgresClient
-	rater              *rater.RatingEngine
-	budgetMgr          *budget.BudgetManager
-	reconciler         *reconcile.ReconciliationEngine
-	focusExport        *focus.FocusExporter
-	detector           *anomaly.AnomalyDetector
-	advisor            *advisor.CostAdvisor
-	guardSvc           *guard.GuardService
-	alertDispatcher    *alert.AlertDispatcher
-	authSvc            *auth.AuthService
-	slaArbiter         *router.SLAArbiter
-	cacheMgr           *cache.SemanticCacheManager
-	multimodalEngine   *multimodal.MultimodalEngine
-	throttlerEngine    *throttler.ThrottlerEngine
-	forecastEngine     *forecast.ForecastEngine
-	clusterCoordinator *cluster.ClusterCoordinator
-	experimentEngine   *experiment.Engine
-	dlpManager         *dlp.Manager
-	swarmManager       *swarm.Manager
-	memoryManager      *memory.MemoryManager
-	reasoningManager   *reasoning.ReasoningManager
-	kvCacheManager     *kvcache.Manager
-	qualityManager     *quality.QualityManager
-	workflowManager    *workflow.WorkflowManager
-	sandboxManager     *sandbox.SandboxManager
-	hierarchyManager   *hierarchy.HierarchyManager
-	federationManager  *federation.FederationManager
-	finetuningManager  *finetuning.Manager
-	wafManager         *waf.Manager
-	heteroManager      *hetero.Manager
-	flywheelManager    *flywheel.FlywheelManager
+	*registry.ControlPlaneRegistry
+	store           storage.Store
+	postgres        *storage.PostgresClient
+	reconciler      *reconcile.ReconciliationEngine
+	focusExport     *focus.FocusExporter
+	detector        *anomaly.AnomalyDetector
+	advisor         *advisor.CostAdvisor
+	guardSvc        *guard.GuardService
+	alertDispatcher *alert.AlertDispatcher
+	authSvc         *auth.AuthService
 }
 
 // SetRegistry binds the unified control plane registry to APIHandler
 func (h *APIHandler) SetRegistry(reg *registry.ControlPlaneRegistry) {
-	if reg == nil {
-		return
+	if reg != nil {
+		h.ControlPlaneRegistry = reg
 	}
-	h.reg = reg
-	h.budgetMgr = reg.BudgetManager
-	h.slaArbiter = reg.SLAArbiter
-	h.cacheMgr = reg.CacheManager
-	h.multimodalEngine = reg.MultimodalEngine
-	h.throttlerEngine = reg.ThrottlerEngine
-	h.forecastEngine = reg.ForecastEngine
-	h.clusterCoordinator = reg.ClusterCoordinator
-	h.experimentEngine = reg.ExperimentEngine
-	h.dlpManager = reg.DLPManager
-	h.swarmManager = reg.SwarmManager
-	h.memoryManager = reg.MemoryManager
-	h.reasoningManager = reg.ReasoningManager
-	h.kvCacheManager = reg.KVCacheManager
-	h.qualityManager = reg.QualityManager
-	h.workflowManager = reg.WorkflowManager
-	h.sandboxManager = reg.SandboxManager
-	h.hierarchyManager = reg.HierarchyManager
-	h.federationManager = reg.FederationManager
-	h.finetuningManager = reg.FineTuningManager
-	h.wafManager = reg.WAFManager
-	h.heteroManager = reg.HeteroManager
-	h.flywheelManager = reg.FlywheelManager
-}
-
-// GetRegistry returns the attached control plane registry
-func (h *APIHandler) GetRegistry() *registry.ControlPlaneRegistry {
-	return h.reg
 }
 
 func NewAPIHandler(
@@ -140,19 +73,22 @@ func NewAPIHandler(
 		g.SetAlertDispatcher(alertDisp)
 	}
 
+	reg := registry.NewControlPlaneRegistry()
+	reg.RaterEngine = r
+	reg.BudgetManager = bm
+	reg.MultimodalEngine = multimodal.NewMultimodalEngine()
+
 	return &APIHandler{
-		store:            store,
-		postgres:         pg,
-		rater:            r,
-		budgetMgr:        bm,
-		reconciler:       reconcile.NewReconciliationEngine(),
-		focusExport:      focus.NewFocusExporter(),
-		detector:         det,
-		advisor:          adv,
-		guardSvc:         g,
-		alertDispatcher:  alertDisp,
-		authSvc:          authSvc,
-		multimodalEngine: multimodal.NewMultimodalEngine(),
+		ControlPlaneRegistry: reg,
+		store:                store,
+		postgres:             pg,
+		reconciler:           reconcile.NewReconciliationEngine(),
+		focusExport:          focus.NewFocusExporter(),
+		detector:             det,
+		advisor:              adv,
+		guardSvc:             g,
+		alertDispatcher:      alertDisp,
+		authSvc:              authSvc,
 	}
 }
 
@@ -241,7 +177,7 @@ func (h *APIHandler) GetTraceDetail(c *gin.Context) {
 
 // GetRates lists all rates in the catalog
 func (h *APIHandler) GetRates(c *gin.Context) {
-	rates := h.rater.GetAllRates()
+	rates := h.RaterEngine.GetAllRates()
 	if rates == nil {
 		rates = make([]domain.RateEntry, 0)
 	}
@@ -256,7 +192,7 @@ func (h *APIHandler) UpsertRate(c *gin.Context) {
 		return
 	}
 
-	h.rater.UpsertRate(entry)
+	h.RaterEngine.UpsertRate(entry)
 
 	if h.postgres != nil {
 		_ = h.postgres.SeedRates(c.Request.Context(), []domain.RateEntry{entry})
@@ -370,11 +306,11 @@ func (h *APIHandler) ExportFocus(c *gin.Context) {
 // GetBudgets returns registered budget rules
 func (h *APIHandler) GetBudgets(c *gin.Context) {
 	tenantID := c.Query("tenant_id")
-	if h.budgetMgr == nil {
+	if h.BudgetManager == nil {
 		c.JSON(http.StatusOK, []domain.BudgetRule{})
 		return
 	}
-	budgets := h.budgetMgr.GetBudgets(tenantID)
+	budgets := h.BudgetManager.GetBudgets(tenantID)
 	if budgets == nil {
 		budgets = []domain.BudgetRule{}
 	}
@@ -383,7 +319,7 @@ func (h *APIHandler) GetBudgets(c *gin.Context) {
 
 // UpsertBudget creates or updates a budget rule
 func (h *APIHandler) UpsertBudget(c *gin.Context) {
-	if h.budgetMgr == nil {
+	if h.BudgetManager == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Budget manager not initialized"})
 		return
 	}
@@ -394,17 +330,17 @@ func (h *APIHandler) UpsertBudget(c *gin.Context) {
 		return
 	}
 
-	saved := h.budgetMgr.UpsertBudget(rule)
+	saved := h.BudgetManager.UpsertBudget(rule)
 	c.JSON(http.StatusOK, saved)
 }
 
 // GetAlerts returns triggered budget alert history
 func (h *APIHandler) GetAlerts(c *gin.Context) {
-	if h.budgetMgr == nil {
+	if h.BudgetManager == nil {
 		c.JSON(http.StatusOK, []domain.AlertEvent{})
 		return
 	}
-	alerts := h.budgetMgr.GetAlerts(50)
+	alerts := h.BudgetManager.GetAlerts(50)
 	if alerts == nil {
 		alerts = []domain.AlertEvent{}
 	}
@@ -414,7 +350,7 @@ func (h *APIHandler) GetAlerts(c *gin.Context) {
 // GetStreamCappingPolicy returns streaming cutoff limits for a tenant
 func (h *APIHandler) GetStreamCappingPolicy(c *gin.Context) {
 	tenantID := c.DefaultQuery("tenant_id", "default")
-	if h.budgetMgr == nil {
+	if h.BudgetManager == nil {
 		c.JSON(http.StatusOK, domain.StreamCappingPolicy{
 			TenantID:         tenantID,
 			MaxTokensPerReq:  4096,
@@ -424,7 +360,7 @@ func (h *APIHandler) GetStreamCappingPolicy(c *gin.Context) {
 		})
 		return
 	}
-	policy := h.budgetMgr.GetStreamCappingPolicy(tenantID)
+	policy := h.BudgetManager.GetStreamCappingPolicy(tenantID)
 	c.JSON(http.StatusOK, policy)
 }
 
@@ -435,11 +371,11 @@ func (h *APIHandler) UpsertStreamCappingPolicy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if h.budgetMgr == nil {
+	if h.BudgetManager == nil {
 		c.JSON(http.StatusOK, policy)
 		return
 	}
-	saved := h.budgetMgr.UpsertStreamCappingPolicy(policy)
+	saved := h.BudgetManager.UpsertStreamCappingPolicy(policy)
 	c.JSON(http.StatusOK, saved)
 }
 
@@ -723,4 +659,3 @@ func (h *APIHandler) UpdateAPIKeyStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": req.Status, "id": id})
 }
-
