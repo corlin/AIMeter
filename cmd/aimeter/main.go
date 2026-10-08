@@ -79,7 +79,15 @@ func main() {
 
 	// 4. Initialize In-Memory Store & Database Connections
 	memStore := storage.NewMemoryStore()
-	var primaryStore storage.Store = memStore
+
+	// ClickHouse, when reachable, is the durable source for the usage/cost ledger.
+	chClient, err := storage.NewClickHouseClient(cfg.Database.ClickHouse)
+	if err != nil {
+		log.Printf("[WARN] ClickHouse unavailable (%v). Running with in-memory ledger store.", err)
+	} else {
+		log.Printf("[INFO] Connected to ClickHouse at %s", cfg.Database.ClickHouse.Addr)
+	}
+	primaryStore := storage.NewLedgerStore(memStore, chClient)
 
 	// Seed Initial Realistic Demo Anomalies & Recommendations
 	_ = memStore.SaveAnomalyEvent(context.Background(), domain.AnomalyEvent{
@@ -118,17 +126,7 @@ func main() {
 	breakerMgr.RecordBlock("org-enterprise-1", "contract-review-agent")
 	breakerMgr.RecordBlock("org-enterprise-1", "contract-review-agent")
 
-	var chClient *storage.ClickHouseClient
-	var pgClient *storage.PostgresClient
-
-	chClient, err = storage.NewClickHouseClient(cfg.Database.ClickHouse)
-	if err != nil {
-		log.Printf("[WARN] ClickHouse connection unavailable (%s). Running with in-memory ledger store.", cfg.Database.ClickHouse.Addr)
-	} else {
-		log.Printf("[INFO] Connected to ClickHouse at %s", cfg.Database.ClickHouse.Addr)
-	}
-
-	pgClient, err = storage.NewPostgresClient(cfg.Database.Postgres.DSN)
+	pgClient, err := storage.NewPostgresClient(cfg.Database.Postgres.DSN)
 	if err != nil {
 		log.Printf("[WARN] Postgres connection unavailable. Running with in-memory config store.")
 	} else {
@@ -145,11 +143,8 @@ func main() {
 
 	// 6. Initialize Micro-Batcher for Storage Writes
 	flushHandler := func(ctx context.Context, usages []domain.UsageEvent, costs []domain.CostItem) error {
-		_ = memStore.WriteBatch(ctx, usages, costs)
-		if chClient != nil {
-			if err := chClient.WriteBatch(ctx, usages, costs); err != nil {
-				log.Printf("[WARN] ClickHouse write failed: %v", err)
-			}
+		if err := primaryStore.WriteBatch(ctx, usages, costs); err != nil {
+			log.Printf("[WARN] ClickHouse write failed: %v", err)
 		}
 		for _, c := range costs {
 			budgetMgr.TrackSpend(c.Attribution.TenantID, c.Attribution.AppID, c.Attribution.WorkflowID, c.EffectiveCost)

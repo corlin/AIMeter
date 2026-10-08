@@ -10,6 +10,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/corlin/AIMeter/pkg/config"
 	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/shopspring/decimal"
 )
 
 type ClickHouseClient struct {
@@ -34,6 +35,12 @@ func NewClickHouseClient(cfg config.ClickHouseConfig) (*ClickHouseClient, error)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to ClickHouse: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := conn.Ping(ctx); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to reach ClickHouse at %s: %w", cfg.Addr, err)
 	}
 
 	return &ClickHouseClient{conn: conn}, nil
@@ -120,11 +127,11 @@ func (c *ClickHouseClient) WriteBatch(ctx context.Context, usages []domain.Usage
 				cost.Unit,
 				cost.RateID,
 				cost.RateVersion,
-				cost.UnitPrice,
+				decimal.NewFromFloat(cost.UnitPrice),
 				cost.Currency,
-				cost.ListCost,
-				cost.ContractDiscount,
-				cost.EffectiveCost,
+				decimal.NewFromFloat(cost.ListCost),
+				decimal.NewFromFloat(cost.ContractDiscount),
+				decimal.NewFromFloat(cost.EffectiveCost),
 				cost.IsReconciled,
 				cost.ReconciliationID,
 				cost.BillingPeriod,
@@ -142,153 +149,109 @@ func (c *ClickHouseClient) WriteBatch(ctx context.Context, usages []domain.Usage
 	return nil
 }
 
-// GetOverviewStats computes aggregate metrics
+// GetOverviewStats computes aggregate metrics. Decimal money columns are cast
+// with toFloat64 so they scan into the float64 domain fields.
 func (c *ClickHouseClient) GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error) {
 	stats := &domain.OverviewStats{
-		TopModels:    make([]domain.BreakdownItem, 0),
-		TopAgents:    make([]domain.BreakdownItem, 0),
 		TopWorkflows: make([]domain.BreakdownItem, 0),
 		SpendTrend:   make([]domain.TimeSeriesSpendData, 0),
 	}
 
-	whereClause := "WHERE timestamp >= ? AND timestamp <= ?"
+	where := "WHERE timestamp >= ? AND timestamp <= ?"
 	args := []any{startTime, endTime}
 	if tenantID != "" && tenantID != "all" {
-		whereClause += " AND tenant_id = ?"
+		where += " AND tenant_id = ?"
 		args = append(args, tenantID)
 	}
 
-	// 1. Total Spend & Requests
-	costQuery := fmt.Sprintf(`
-		SELECT 
-			sum(effective_cost) AS total_spend,
-			count(DISTINCT trace_id) AS total_requests
-		FROM aimeter.cost_ledger 
-		%s
-	`, whereClause)
-
-	row := c.conn.QueryRow(ctx, costQuery, args...)
-	var totalSpend float64
+	// 1. Total Spend, Tokens & Requests
 	var totalRequests uint64
-	if err := row.Scan(&totalSpend, &totalRequests); err == nil {
-		stats.TotalSpendUSD = totalSpend
-		stats.TotalRequests = int64(totalRequests)
-		if totalRequests > 0 {
-			stats.AverageRequestCost = totalSpend / float64(totalRequests)
-		}
+	var totalTokens float64
+	if err := c.conn.QueryRow(ctx, `
+		SELECT toFloat64(sum(effective_cost)), sum(quantity), uniqExact(trace_id)
+		FROM aimeter.cost_ledger `+where, args...,
+	).Scan(&stats.TotalSpendUSD, &totalTokens, &totalRequests); err != nil {
+		return nil, fmt.Errorf("query overview totals failed: %w", err)
+	}
+	stats.TotalTokens = int64(totalTokens)
+	stats.TotalRequests = int64(totalRequests)
+	if totalRequests > 0 {
+		stats.AverageRequestCost = stats.TotalSpendUSD / float64(totalRequests)
 	}
 
-	// 2. Total Tokens & Cache Hit Ratio from Usage Ledger
-	usageQuery := fmt.Sprintf(`
-		SELECT 
-			sum(quantity) AS total_tokens,
-			sum(CASE WHEN meter_name = 'LLM.CacheReadToken' THEN quantity ELSE 0 END) AS cached_tokens
-		FROM aimeter.usage_ledger 
-		%s AND meter_name IN ('LLM.InputToken', 'LLM.OutputToken', 'LLM.CacheReadToken', 'LLM.ReasoningToken')
-	`, whereClause)
-
-	uRow := c.conn.QueryRow(ctx, usageQuery, args...)
-	var totalTokens, cachedTokens float64
-	if err := uRow.Scan(&totalTokens, &cachedTokens); err == nil {
-		stats.TotalTokens = int64(totalTokens)
-		if totalTokens > 0 {
-			stats.CacheHitRatio = cachedTokens / totalTokens
-		}
+	// 2. Cache Hit Ratio from Usage Ledger
+	var cachedTokens float64
+	if err := c.conn.QueryRow(ctx, `
+		SELECT sumIf(quantity, meter_name = 'LLM.CacheReadToken')
+		FROM aimeter.usage_ledger `+where, args...,
+	).Scan(&cachedTokens); err != nil {
+		return nil, fmt.Errorf("query cache tokens failed: %w", err)
+	}
+	if totalTokens > 0 {
+		stats.CacheHitRatio = cachedTokens / totalTokens
 	}
 
-	// 3. Top Models
-	topModelsQuery := fmt.Sprintf(`
-		SELECT 
-			model, 
-			sum(effective_cost) as spend, 
-			sum(quantity) as tokens, 
-			count(DISTINCT trace_id) as reqs
-		FROM aimeter.cost_ledger 
-		%s
-		GROUP BY model 
-		ORDER BY spend DESC 
-		LIMIT 5
-	`, whereClause)
-
-	rows, err := c.conn.Query(ctx, topModelsQuery, args...)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var item domain.BreakdownItem
-			var reqs uint64
-			var tokens float64
-			if err := rows.Scan(&item.Key, &item.SpendUSD, &tokens, &reqs); err == nil {
-				item.Tokens = int64(tokens)
-				item.Requests = int64(reqs)
-				if stats.TotalSpendUSD > 0 {
-					item.Percentage = (item.SpendUSD / stats.TotalSpendUSD) * 100
-				}
-				stats.TopModels = append(stats.TopModels, item)
-			}
-		}
+	// 3. Top Models & Agents
+	var err error
+	if stats.TopModels, err = c.topBreakdown(ctx, "if(model = '', 'unknown', model)", where, args, stats.TotalSpendUSD); err != nil {
+		return nil, err
+	}
+	if stats.TopAgents, err = c.topBreakdown(ctx, "if(agent_id = '', 'MainAgent', agent_id)", where, args, stats.TotalSpendUSD); err != nil {
+		return nil, err
 	}
 
-	// 4. Top Agents
-	topAgentsQuery := fmt.Sprintf(`
-		SELECT 
-			agent_id, 
-			sum(effective_cost) as spend, 
-			sum(quantity) as tokens, 
-			count(DISTINCT trace_id) as reqs
-		FROM aimeter.cost_ledger 
-		%s AND agent_id != ''
-		GROUP BY agent_id 
-		ORDER BY spend DESC 
-		LIMIT 5
-	`, whereClause)
-
-	aRows, err := c.conn.Query(ctx, topAgentsQuery, args...)
-	if err == nil {
-		defer aRows.Close()
-		for aRows.Next() {
-			var item domain.BreakdownItem
-			var reqs uint64
-			var tokens float64
-			if err := aRows.Scan(&item.Key, &item.SpendUSD, &tokens, &reqs); err == nil {
-				item.Tokens = int64(tokens)
-				item.Requests = int64(reqs)
-				if stats.TotalSpendUSD > 0 {
-					item.Percentage = (item.SpendUSD / stats.TotalSpendUSD) * 100
-				}
-				stats.TopAgents = append(stats.TopAgents, item)
-			}
-		}
+	// 4. Hourly Spend Trend
+	rows, err := c.conn.Query(ctx, `
+		SELECT toStartOfHour(timestamp) AS tp, toFloat64(sum(effective_cost)), sum(quantity)
+		FROM aimeter.cost_ledger `+where+`
+		GROUP BY tp ORDER BY tp ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query spend trend failed: %w", err)
 	}
-
-	// 5. Spend Trend (grouped by hour/day)
-	trendQuery := fmt.Sprintf(`
-		SELECT 
-			toStartOfHour(timestamp) as tp, 
-			sum(effective_cost) as spend, 
-			sum(quantity) as tokens
-		FROM aimeter.cost_ledger 
-		%s
-		GROUP BY tp 
-		ORDER BY tp ASC
-	`, whereClause)
-
-	tRows, err := c.conn.Query(ctx, trendQuery, args...)
-	if err == nil {
-		defer tRows.Close()
-		for tRows.Next() {
-			var tp time.Time
-			var spend, tokens float64
-			if err := tRows.Scan(&tp, &spend, &tokens); err == nil {
-				stats.SpendTrend = append(stats.SpendTrend, domain.TimeSeriesSpendData{
-					TimePoint: tp.Format("2006-01-02 15:04"),
-					SpendUSD:  spend,
-					Tokens:    int64(tokens),
-				})
-			}
+	defer rows.Close()
+	for rows.Next() {
+		var tp time.Time
+		var spend, tokens float64
+		if err := rows.Scan(&tp, &spend, &tokens); err != nil {
+			return nil, fmt.Errorf("scan spend trend failed: %w", err)
 		}
+		stats.SpendTrend = append(stats.SpendTrend, domain.TimeSeriesSpendData{
+			TimePoint: tp.UTC().Format("2006-01-02 15:00"),
+			SpendUSD:  spend,
+			Tokens:    int64(tokens),
+		})
 	}
+	return stats, rows.Err()
+}
 
-	return stats, nil
+// topBreakdown returns the top 5 spend groups for the given key expression.
+// Requests counts cost items, matching MemoryStore semantics.
+func (c *ClickHouseClient) topBreakdown(ctx context.Context, keyExpr, where string, args []any, totalSpend float64) ([]domain.BreakdownItem, error) {
+	rows, err := c.conn.Query(ctx, `
+		SELECT `+keyExpr+` AS k, toFloat64(sum(effective_cost)) AS spend, sum(quantity), count()
+		FROM aimeter.cost_ledger `+where+`
+		GROUP BY k ORDER BY spend DESC LIMIT 5`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query breakdown by %s failed: %w", keyExpr, err)
+	}
+	defer rows.Close()
+
+	items := make([]domain.BreakdownItem, 0, 5)
+	for rows.Next() {
+		var item domain.BreakdownItem
+		var tokens float64
+		var reqs uint64
+		if err := rows.Scan(&item.Key, &item.SpendUSD, &tokens, &reqs); err != nil {
+			return nil, fmt.Errorf("scan breakdown failed: %w", err)
+		}
+		item.Tokens = int64(tokens)
+		item.Requests = int64(reqs)
+		if totalSpend > 0 {
+			item.Percentage = item.SpendUSD / totalSpend * 100
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 // GetTraceSummaries lists recent traces with cost summaries
@@ -311,7 +274,7 @@ func (c *ClickHouseClient) GetTraceSummaries(ctx context.Context, tenantID strin
 			any(customer_id), 
 			any(app_id), 
 			any(workflow_id), 
-			sum(effective_cost) as total_cost, 
+			toFloat64(sum(effective_cost)) as total_cost, 
 			sum(quantity) as total_tokens, 
 			min(timestamp) as min_ts
 		FROM aimeter.cost_ledger 
@@ -354,8 +317,8 @@ func (c *ClickHouseClient) GetTraceDetail(ctx context.Context, traceID string) (
 		SELECT 
 			cost_item_id, usage_event_id, timestamp, trace_id, span_id, parent_span_id,
 			tenant_id, customer_id, app_id, workflow_id, agent_id, feature_id, environment,
-			provider, model, meter_name, quantity, unit, rate_id, rate_version, unit_price,
-			currency, list_cost, contract_discount, effective_cost, is_reconciled, billing_period
+			provider, model, meter_name, quantity, unit, rate_id, rate_version, toFloat64(unit_price),
+			currency, toFloat64(list_cost), toFloat64(contract_discount), toFloat64(effective_cost), is_reconciled, billing_period
 		FROM aimeter.cost_ledger 
 		WHERE trace_id = ?
 		ORDER BY timestamp ASC

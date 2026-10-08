@@ -1,0 +1,91 @@
+package storage
+
+import (
+	"context"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/corlin/AIMeter/pkg/config"
+	"github.com/corlin/AIMeter/pkg/domain"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Run with a live ClickHouse that has migrations/clickhouse applied:
+//
+//	AIMETER_CLICKHOUSE_TEST_ADDR=localhost:9000 go test ./pkg/storage -run ClickHouse
+func newTestClickHouse(t *testing.T) *ClickHouseClient {
+	addr := os.Getenv("AIMETER_CLICKHOUSE_TEST_ADDR")
+	if addr == "" {
+		t.Skip("AIMETER_CLICKHOUSE_TEST_ADDR not set")
+	}
+	ch, err := NewClickHouseClient(config.ClickHouseConfig{Addr: addr, Database: "aimeter", Username: "default"})
+	require.NoError(t, err)
+	require.NoError(t, ch.Ping(context.Background()))
+	t.Cleanup(func() { _ = ch.Close() })
+	return ch
+}
+
+func testLedger(tenant, trace string, now time.Time) ([]domain.UsageEvent, []domain.CostItem) {
+	attr := domain.AttributionContext{TenantID: tenant, AppID: "app", WorkflowID: "wf-1", AgentID: "planner"}
+	var usages []domain.UsageEvent
+	var costs []domain.CostItem
+	spans := []struct{ id, parent, model string }{
+		{"root", "", "gpt-4o"},
+		{"child", "root", "gpt-4o-mini"},
+	}
+	for i, s := range spans {
+		ev := domain.UsageEvent{
+			EventID: uuid.New(), Timestamp: now.Add(time.Duration(i) * time.Second),
+			TraceID: trace, SpanID: s.id, ParentSpanID: s.parent, Attribution: attr,
+			Provider: "openai", Model: s.model, MeterName: "LLM.InputToken", Quantity: 1000, Unit: "token",
+			LatencyMs: 120,
+		}
+		usages = append(usages, ev)
+		costs = append(costs, domain.CostItem{
+			CostItemID: uuid.New(), UsageEventID: ev.EventID, Timestamp: ev.Timestamp,
+			TraceID: trace, SpanID: s.id, ParentSpanID: s.parent, Attribution: attr,
+			Provider: "openai", Model: s.model, MeterName: "LLM.InputToken", Quantity: 1000, Unit: "token",
+			RateID: uuid.New(), RateVersion: "v1", UnitPrice: 0.0000025, Currency: "USD",
+			ListCost: 0.25, EffectiveCost: 0.25, BillingPeriod: "2026-10",
+		})
+	}
+	return usages, costs
+}
+
+func TestClickHouse_WriteThenRead(t *testing.T) {
+	ch := newTestClickHouse(t)
+	ctx := context.Background()
+	tenant := "it-" + uuid.NewString()[:8]
+	trace := "trace-" + uuid.NewString()[:8]
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	usages, costs := testLedger(tenant, trace, now)
+	require.NoError(t, ch.WriteBatch(ctx, usages, costs))
+
+	stats, err := ch.GetOverviewStats(ctx, tenant, now.Add(-time.Hour), now.Add(time.Hour))
+	require.NoError(t, err)
+	assert.InDelta(t, 0.50, stats.TotalSpendUSD, 1e-9)
+	assert.EqualValues(t, 1, stats.TotalRequests)
+	assert.EqualValues(t, 2000, stats.TotalTokens)
+	assert.Len(t, stats.TopModels, 2)
+	assert.Len(t, stats.TopAgents, 1)
+	assert.NotEmpty(t, stats.SpendTrend)
+
+	summaries, err := ch.GetTraceSummaries(ctx, tenant, 10)
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	assert.Equal(t, trace, summaries[0].TraceID)
+	assert.InDelta(t, 0.50, summaries[0].TotalCost, 1e-9)
+
+	detail, err := ch.GetTraceDetail(ctx, trace)
+	require.NoError(t, err)
+	require.NotNil(t, detail.RootNode)
+	assert.Equal(t, "root", detail.RootNode.SpanID)
+	require.Len(t, detail.RootNode.Children, 1)
+	assert.Equal(t, "child", detail.RootNode.Children[0].SpanID)
+	assert.EqualValues(t, 120, detail.RootNode.LatencyMs)
+	assert.InDelta(t, 0.50, detail.TotalCost, 1e-9)
+}
