@@ -1,75 +1,53 @@
+import { getApiKey, signalUnauthorized } from "./session";
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
 
 /**
- * Standard GET helper with error tolerance and typed fallback.
+ * fetch against the control plane API: attaches the session API key and
+ * signals the AuthGate on 401 so the operator is asked to sign in.
  */
-export async function apiGet<T>(endpoint: string, fallback: T): Promise<T> {
+export async function apiFetch(endpoint: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const key = getApiKey();
+  if (key) headers.set("Authorization", `Bearer ${key}`);
+
+  const res = await fetch(`${API_BASE}${endpoint}`, { cache: "no-store", ...init, headers });
+  if (res.status === 401) signalUnauthorized();
+  return res;
+}
+
+/** JSON request with error tolerance: returns fallback on any failure. */
+async function requestJSON<T>(method: string, endpoint: string, fallback: T, body?: unknown): Promise<T> {
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, { cache: "no-store" });
+    const res = await apiFetch(endpoint, {
+      method,
+      ...(body !== undefined && {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    });
     if (!res.ok) {
-      throw new Error(`GET ${endpoint} returned status ${res.status}`);
+      throw new Error(`${method} ${endpoint} returned status ${res.status}`);
     }
     return await res.json();
   } catch (err) {
-    console.warn(`[apiGet] Failed to fetch ${endpoint}, returning fallback:`, err);
+    console.warn(`[api ${method}] ${endpoint} failed, returning fallback:`, err);
     return fallback;
   }
 }
 
-/**
- * Standard POST helper with JSON payload and typed fallback.
- */
-export async function apiPost<T, B = unknown>(endpoint: string, body: B, fallback: T): Promise<T> {
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      throw new Error(`POST ${endpoint} returned status ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    console.warn(`[apiPost] Failed to post to ${endpoint}, returning fallback:`, err);
-    return fallback;
-  }
+export function apiGet<T>(endpoint: string, fallback: T): Promise<T> {
+  return requestJSON("GET", endpoint, fallback);
 }
 
-/**
- * Standard PUT helper with JSON payload and typed fallback.
- */
-export async function apiPut<T, B = unknown>(endpoint: string, body: B, fallback: T): Promise<T> {
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      throw new Error(`PUT ${endpoint} returned status ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    console.warn(`[apiPut] Failed to put to ${endpoint}, returning fallback:`, err);
-    return fallback;
-  }
+export function apiPost<T, B = unknown>(endpoint: string, body: B, fallback: T): Promise<T> {
+  return requestJSON("POST", endpoint, fallback, body);
 }
 
-/**
- * Standard DELETE helper with typed fallback.
- */
-export async function apiDelete<T>(endpoint: string, fallback: T): Promise<T> {
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      throw new Error(`DELETE ${endpoint} returned status ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    console.warn(`[apiDelete] Failed to delete ${endpoint}, returning fallback:`, err);
-    return fallback;
-  }
+export function apiPut<T, B = unknown>(endpoint: string, body: B, fallback: T): Promise<T> {
+  return requestJSON("PUT", endpoint, fallback, body);
+}
+
+export function apiDelete<T>(endpoint: string, fallback: T): Promise<T> {
+  return requestJSON("DELETE", endpoint, fallback);
 }

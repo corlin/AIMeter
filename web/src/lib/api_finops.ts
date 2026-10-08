@@ -22,7 +22,7 @@ import {
   GPUCostCalculationRequest,
   GPUCostCalculationResult,
 } from "@/types";
-import { API_BASE, apiGet, apiPost } from "./http";
+import { apiFetch, apiGet, apiPost } from "./http";
 
 export const defaultTenants: Tenant[] = [
   { id: "org-enterprise-1", name: "Enterprise Corp", default_currency: "USD", global_discount: 0.15 },
@@ -70,7 +70,7 @@ export async function uploadInvoiceCSV(formData: FormData): Promise<Reconciliati
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const res = await fetch(`${API_BASE}/reconcile/upload`, {
+    const res = await apiFetch(`/reconcile/upload`, {
       method: "POST",
       body: formData,
       signal: controller.signal,
@@ -161,7 +161,7 @@ export async function createAlertChannel(channel: Partial<AlertChannel>): Promis
 
 export async function deleteAlertChannel(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/alerts/channels/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await apiFetch(`/alerts/channels/${encodeURIComponent(id)}`, { method: "DELETE" });
     return res.ok;
   } catch {
     return false;
@@ -202,7 +202,7 @@ export async function createAPIKey(req: CreateKeyRequest): Promise<KeyCreateResu
 
 export async function revokeAPIKey(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/auth/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await apiFetch(`/auth/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
     return res.ok;
   } catch {
     return false;
@@ -211,7 +211,7 @@ export async function revokeAPIKey(id: string): Promise<boolean> {
 
 export async function updateAPIKeyStatus(id: string, status: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/auth/keys/${encodeURIComponent(id)}/status`, {
+    const res = await apiFetch(`/auth/keys/${encodeURIComponent(id)}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),

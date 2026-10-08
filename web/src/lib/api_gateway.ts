@@ -35,7 +35,7 @@ import {
   WAFSimulateRequest,
   WAFSimulateResponse,
 } from "@/types";
-import { API_BASE, apiGet, apiPost, apiDelete } from "./http";
+import { apiFetch, apiGet, apiPost, apiDelete } from "./http";
 
 // ==========================================
 // Phase 12: Streaming Hard-Capping & Budget Cut-off
@@ -142,7 +142,7 @@ export async function fetchCacheEntries(tenantId = "all", limit = 50, offset = 0
 
 export async function deleteCacheEntry(id: string, tenantId = "default"): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/cache/entries/${encodeURIComponent(id)}?tenant_id=${encodeURIComponent(tenantId)}`, { method: "DELETE" });
+    const res = await apiFetch(`/cache/entries/${encodeURIComponent(id)}?tenant_id=${encodeURIComponent(tenantId)}`, { method: "DELETE" });
     return res.ok;
   } catch {
     return false;
@@ -151,7 +151,7 @@ export async function deleteCacheEntry(id: string, tenantId = "default"): Promis
 
 export async function clearCacheEntries(tenantId = "all"): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/cache/entries/clear?tenant_id=${encodeURIComponent(tenantId)}`, { method: "POST" });
+    const res = await apiFetch(`/cache/entries/clear?tenant_id=${encodeURIComponent(tenantId)}`, { method: "POST" });
     return res.ok;
   } catch {
     return false;
@@ -264,7 +264,7 @@ export async function saveDLPPolicy(policy: DLPPolicy): Promise<DLPPolicy> {
 
 export async function deleteDLPPolicy(tenantId: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/privacy/policies/${encodeURIComponent(tenantId)}`, { method: "DELETE" });
+    const res = await apiFetch(`/privacy/policies/${encodeURIComponent(tenantId)}`, { method: "DELETE" });
     return res.ok;
   } catch {
     return false;
