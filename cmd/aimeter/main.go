@@ -128,7 +128,7 @@ func main() {
 
 	pgClient, err := storage.NewPostgresClient(cfg.Database.Postgres.DSN)
 	if err != nil {
-		log.Printf("[WARN] Postgres connection unavailable. Running with in-memory config store.")
+		log.Printf("[WARN] Postgres unavailable (%v). Running with in-memory config store.", err)
 	} else {
 		log.Printf("[INFO] Connected to PostgreSQL")
 		if err := pgClient.SeedRates(context.Background(), ratingEngine.GetAllRates()); err != nil {

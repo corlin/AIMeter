@@ -28,6 +28,14 @@ func NewPostgresClient(dsn string) (*PostgresClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres pool: %w", err)
 	}
+	// pgxpool connects lazily; ping so an unreachable server is reported here
+	// instead of failing every later query.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to reach postgres: %w", err)
+	}
 
 	client := &PostgresClient{pool: pool}
 	// Seed default tenants if needed
@@ -106,38 +114,6 @@ func (p *PostgresClient) SeedRates(ctx context.Context, rates []domain.RateEntry
 	}
 
 	return nil
-}
-
-// GetRates loads all rates from database
-func (p *PostgresClient) GetRates(ctx context.Context) ([]domain.RateEntry, error) {
-	query := `
-		SELECT 
-			id, provider, model, meter_name, region, service_tier, 
-			pricing_type, unit_price, currency, unit, effective_start_at, effective_end_at,
-			tenant_id, discount_rate
-		FROM rate_catalogs
-		ORDER BY provider, model, meter_name
-	`
-
-	rates := make([]domain.RateEntry, 0)
-	rows, err := p.pool.Query(ctx, query)
-	if err != nil {
-		return rates, fmt.Errorf("failed to query rates: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var r domain.RateEntry
-		if err := rows.Scan(
-			&r.ID, &r.Provider, &r.Model, &r.MeterName, &r.Region, &r.ServiceTier,
-			&r.PricingType, &r.UnitPrice, &r.Currency, &r.Unit, &r.EffectiveStartAt, &r.EffectiveEndAt,
-			&r.TenantID, &r.DiscountRate,
-		); err == nil {
-			rates = append(rates, r)
-		}
-	}
-
-	return rates, nil
 }
 
 // UpsertTenant creates or updates a tenant
