@@ -113,6 +113,7 @@ func (s *IngestionService) RegisterRESTHandler(rg *gin.RouterGroup) {
 			if p.Attributes == nil {
 				p.Attributes = make(map[string]string)
 			}
+			mergeAttribution(p.Attributes, p.Attribution)
 
 			input := normalizer.RawUsageInput{
 				Timestamp:      ts,
@@ -139,4 +140,26 @@ func (s *IngestionService) RegisterRESTHandler(rg *gin.RouterGroup) {
 			"events_ingested": totalIngested,
 		})
 	})
+}
+
+// mergeAttribution copies explicit attribution fields into span attributes so
+// the resolver sees them; attributes already present take precedence and an
+// authenticated tenant still overrides tenant_id.
+func mergeAttribution(attrs map[string]string, a *domain.AttributionContext) {
+	if a == nil {
+		return
+	}
+	for k, v := range map[string]string{
+		"tenant_id":   a.TenantID,
+		"customer_id": a.CustomerID,
+		"app_id":      a.AppID,
+		"workflow_id": a.WorkflowID,
+		"agent_id":    a.AgentID,
+		"feature_id":  a.FeatureID,
+		"environment": a.Environment,
+	} {
+		if _, exists := attrs[k]; !exists && v != "" {
+			attrs[k] = v
+		}
+	}
 }

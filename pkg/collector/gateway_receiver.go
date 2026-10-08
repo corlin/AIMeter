@@ -99,17 +99,7 @@ func (s *IngestionService) HandleGatewayLog(c *gin.Context) {
 	}
 
 	baggageHeader := c.GetHeader("baggage")
-	if payload.Attribution != nil {
-		if baggageHeader == "" {
-			baggageHeader = fmt.Sprintf("tenant_id=%s,customer_id=%s,app_id=%s,workflow_id=%s,agent_id=%s",
-				payload.Attribution.TenantID,
-				payload.Attribution.CustomerID,
-				payload.Attribution.AppID,
-				payload.Attribution.WorkflowID,
-				payload.Attribution.AgentID,
-			)
-		}
-	}
+	mergeAttribution(attrs, payload.Attribution)
 
 	input := normalizer.RawUsageInput{
 		Timestamp:      time.Now().UTC(),
