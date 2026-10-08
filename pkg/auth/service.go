@@ -72,9 +72,6 @@ func (s *AuthService) GenerateKey(req CreateKeyRequest) (*KeyCreateResult, error
 	if req.TenantID == "" {
 		return nil, fmt.Errorf("tenant_id is required")
 	}
-	if req.Name == "" {
-		req.Name = "Default Key"
-	}
 
 	// 1. Generate 16 bytes of cryptographically secure random entropy (32 hex characters)
 	entropy := make([]byte, 16)
@@ -82,6 +79,23 @@ func (s *AuthService) GenerateKey(req CreateKeyRequest) (*KeyCreateResult, error
 		return nil, fmt.Errorf("failed to generate random key: %w", err)
 	}
 	rawKey := fmt.Sprintf("sk-aimeter-live-%s", hex.EncodeToString(entropy))
+	return s.registerKey(rawKey, req), nil
+}
+
+// ImportKey registers an operator-supplied raw secret (e.g. a bootstrap admin key
+// from the environment) so it can authenticate like any generated key.
+func (s *AuthService) ImportKey(rawKey string, req CreateKeyRequest) (*APIKey, error) {
+	rawKey = strings.TrimSpace(rawKey)
+	if rawKey == "" || req.TenantID == "" {
+		return nil, fmt.Errorf("raw key and tenant_id are required")
+	}
+	return s.registerKey(rawKey, req).APIKey, nil
+}
+
+func (s *AuthService) registerKey(rawKey string, req CreateKeyRequest) *KeyCreateResult {
+	if req.Name == "" {
+		req.Name = "Default Key"
+	}
 
 	// 2. Compute SHA-256 hash for secure storage
 	hash := sha256.Sum256([]byte(rawKey))
@@ -105,7 +119,7 @@ func (s *AuthService) GenerateKey(req CreateKeyRequest) (*KeyCreateResult, error
 	}
 
 	// 6. Assemble APIKey entity
-	keyID := fmt.Sprintf("key_%d_%s", time.Now().UnixNano(), hex.EncodeToString(entropy[:4]))
+	keyID := fmt.Sprintf("key_%d_%s", time.Now().UnixNano(), keyHash[:8])
 	apiKey := &APIKey{
 		ID:           keyID,
 		TenantID:     req.TenantID,
@@ -130,7 +144,7 @@ func (s *AuthService) GenerateKey(req CreateKeyRequest) (*KeyCreateResult, error
 	return &KeyCreateResult{
 		RawKey: rawKey,
 		APIKey: apiKey,
-	}, nil
+	}
 }
 
 // ValidateKey validates rawKey and checks whether it contains the requiredScope.

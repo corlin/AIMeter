@@ -179,7 +179,21 @@ func main() {
 		RateLimitQPS: 500,
 	})
 	if err == nil {
-		log.Printf("[INFO Auth] Demo API Key generated: %s (Masked: %s)", demoKey.RawKey, demoKey.APIKey.KeyPrefix)
+		log.Printf("[INFO Auth] Demo API Key generated (Masked: %s)", demoKey.APIKey.KeyPrefix)
+	}
+
+	// Bootstrap operator key: with auth enabled, the /api/v1 control plane
+	// requires admin:* for mutations (including issuing further keys).
+	if rawAdminKey := os.Getenv("AIMETER_ADMIN_KEY"); rawAdminKey != "" {
+		if _, err := authSvc.ImportKey(rawAdminKey, auth.CreateKeyRequest{
+			TenantID: "platform",
+			Name:     "Bootstrap Admin Key (AIMETER_ADMIN_KEY)",
+			Scopes:   []string{auth.ScopeAdminAll},
+		}); err != nil {
+			log.Printf("[WARN Auth] Failed to import AIMETER_ADMIN_KEY: %v", err)
+		}
+	} else if cfg.Auth.Enabled {
+		log.Printf("[WARN Auth] auth.enabled=true but AIMETER_ADMIN_KEY is unset: control plane writes will be rejected")
 	}
 
 	// 9. Initialize API Server

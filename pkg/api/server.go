@@ -148,8 +148,9 @@ func NewServer(
 
 	// OTel & REST Receiver Endpoints
 	if collectorSvc != nil {
-		collectorSvc.RegisterOTLPHTTPHandler(router.Group(""))
-		collectorSvc.RegisterRESTHandler(router.Group("/api/v1"))
+		telemetryAuth := auth.RequireScopeMiddleware(authSvc, auth.ScopeTelemetryWrite, authEnabled)
+		collectorSvc.RegisterOTLPHTTPHandler(router.Group("", telemetryAuth))
+		collectorSvc.RegisterRESTHandler(router.Group("/api/v1", telemetryAuth))
 		router.POST("/v1/gateway/:vendor", auth.RequireScopeMiddleware(authSvc, auth.ScopeTelemetryWrite, authEnabled), collectorSvc.HandleGatewayLog)
 	}
 
@@ -168,7 +169,7 @@ func NewServer(
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
 	// AI Meter REST APIs (Modularized by Domain Hubs)
-	apiV1 := router.Group("/api/v1")
+	apiV1 := router.Group("/api/v1", auth.RequireConsoleAccess(authSvc, authEnabled))
 	{
 		registerFinOpsRoutes(apiV1, handler)
 		registerGatewayRoutes(apiV1, handler)

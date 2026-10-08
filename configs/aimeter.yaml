@@ -22,5 +22,5 @@ rates:
   cache_ttl_minutes: 60
 
 auth:
-  enabled: false # Set to true to enforce strict API key authentication across all gateway and guard endpoints
+  enabled: false # true: enforce API keys on proxy, guard, telemetry and /api/v1 (reads need read:metrics, writes need admin:*; non-admin keys are pinned to their tenant). Bootstrap admin via AIMETER_ADMIN_KEY env.
 
