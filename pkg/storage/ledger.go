@@ -61,3 +61,21 @@ func (s *LedgerStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	}
 	return detail, nil
 }
+
+func (s *LedgerStore) GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error) {
+	items, err := s.ch.GetCostItems(ctx, tenantID, period)
+	if err != nil {
+		log.Printf("[WARN Ledger] ClickHouse cost items failed, serving in-memory ledger: %v", err)
+		return s.MemoryStore.GetCostItems(ctx, tenantID, period)
+	}
+	return items, nil
+}
+
+func (s *LedgerStore) GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error) {
+	events, err := s.ch.GetUsageEvents(ctx, tenantID)
+	if err != nil {
+		log.Printf("[WARN Ledger] ClickHouse usage events failed, serving in-memory ledger: %v", err)
+		return s.MemoryStore.GetUsageEvents(ctx, tenantID)
+	}
+	return events, nil
+}

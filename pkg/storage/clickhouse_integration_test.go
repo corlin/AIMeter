@@ -88,4 +88,22 @@ func TestClickHouse_WriteThenRead(t *testing.T) {
 	assert.Equal(t, "child", detail.RootNode.Children[0].SpanID)
 	assert.EqualValues(t, 120, detail.RootNode.LatencyMs)
 	assert.InDelta(t, 0.50, detail.TotalCost, 1e-9)
+
+	costItems, err := ch.GetCostItems(ctx, tenant, "2026-10")
+	require.NoError(t, err)
+	require.Len(t, costItems, 2)
+	assert.Equal(t, costs[0].CostItemID, costItems[0].CostItemID)
+	assert.Equal(t, "USD", costItems[0].Currency)
+	assert.InDelta(t, 0.25, costItems[0].EffectiveCost, 1e-9)
+
+	none, err := ch.GetCostItems(ctx, tenant, "1999-01")
+	require.NoError(t, err)
+	assert.Empty(t, none)
+
+	events, err := ch.GetUsageEvents(ctx, tenant)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, usages[0].EventID, events[0].EventID)
+	assert.Equal(t, tenant, events[0].Attribution.TenantID)
+	assert.EqualValues(t, 120, events[0].LatencyMs)
 }

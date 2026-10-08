@@ -312,39 +312,9 @@ func (c *ClickHouseClient) GetTraceSummaries(ctx context.Context, tenantID strin
 
 // GetTraceDetail builds the full hierarchical execution tree for a trace
 func (c *ClickHouseClient) GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error) {
-	// Query all cost items for this trace
-	query := `
-		SELECT 
-			cost_item_id, usage_event_id, timestamp, trace_id, span_id, parent_span_id,
-			tenant_id, customer_id, app_id, workflow_id, agent_id, feature_id, environment,
-			provider, model, meter_name, quantity, unit, rate_id, rate_version, toFloat64(unit_price),
-			currency, toFloat64(list_cost), toFloat64(contract_discount), toFloat64(effective_cost), is_reconciled, billing_period
-		FROM aimeter.cost_ledger 
-		WHERE trace_id = ?
-		ORDER BY timestamp ASC
-	`
-
-	rows, err := c.conn.Query(ctx, query, traceID)
+	costItems, err := c.queryCostItems(ctx, "WHERE trace_id = ?", traceID)
 	if err != nil {
-		return nil, fmt.Errorf("query trace cost items failed: %w", err)
-	}
-	defer rows.Close()
-
-	var costItems []domain.CostItem
-	for rows.Next() {
-		var item domain.CostItem
-		var isReconciled uint8
-		if err := rows.Scan(
-			&item.CostItemID, &item.UsageEventID, &item.Timestamp, &item.TraceID, &item.SpanID, &item.ParentSpanID,
-			&item.Attribution.TenantID, &item.Attribution.CustomerID, &item.Attribution.AppID, &item.Attribution.WorkflowID,
-			&item.Attribution.AgentID, &item.Attribution.FeatureID, &item.Attribution.Environment,
-			&item.Provider, &item.Model, &item.MeterName, &item.Quantity, &item.Unit, &item.RateID, &item.RateVersion,
-			&item.UnitPrice, &item.Currency, &item.ListCost, &item.ContractDiscount, &item.EffectiveCost,
-			&isReconciled, &item.BillingPeriod,
-		); err == nil {
-			item.IsReconciled = isReconciled
-			costItems = append(costItems, item)
-		}
+		return nil, err
 	}
 
 	if len(costItems) == 0 {
@@ -450,4 +420,89 @@ func (c *ClickHouseClient) GetTraceDetail(ctx context.Context, traceID string) (
 		Timestamp:   firstItem.Timestamp,
 		RootNode:    rootNode,
 	}, nil
+}
+
+// GetCostItems lists cost items for a tenant ("" or "all" for every tenant),
+// optionally restricted to a billing period.
+func (c *ClickHouseClient) GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error) {
+	where, args := "WHERE 1", []any{}
+	if tenantID != "" && tenantID != "all" {
+		where += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	if period != "" {
+		where += " AND billing_period = ?"
+		args = append(args, period)
+	}
+	return c.queryCostItems(ctx, where, args...)
+}
+
+// GetUsageEvents lists usage events for a tenant ("" or "all" for every tenant).
+func (c *ClickHouseClient) GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error) {
+	where, args := "WHERE 1", []any{}
+	if tenantID != "" && tenantID != "all" {
+		where += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	rows, err := c.conn.Query(ctx, `
+		SELECT event_id, timestamp, trace_id, span_id, parent_span_id,
+			tenant_id, customer_id, app_id, workflow_id, agent_id, feature_id, environment,
+			provider, model, region, service_tier, meter_name, quantity, unit,
+			latency_ms, time_to_first_token_ms, http_status_code, error_code, raw_attributes
+		FROM aimeter.usage_ledger `+where+`
+		ORDER BY timestamp ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query usage events failed: %w", err)
+	}
+	defer rows.Close()
+
+	var events []domain.UsageEvent
+	for rows.Next() {
+		var u domain.UsageEvent
+		if err := rows.Scan(
+			&u.EventID, &u.Timestamp, &u.TraceID, &u.SpanID, &u.ParentSpanID,
+			&u.Attribution.TenantID, &u.Attribution.CustomerID, &u.Attribution.AppID, &u.Attribution.WorkflowID,
+			&u.Attribution.AgentID, &u.Attribution.FeatureID, &u.Attribution.Environment,
+			&u.Provider, &u.Model, &u.Region, &u.ServiceTier, &u.MeterName, &u.Quantity, &u.Unit,
+			&u.LatencyMs, &u.TTFTMs, &u.HTTPStatusCode, &u.ErrorCode, &u.RawAttributes,
+		); err != nil {
+			return nil, fmt.Errorf("scan usage event failed: %w", err)
+		}
+		events = append(events, u)
+	}
+	return events, rows.Err()
+}
+
+// queryCostItems selects cost_ledger rows matching where, oldest first.
+// Decimal columns are cast to Float64 and FixedString currency is trimmed.
+func (c *ClickHouseClient) queryCostItems(ctx context.Context, where string, args ...any) ([]domain.CostItem, error) {
+	rows, err := c.conn.Query(ctx, `
+		SELECT cost_item_id, usage_event_id, timestamp, trace_id, span_id, parent_span_id,
+			tenant_id, customer_id, app_id, workflow_id, agent_id, feature_id, environment,
+			provider, model, meter_name, quantity, unit, rate_id, rate_version, toFloat64(unit_price),
+			replaceAll(toString(currency), '\0', ''), toFloat64(list_cost), toFloat64(contract_discount),
+			toFloat64(effective_cost), is_reconciled, billing_period
+		FROM aimeter.cost_ledger `+where+`
+		ORDER BY timestamp ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query cost items failed: %w", err)
+	}
+	defer rows.Close()
+
+	var items []domain.CostItem
+	for rows.Next() {
+		var item domain.CostItem
+		if err := rows.Scan(
+			&item.CostItemID, &item.UsageEventID, &item.Timestamp, &item.TraceID, &item.SpanID, &item.ParentSpanID,
+			&item.Attribution.TenantID, &item.Attribution.CustomerID, &item.Attribution.AppID, &item.Attribution.WorkflowID,
+			&item.Attribution.AgentID, &item.Attribution.FeatureID, &item.Attribution.Environment,
+			&item.Provider, &item.Model, &item.MeterName, &item.Quantity, &item.Unit, &item.RateID, &item.RateVersion,
+			&item.UnitPrice, &item.Currency, &item.ListCost, &item.ContractDiscount, &item.EffectiveCost,
+			&item.IsReconciled, &item.BillingPeriod,
+		); err != nil {
+			return nil, fmt.Errorf("scan cost item failed: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
