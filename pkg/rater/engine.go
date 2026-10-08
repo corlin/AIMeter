@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,6 +77,18 @@ func (r *RatingEngine) UpsertTenant(tenant domain.Tenant) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.tenants[tenant.ID] = &tenant
+}
+
+// GetTenants returns registered tenant profiles sorted by ID
+func (r *RatingEngine) GetTenants() []domain.Tenant {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	tenants := make([]domain.Tenant, 0, len(r.tenants))
+	for _, t := range r.tenants {
+		tenants = append(tenants, *t)
+	}
+	sort.Slice(tenants, func(i, j int) bool { return tenants[i].ID < tenants[j].ID })
+	return tenants
 }
 
 // UpsertRate adds or updates a rate rule

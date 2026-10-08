@@ -171,6 +171,12 @@ func (h *APIHandler) GetTraceDetail(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
+	// tenant_id is forced to the caller's tenant for tenant-scoped keys; answer
+	// 404 rather than 403 so trace IDs of other tenants are not confirmed.
+	if tenantID := c.Query("tenant_id"); tenantID != "" && tenantID != "all" && detail.TenantID != tenantID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "trace not found: " + traceID})
+		return
+	}
 
 	c.JSON(http.StatusOK, detail)
 }

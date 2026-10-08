@@ -98,18 +98,27 @@ func (h *APIHandler) CalculateGPUCost(c *gin.Context) {
 
 // GetTenants lists all tenants
 func (h *APIHandler) GetTenants(c *gin.Context) {
+	tenants := []domain.Tenant{}
+	if h.RaterEngine != nil {
+		tenants = h.RaterEngine.GetTenants()
+	}
 	if h.postgres != nil {
-		tenants, err := h.postgres.GetTenants(c.Request.Context())
-		if err == nil && len(tenants) > 0 {
-			c.JSON(http.StatusOK, tenants)
-			return
+		if pgTenants, err := h.postgres.GetTenants(c.Request.Context()); err == nil && len(pgTenants) > 0 {
+			tenants = pgTenants
 		}
 	}
-	c.JSON(http.StatusOK, []domain.Tenant{
-		{ID: "org-enterprise-1", Name: "Enterprise Corp", DefaultCurrency: "USD", GlobalDiscount: 0.15},
-		{ID: "org-fintech-2", Name: "Fintech Global", DefaultCurrency: "USD", GlobalDiscount: 0.0},
-		{ID: "default", Name: "Default Organization", DefaultCurrency: "USD", GlobalDiscount: 0.0},
-	})
+
+	// tenant_id is forced to the caller's tenant for tenant-scoped keys.
+	if tenantID := c.Query("tenant_id"); tenantID != "" && tenantID != "all" {
+		scoped := make([]domain.Tenant, 0, 1)
+		for _, t := range tenants {
+			if t.ID == tenantID {
+				scoped = append(scoped, t)
+			}
+		}
+		tenants = scoped
+	}
+	c.JSON(http.StatusOK, tenants)
 }
 
 // CreateTenant registers a new enterprise tenant / customer

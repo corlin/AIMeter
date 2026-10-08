@@ -169,7 +169,7 @@ func NewServer(
 	router.POST("/v1/proxy/:vendor/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleVendorChatCompletions)
 
 	// AI Meter REST APIs (Modularized by Domain Hubs)
-	apiV1 := router.Group("/api/v1", auth.RequireConsoleAccess(authSvc, authEnabled))
+	apiV1 := router.Group("/api/v1", auth.RequireConsoleAccess(authSvc, authEnabled), requireTenantScopedRoute)
 	{
 		registerFinOpsRoutes(apiV1, handler)
 		registerGatewayRoutes(apiV1, handler)

@@ -75,7 +75,8 @@ func pinTenant(c *gin.Context) bool {
 
 	q := c.Request.URL.Query()
 	for _, requested := range []string{c.Param("tenant_id"), q.Get("tenant_id")} {
-		if requested != "" && requested != tenant {
+		// "all" / "*" mean "every tenant I can see", i.e. the pinned one.
+		if requested != "" && requested != "all" && requested != "*" && requested != tenant {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": "Forbidden: API key is not authorized for the requested tenant",
 			})
