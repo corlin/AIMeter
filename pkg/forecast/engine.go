@@ -94,7 +94,13 @@ func (e *ForecastEngine) loadSeedPolicies() {
 func (e *ForecastEngine) GetPolicy(tenantID string) domain.RemediationPolicy {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+	return e.policyLocked(tenantID)
+}
 
+// policyLocked is GetPolicy for callers already holding e.mu. Never call
+// GetPolicy with e.mu held: re-acquiring RLock deadlocks once a writer queues
+// between the two RLocks.
+func (e *ForecastEngine) policyLocked(tenantID string) domain.RemediationPolicy {
 	if p, ok := e.policies[tenantID]; ok {
 		return *p
 	}
@@ -155,7 +161,7 @@ func (e *ForecastEngine) GetStatus(tenantID string) domain.RemediationStatus {
 	if s, ok := e.statuses[tenantID]; ok {
 		return *s
 	}
-	policy := e.GetPolicy(tenantID)
+	policy := e.policyLocked(tenantID)
 	return domain.RemediationStatus{
 		TenantID:         tenantID,
 		CurrentLevel:     domain.RemediationLevelNormal,
