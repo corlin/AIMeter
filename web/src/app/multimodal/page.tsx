@@ -264,7 +264,7 @@ export default function MultimodalPage() {
                     <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
                       <div
                         className="bg-purple-500 h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(5, Math.min(100, item.percentage || 20))}%` }}
+                        style={{ width: `${Math.max(5, Math.min(100, item.percentage || 0))}%` }}
                       />
                     </div>
                   </div>

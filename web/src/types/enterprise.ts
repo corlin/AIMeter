@@ -25,6 +25,11 @@ export interface ForecastProjection {
   is_breach_predicted: boolean;
   breach_estimated_at?: string;
   confidence_score: number;
+  /** false: tenant has no budget rule, so breach and remediation are not evaluated */
+  has_budget: boolean;
+  /** fewer than 3 days of ledger data: projection is a run-rate estimate */
+  insufficient_data: boolean;
+  observed_days: number;
   remediation_level: RemediationLevel;
   trend_slope_usd_per_day: number;
   data_points: ForecastDataPoint[];

@@ -39,7 +39,10 @@ type ForecastProjection struct {
 	ProjectedSpendP50   float64             `json:"projected_spend_p50_usd"`
 	IsBreachPredicted   bool                `json:"is_breach_predicted"`
 	BreachEstimatedAt   *time.Time          `json:"breach_estimated_at,omitempty"`
-	ConfidenceScore     float64             `json:"confidence_score"` // 0.0 - 1.0 (e.g. 0.94)
+	ConfidenceScore     float64             `json:"confidence_score"`  // 0.0 - 1.0; 0.5 for run-rate estimates
+	HasBudget           bool                `json:"has_budget"`        // false: no budget rule, breach/remediation not evaluated
+	InsufficientData    bool                `json:"insufficient_data"` // fewer than 3 days of ledger data: run-rate estimate
+	ObservedDays        int                 `json:"observed_days"`
 	RemediationLevel    RemediationLevel    `json:"remediation_level"`
 	TrendSlopeUSDPerDay float64             `json:"trend_slope_usd_per_day"`
 	DataPoints          []ForecastDataPoint `json:"data_points"`

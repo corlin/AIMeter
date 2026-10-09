@@ -19,7 +19,8 @@ import {
   Scissors,
   Shuffle,
   Gauge,
-  X
+  X,
+  Info
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { 
@@ -172,6 +173,7 @@ export default function ForecastingPage() {
     if (!projection || !projection.data_points || projection.data_points.length === 0) return null;
     const pts = projection.data_points;
     const maxVal = Math.max(
+      1, // avoid a zero scale when there is no budget and no spend
       projection.monthly_budget_usd * 1.15,
       ...pts.map(p => Math.max(p.upper_bound_p90_usd || 0, p.actual_spend_usd || 0, p.predicted_spend_usd || 0))
     );
@@ -339,6 +341,26 @@ export default function ForecastingPage() {
         </div>
       </div>
 
+      {/* Data-quality notices: never present an estimate as a fitted forecast */}
+      {projection && !projection.has_budget && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div>
+            该租户尚未设置月度预算，不会预测超支，也不会触发自动自愈。
+            <a href="/budgets" className="ml-1 underline underline-offset-2 hover:text-amber-100">去设置预算 →</a>
+          </div>
+        </div>
+      )}
+      {projection && projection.insufficient_data && (
+        <div className="flex items-start gap-3 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-3 text-sm text-zinc-300">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+          <div>
+            本月仅有 {projection.observed_days} 天账本数据（少于 3 天），以下为按当前日均消耗的线性估算，置信度较低。
+            {projection.current_spend_usd === 0 && " 尚未收到任何消耗数据。"}
+          </div>
+        </div>
+      )}
+
       {/* 4 Macro KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -373,7 +395,7 @@ export default function ForecastingPage() {
 
         <StatCard
           title="自愈累计阻断与节省"
-          value={`$${(totalSavings || 345.8).toFixed(2)}`}
+          value={`$${totalSavings.toFixed(2)}`}
           subtitle={`当前活跃生效动作: ${currentTenantStatus.active_actions.length} 项 | 高风险租户: ${highRiskTenantsCount} 个`}
           icon={<ShieldAlert className="w-4 h-4 text-teal-400" />}
           trend={{ value: "四级闭环生效", isPositive: true }}

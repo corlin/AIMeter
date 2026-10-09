@@ -2,6 +2,7 @@ package forecast
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"net/http"
 	"sync"
@@ -257,4 +258,71 @@ func TestConcurrencyAndRace(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// A tenant with no budget and no spend must not get a fabricated projection,
+// a breach prediction or a remediation level.
+func TestPredictTenantWithoutBudgetOrData(t *testing.T) {
+	eng, _, _ := setupTestEngine(t)
+
+	proj, err := eng.PredictTenant(context.Background(), "tenant-new", "current")
+	if err != nil {
+		t.Fatalf("PredictTenant returned error: %v", err)
+	}
+	if proj.HasBudget || !proj.InsufficientData {
+		t.Errorf("expected has_budget=false insufficient_data=true, got %v %v", proj.HasBudget, proj.InsufficientData)
+	}
+	if proj.CurrentSpendUSD != 0 || proj.ProjectedSpendUSD != 0 {
+		t.Errorf("expected $0 current/projected spend, got %v / %v", proj.CurrentSpendUSD, proj.ProjectedSpendUSD)
+	}
+	if proj.IsBreachPredicted || proj.RemediationLevel != domain.RemediationLevelNormal {
+		t.Errorf("expected no breach and normal level, got %v / %v", proj.IsBreachPredicted, proj.RemediationLevel)
+	}
+	if st := eng.GetStatus("tenant-new"); st.CurrentLevel != domain.RemediationLevelNormal {
+		t.Errorf("auto-pilot must not remediate a tenant without budget, got level %v", st.CurrentLevel)
+	}
+	if proj.MonthlyBudgetUSD != 0 {
+		t.Errorf("expected no budget to be reported as $0, got %v", proj.MonthlyBudgetUSD)
+	}
+
+	// Simulation must not divide by a missing budget (NaN breaks JSON encoding).
+	sim, err := eng.Simulate(context.Background(), domain.ForecastSimulateRequest{TenantID: "tenant-new", TrafficMultiplier: 3})
+	if err != nil {
+		t.Fatalf("Simulate returned error: %v", err)
+	}
+	if _, err := json.Marshal(sim); err != nil {
+		t.Fatalf("simulation result is not JSON-encodable: %v", err)
+	}
+	if sim.RecommendedRemediationLevel != domain.RemediationLevelNormal {
+		t.Errorf("expected no remediation without budget, got %v", sim.RecommendedRemediationLevel)
+	}
+}
+
+// Estimated savings are derived from the tenant's projection, not constants.
+func TestRemediationSavingsDerivedFromProjection(t *testing.T) {
+	eng, budgetMgr, _ := setupTestEngine(t)
+	ctx := context.Background()
+
+	// No projection yet: a manual remediation has nothing to estimate from.
+	st, err := eng.Remediate(ctx, "tenant-no-proj", domain.RemediationLevelActiveThrottle, "tester", "manual")
+	if err != nil {
+		t.Fatalf("Remediate: %v", err)
+	}
+	if st.EstimatedSavingsUSD != 0 {
+		t.Errorf("expected $0 savings without a projection, got %v", st.EstimatedSavingsUSD)
+	}
+
+	budgetMgr.UpsertBudget(domain.BudgetRule{ID: uuid.New(), TenantID: "tenant-proj", MonthlyLimitUSD: 200, CurrentSpendUSD: 150})
+	proj, err := eng.PredictTenant(ctx, "tenant-proj", "current")
+	if err != nil {
+		t.Fatalf("PredictTenant: %v", err)
+	}
+	st, err = eng.Remediate(ctx, "tenant-proj", domain.RemediationLevelActiveThrottle, "tester", "manual")
+	if err != nil {
+		t.Fatalf("Remediate: %v", err)
+	}
+	want := math.Round(proj.ProjectedSpendUSD*0.45*100) / 100
+	if st.EstimatedSavingsUSD != want {
+		t.Errorf("expected savings %v (45%% of projected %v), got %v", want, proj.ProjectedSpendUSD, st.EstimatedSavingsUSD)
+	}
 }

@@ -197,8 +197,11 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 	daysInMonth := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 
 	// 1. Gather current budget limit and spend from budget manager
-	var budgetLimit float64 = 1000.0 // Default limit if none configured
+	// Without a configured budget there is nothing to breach: the placeholder
+	// limit only scales the chart and never drives breach or remediation.
+	var budgetLimit float64 = 1000.0
 	var currentSpend float64 = 0.0
+	hasBudget := false
 
 	if e.budgetMgr != nil {
 		rules := e.budgetMgr.GetBudgets(tenantID)
@@ -206,6 +209,7 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 			if r.MonthlyLimitUSD > 0 {
 				budgetLimit = r.MonthlyLimitUSD
 				currentSpend = r.CurrentSpendUSD
+				hasBudget = true
 				break
 			}
 		}
@@ -232,23 +236,12 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 		}
 	}
 
-	// If historical points are sparse, synthesize smooth progression based on currentSpend
-	if len(dailySpends) < 3 {
-		if currentSpend <= 0 {
-			currentSpend = 120.0 // Realistic demo baseline spend for tenant
-		}
-		avgDaily := currentSpend / float64(currentDay)
-		for d := 1; d <= currentDay; d++ {
-			// Add pseudo-realistic weekday vs weekend wobble
-			dayDate := time.Date(year, month, d, 12, 0, 0, 0, time.UTC)
-			seasonality := 1.15
-			if dayDate.Weekday() == time.Saturday || dayDate.Weekday() == time.Sunday {
-				seasonality = 0.65
-			}
-			jitter := (math.Sin(float64(d)*1.5) * 0.1) + 1.0
-			dailySpends[d] = avgDaily * seasonality * jitter
-		}
-	}
+	// With fewer than 3 observed days there is no meaningful daily trend: days
+	// without data fall back to the real run-rate (tracked spend / elapsed days)
+	// below, and the projection is flagged as a run-rate estimate. Nothing is
+	// synthesised: a tenant with no spend projects $0.
+	observedDays := len(dailySpends)
+	insufficientData := observedDays < 3
 
 	// 3. Compute EWMA & Ordinary Least Squares (OLS) Slope on daily spend
 	historyDays := make([]float64, 0, currentDay)
@@ -302,7 +295,7 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 			seasonality = 0.65
 		}
 
-		expectedDaily := math.Max(1.0, (ewmaVal+(slope*daysAhead))*seasonality)
+		expectedDaily := math.Max(0, (ewmaVal+(slope*daysAhead))*seasonality)
 		dailyP90 := expectedDaily * 1.25 // +25% upper confidence band
 		dailyP50 := expectedDaily * 0.90 // -10% lower conservative band
 
@@ -311,7 +304,7 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 		projectedP50 += dailyP50
 
 		// Check if threshold breached on this future day
-		if !isBreach && projectedCum >= budgetLimit {
+		if hasBudget && !isBreach && projectedCum >= budgetLimit {
 			isBreach = true
 			// Calculate exact hour/minute interpolation
 			prevCum := projectedCum - expectedDaily
@@ -337,7 +330,9 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 	spendRatio := projectedCum / budgetLimit
 	var remLevel domain.RemediationLevel = domain.RemediationLevelNormal
 
-	if spendRatio >= policy.HardCapThreshold {
+	if !hasBudget {
+		// No budget rule: nothing to protect, never remediate.
+	} else if spendRatio >= policy.HardCapThreshold {
 		remLevel = domain.RemediationLevelHardCap
 	} else if spendRatio >= policy.ActiveThrottleThreshold {
 		remLevel = domain.RemediationLevelActiveThrottle
@@ -345,18 +340,31 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 		remLevel = domain.RemediationLevelSoftMitigate
 	}
 
+	reportedBudget := budgetLimit
+	if !hasBudget {
+		reportedBudget = 0 // do not present the internal placeholder as a budget
+	}
+
+	confidence := 0.94
+	if insufficientData {
+		confidence = 0.5 // run-rate estimate rather than a fitted trend
+	}
+
 	projection := &domain.ForecastProjection{
 		TenantID:            tenantID,
 		Period:              now.Format("2006-01"),
 		Currency:            "USD",
 		CurrentSpendUSD:     math.Round(currentSpend*100) / 100,
-		MonthlyBudgetUSD:    math.Round(budgetLimit*100) / 100,
+		MonthlyBudgetUSD:    math.Round(reportedBudget*100) / 100,
 		ProjectedSpendUSD:   math.Round(projectedCum*100) / 100,
 		ProjectedSpendP90:   math.Round(projectedP90*100) / 100,
 		ProjectedSpendP50:   math.Round(projectedP50*100) / 100,
 		IsBreachPredicted:   isBreach,
 		BreachEstimatedAt:   breachTime,
-		ConfidenceScore:     0.94,
+		ConfidenceScore:     confidence,
+		HasBudget:           hasBudget,
+		InsufficientData:    insufficientData,
+		ObservedDays:        observedDays,
 		RemediationLevel:    remLevel,
 		TrendSlopeUSDPerDay: math.Round(slope*100) / 100,
 		DataPoints:          dataPoints,
@@ -465,7 +473,7 @@ func (e *ForecastEngine) Remediate(
 			})
 		}
 		status.ActiveActions = actionsTaken
-		status.EstimatedSavingsUSD = 120.50 // Estimated 20% token savings
+		status.EstimatedSavingsUSD = e.estimateSavingsLocked(tenantID, targetLevel)
 
 	case domain.RemediationLevelActiveThrottle:
 		// Level 2: Includes L1 + Cheaper Model Routing + Throttler Burst Tightening
@@ -495,7 +503,7 @@ func (e *ForecastEngine) Remediate(
 			actionsTaken = append(actionsTaken, "sla_cheaper_model_route")
 		}
 		status.ActiveActions = actionsTaken
-		status.EstimatedSavingsUSD = 345.80 // Estimated 45% blended savings
+		status.EstimatedSavingsUSD = e.estimateSavingsLocked(tenantID, targetLevel)
 
 	case domain.RemediationLevelHardCap:
 		// Level 3: Strict stream capping & 429 quota exhaustion
@@ -513,7 +521,7 @@ func (e *ForecastEngine) Remediate(
 		}
 		actionsTaken = append(actionsTaken, "quota_exhaustion_429")
 		status.ActiveActions = actionsTaken
-		status.EstimatedSavingsUSD = 780.00 // Prevents runaway breach
+		status.EstimatedSavingsUSD = e.estimateSavingsLocked(tenantID, targetLevel)
 	}
 
 	// Record audit log entry
@@ -605,11 +613,16 @@ func (e *ForecastEngine) Simulate(ctx context.Context, req domain.ForecastSimula
 		}
 	}
 
-	spendRatio := simCumulative / baseProj.MonthlyBudgetUSD
+	var spendRatio float64
+	if baseProj.HasBudget && baseProj.MonthlyBudgetUSD > 0 {
+		spendRatio = simCumulative / baseProj.MonthlyBudgetUSD
+	}
 	var recLevel domain.RemediationLevel = domain.RemediationLevelNormal
 	policy := e.GetPolicy(req.TenantID)
 
-	if spendRatio >= policy.HardCapThreshold {
+	if !baseProj.HasBudget {
+		// No budget: nothing to compare against, recommend no remediation.
+	} else if spendRatio >= policy.HardCapThreshold {
 		recLevel = domain.RemediationLevelHardCap
 	} else if spendRatio >= policy.ActiveThrottleThreshold {
 		recLevel = domain.RemediationLevelActiveThrottle
@@ -635,6 +648,12 @@ func (e *ForecastEngine) Simulate(ctx context.Context, req domain.ForecastSimula
 		baseProj.MonthlyBudgetUSD,
 		recLevel,
 	)
+	if !baseProj.HasBudget {
+		analysis = fmt.Sprintf(
+			"Traffic multiplier %.1fx will increase projected month-end spend from $%.2f to $%.2f. No budget is configured for this tenant, so no remediation is recommended.",
+			req.TrafficMultiplier, baseProj.ProjectedSpendUSD, simCumulative,
+		)
+	}
 
 	return &domain.ForecastSimulateResponse{
 		TenantID:                    req.TenantID,
@@ -709,4 +728,26 @@ func computeOLSSlope(x, y []float64) float64 {
 		return 0.0
 	}
 	return (n*sumXY - sumX*sumY) / denom
+}
+
+// estimateSavingsLocked estimates month-end savings of a remediation level from
+// the tenant's latest projection: ~20% token savings for soft mitigation, ~45%
+// blended savings for active throttling, and the prevented overrun above budget
+// for a hard cap. Without a projection there is nothing to estimate from.
+// Callers must hold e.mu.
+func (e *ForecastEngine) estimateSavingsLocked(tenantID string, level domain.RemediationLevel) float64 {
+	proj, ok := e.cachedProjections[tenantID]
+	if !ok || proj == nil {
+		return 0
+	}
+	var savings float64
+	switch level {
+	case domain.RemediationLevelSoftMitigate:
+		savings = proj.ProjectedSpendUSD * 0.20
+	case domain.RemediationLevelActiveThrottle:
+		savings = proj.ProjectedSpendUSD * 0.45
+	case domain.RemediationLevelHardCap:
+		savings = math.Max(0, proj.ProjectedSpendUSD-proj.MonthlyBudgetUSD)
+	}
+	return math.Round(savings*100) / 100
 }
