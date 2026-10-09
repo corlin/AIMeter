@@ -91,6 +91,22 @@ type CostItem struct {
 	GPUDurationMs    uint32             `json:"gpu_duration_ms,omitempty"`
 }
 
+// CostRollup is the cost ledger summed per UTC day, provider, model and meter.
+// Analytics (reconciliation, recommendations, forecasting) consume rollups so
+// their input size is bounded by dimensions, not by ledger rows. Each usage
+// event is rated into exactly one cost item, so Quantity also equals the
+// metered usage quantity.
+type CostRollup struct {
+	Day           time.Time `json:"day"`
+	Provider      string    `json:"provider"`
+	Model         string    `json:"model"`
+	MeterName     string    `json:"meter_name"`
+	Quantity      float64   `json:"quantity"`
+	EffectiveCost float64   `json:"effective_cost"`
+	ListCost      float64   `json:"list_cost"`
+	Items         int64     `json:"items"` // number of cost items summed
+}
+
 // RateEntry represents a pricing rule in the Rate Catalog
 type RateEntry struct {
 	ID               uuid.UUID  `json:"id"`

@@ -18,25 +18,24 @@ func NewCostAdvisor() *CostAdvisor {
 // GenerateRecommendations inspects usage and cost ledgers to generate actionable savings suggestions
 func (a *CostAdvisor) GenerateRecommendations(
 	tenantID string,
-	costs []domain.CostItem,
-	usages []domain.UsageEvent,
+	rollups []domain.CostRollup,
 ) []domain.CostRecommendation {
 	var recs []domain.CostRecommendation
 
 	// 1. Analyze Cache Optimization Opportunities
-	cacheRec := a.analyzeCacheOpportunity(tenantID, costs, usages)
+	cacheRec := a.analyzeCacheOpportunity(tenantID, rollups)
 	if cacheRec != nil {
 		recs = append(recs, *cacheRec)
 	}
 
 	// 2. Analyze Model Downgrade / Smart Routing Opportunities
-	downgradeRec := a.analyzeModelDowngrades(tenantID, costs, usages)
+	downgradeRec := a.analyzeModelDowngrades(tenantID, rollups)
 	if downgradeRec != nil {
 		recs = append(recs, *downgradeRec)
 	}
 
 	// 3. Analyze Reasoning Token Budget Controls
-	reasoningRec := a.analyzeReasoningBudget(tenantID, costs, usages)
+	reasoningRec := a.analyzeReasoningBudget(tenantID, rollups)
 	if reasoningRec != nil {
 		recs = append(recs, *reasoningRec)
 	}
@@ -44,23 +43,20 @@ func (a *CostAdvisor) GenerateRecommendations(
 	return recs
 }
 
-func (a *CostAdvisor) analyzeCacheOpportunity(tenantID string, costs []domain.CostItem, usages []domain.UsageEvent) *domain.CostRecommendation {
+func (a *CostAdvisor) analyzeCacheOpportunity(tenantID string, rollups []domain.CostRollup) *domain.CostRecommendation {
 	var unchachedInputSpend float64
 	var unchachedInputTokens float64
 	var cachedInputTokens float64
 
-	for _, c := range costs {
-		if c.MeterName == domain.MeterLLMInputToken {
-			if strings.Contains(c.Model, "claude") || strings.Contains(c.Model, "gpt-4o") || strings.Contains(c.Model, "deepseek") {
-				unchachedInputSpend += c.EffectiveCost
-				unchachedInputTokens += c.Quantity
+	for _, r := range rollups {
+		switch r.MeterName {
+		case domain.MeterLLMInputToken:
+			if strings.Contains(r.Model, "claude") || strings.Contains(r.Model, "gpt-4o") || strings.Contains(r.Model, "deepseek") {
+				unchachedInputSpend += r.EffectiveCost
+				unchachedInputTokens += r.Quantity
 			}
-		}
-	}
-
-	for _, u := range usages {
-		if u.MeterName == domain.MeterLLMCacheReadToken {
-			cachedInputTokens += u.Quantity
+		case domain.MeterLLMCacheReadToken:
+			cachedInputTokens += r.Quantity
 		}
 	}
 
@@ -92,14 +88,17 @@ func (a *CostAdvisor) analyzeCacheOpportunity(tenantID string, costs []domain.Co
 	return nil
 }
 
-func (a *CostAdvisor) analyzeModelDowngrades(tenantID string, costs []domain.CostItem, usages []domain.UsageEvent) *domain.CostRecommendation {
+func (a *CostAdvisor) analyzeModelDowngrades(tenantID string, rollups []domain.CostRollup) *domain.CostRecommendation {
 	var gpt4oSpend float64
-	var gpt4oRequests int
+	var gpt4oRequests int64
 
-	for _, c := range costs {
-		if c.Model == "gpt-4o" {
-			gpt4oSpend += c.EffectiveCost
-			gpt4oRequests++
+	for _, r := range rollups {
+		if r.Model == "gpt-4o" {
+			gpt4oSpend += r.EffectiveCost
+			// Every call meters exactly one input-token item.
+			if r.MeterName == domain.MeterLLMInputToken {
+				gpt4oRequests += r.Items
+			}
 		}
 	}
 
@@ -127,23 +126,16 @@ func (a *CostAdvisor) analyzeModelDowngrades(tenantID string, costs []domain.Cos
 	return nil
 }
 
-func (a *CostAdvisor) analyzeReasoningBudget(tenantID string, costs []domain.CostItem, usages []domain.UsageEvent) *domain.CostRecommendation {
+func (a *CostAdvisor) analyzeReasoningBudget(tenantID string, rollups []domain.CostRollup) *domain.CostRecommendation {
 	var reasoningTokens float64
-	var totalOutputTokens float64
 	var reasoningSpend float64
 
-	for _, c := range costs {
-		if strings.Contains(c.Model, "reasoner") || strings.Contains(c.Model, "o1") || strings.Contains(c.Model, "o3") {
-			reasoningSpend += c.EffectiveCost
+	for _, r := range rollups {
+		if strings.Contains(r.Model, "reasoner") || strings.Contains(r.Model, "o1") || strings.Contains(r.Model, "o3") {
+			reasoningSpend += r.EffectiveCost
 		}
-	}
-
-	for _, u := range usages {
-		if u.MeterName == domain.MeterLLMReasoningToken {
-			reasoningTokens += u.Quantity
-		}
-		if u.MeterName == domain.MeterLLMOutputToken {
-			totalOutputTokens += u.Quantity
+		if r.MeterName == domain.MeterLLMReasoningToken {
+			reasoningTokens += r.Quantity
 		}
 	}
 

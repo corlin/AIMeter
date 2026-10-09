@@ -438,42 +438,6 @@ func (c *ClickHouseClient) GetCostItems(ctx context.Context, tenantID string, pe
 	return c.queryCostItems(ctx, where, args...)
 }
 
-// GetUsageEvents lists usage events for a tenant ("" or "all" for every tenant).
-func (c *ClickHouseClient) GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error) {
-	where, args := "WHERE 1", []any{}
-	if tenantID != "" && tenantID != "all" {
-		where += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
-	rows, err := c.conn.Query(ctx, `
-		SELECT event_id, timestamp, trace_id, span_id, parent_span_id,
-			tenant_id, customer_id, app_id, workflow_id, agent_id, feature_id, environment,
-			provider, model, region, service_tier, meter_name, quantity, unit,
-			latency_ms, time_to_first_token_ms, http_status_code, error_code, raw_attributes
-		FROM aimeter.usage_ledger `+where+`
-		ORDER BY timestamp ASC`, args...)
-	if err != nil {
-		return nil, fmt.Errorf("query usage events failed: %w", err)
-	}
-	defer rows.Close()
-
-	var events []domain.UsageEvent
-	for rows.Next() {
-		var u domain.UsageEvent
-		if err := rows.Scan(
-			&u.EventID, &u.Timestamp, &u.TraceID, &u.SpanID, &u.ParentSpanID,
-			&u.Attribution.TenantID, &u.Attribution.CustomerID, &u.Attribution.AppID, &u.Attribution.WorkflowID,
-			&u.Attribution.AgentID, &u.Attribution.FeatureID, &u.Attribution.Environment,
-			&u.Provider, &u.Model, &u.Region, &u.ServiceTier, &u.MeterName, &u.Quantity, &u.Unit,
-			&u.LatencyMs, &u.TTFTMs, &u.HTTPStatusCode, &u.ErrorCode, &u.RawAttributes,
-		); err != nil {
-			return nil, fmt.Errorf("scan usage event failed: %w", err)
-		}
-		events = append(events, u)
-	}
-	return events, rows.Err()
-}
-
 // queryCostItems selects cost_ledger rows matching where, oldest first.
 // Decimal columns are cast to Float64 and FixedString currency is trimmed.
 func (c *ClickHouseClient) queryCostItems(ctx context.Context, where string, args ...any) ([]domain.CostItem, error) {
@@ -598,4 +562,39 @@ func (c *ClickHouseClient) GetReconciliationReports(ctx context.Context) ([]doma
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()
+}
+
+// GetCostRollups sums the cost ledger per UTC day, provider, model and meter in
+// ClickHouse, so callers receive one row per group instead of every cost item.
+func (c *ClickHouseClient) GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error) {
+	where, args := "WHERE 1", []any{}
+	if tenantID != "" && tenantID != "all" {
+		where += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	if period != "" {
+		where += " AND billing_period = ?"
+		args = append(args, period)
+	}
+	rows, err := c.conn.Query(ctx, `
+		SELECT toDate(timestamp) AS day, provider, model, meter_name,
+			sum(quantity), toFloat64(sum(effective_cost)), toFloat64(sum(list_cost)), toInt64(count())
+		FROM aimeter.cost_ledger `+where+`
+		GROUP BY day, provider, model, meter_name
+		ORDER BY day ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query cost rollups failed: %w", err)
+	}
+	defer rows.Close()
+
+	rollups := []domain.CostRollup{}
+	for rows.Next() {
+		var r domain.CostRollup
+		if err := rows.Scan(&r.Day, &r.Provider, &r.Model, &r.MeterName, &r.Quantity, &r.EffectiveCost, &r.ListCost, &r.Items); err != nil {
+			return nil, fmt.Errorf("scan cost rollup failed: %w", err)
+		}
+		r.Day = r.Day.UTC()
+		rollups = append(rollups, r)
+	}
+	return rollups, rows.Err()
 }

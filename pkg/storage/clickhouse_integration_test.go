@@ -100,12 +100,19 @@ func TestClickHouse_WriteThenRead(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, none)
 
-	events, err := ch.GetUsageEvents(ctx, tenant)
+	rollups, err := ch.GetCostRollups(ctx, tenant, "2026-10")
 	require.NoError(t, err)
-	require.Len(t, events, 2)
-	assert.Equal(t, usages[0].EventID, events[0].EventID)
-	assert.Equal(t, tenant, events[0].Attribution.TenantID)
-	assert.EqualValues(t, 120, events[0].LatencyMs)
+	require.Len(t, rollups, 2) // one per model (same day, provider, meter)
+	var rollupCost float64
+	var rollupItems int64
+	for _, r := range rollups {
+		rollupCost += r.EffectiveCost
+		rollupItems += r.Items
+		assert.Equal(t, now.Format("2006-01-02"), r.Day.Format("2006-01-02"))
+	}
+	assert.InDelta(t, 0.50, rollupCost, 1e-9)
+	assert.EqualValues(t, 2, rollupItems)
+	assert.Len(t, usages, 2)
 }
 
 func TestClickHouse_OperationalState(t *testing.T) {

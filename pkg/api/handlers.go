@@ -262,12 +262,12 @@ func (h *APIHandler) UploadInvoiceCSV(c *gin.Context) {
 		return
 	}
 
-	costs, _ := h.store.GetCostItems(c.Request.Context(), "all", period)
-	if len(costs) == 0 {
-		costs, _ = h.store.GetCostItems(c.Request.Context(), "all", "")
+	observed, _ := h.store.GetCostRollups(c.Request.Context(), "all", period)
+	if len(observed) == 0 {
+		observed, _ = h.store.GetCostRollups(c.Request.Context(), "all", "")
 	}
 
-	report := h.reconciler.Reconcile(period, provider, costs, invoices)
+	report := h.reconciler.Reconcile(period, provider, observed, invoices)
 	_ = h.store.SaveReconciliationReport(c.Request.Context(), report)
 
 	c.JSON(http.StatusOK, report)
@@ -406,10 +406,9 @@ func (h *APIHandler) GetAnomalies(c *gin.Context) {
 func (h *APIHandler) GetRecommendations(c *gin.Context) {
 	tenantID := c.DefaultQuery("tenant_id", "all")
 
-	costs, _ := h.store.GetCostItems(c.Request.Context(), tenantID, "")
-	usages, _ := h.store.GetUsageEvents(c.Request.Context(), tenantID)
+	rollups, _ := h.store.GetCostRollups(c.Request.Context(), tenantID, "")
 
-	recs := h.advisor.GenerateRecommendations(tenantID, costs, usages)
+	recs := h.advisor.GenerateRecommendations(tenantID, rollups)
 	if recs == nil {
 		recs = []domain.CostRecommendation{}
 	}

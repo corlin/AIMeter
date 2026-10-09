@@ -21,7 +21,7 @@ type Store interface {
 	GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error)
 	GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error)
 	GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error)
-	GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error)
+	GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error)
 	SaveReconciliationReport(ctx context.Context, report domain.ReconciliationReport) error
 	GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error)
 	SaveAnomalyEvent(ctx context.Context, anomaly domain.AnomalyEvent) error
@@ -85,20 +85,39 @@ func (s *MemoryStore) GetCostItems(ctx context.Context, tenantID string, period 
 	return result, nil
 }
 
-func (s *MemoryStore) GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// GetCostRollups sums cost items per UTC day, provider, model and meter,
+// using the same tenant/period filters as GetCostItems.
+func (s *MemoryStore) GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error) {
+	items, _ := s.GetCostItems(ctx, tenantID, period)
 
-	var result []domain.UsageEvent
-	for _, u := range s.usages {
-		if tenantID != "" && tenantID != "all" && u.Attribution.TenantID != tenantID {
-			continue
-		}
-		result = append(result, u)
+	type key struct {
+		day                    time.Time
+		provider, model, meter string
 	}
-	return result, nil
-}
+	sums := make(map[key]*domain.CostRollup)
+	var order []key
+	for _, c := range items {
+		t := c.Timestamp.UTC()
+		k := key{time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), c.Provider, c.Model, c.MeterName}
+		r, ok := sums[k]
+		if !ok {
+			r = &domain.CostRollup{Day: k.day, Provider: k.provider, Model: k.model, MeterName: k.meter}
+			sums[k] = r
+			order = append(order, k)
+		}
+		r.Quantity += c.Quantity
+		r.EffectiveCost += c.EffectiveCost
+		r.ListCost += c.ListCost
+		r.Items++
+	}
 
+	rollups := make([]domain.CostRollup, 0, len(order))
+	for _, k := range order {
+		rollups = append(rollups, *sums[k])
+	}
+	sort.SliceStable(rollups, func(i, j int) bool { return rollups[i].Day.Before(rollups[j].Day) })
+	return rollups, nil
+}
 func (s *MemoryStore) SaveAnomalyEvent(ctx context.Context, anomaly domain.AnomalyEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

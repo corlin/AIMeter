@@ -72,15 +72,6 @@ func (s *LedgerStore) GetCostItems(ctx context.Context, tenantID string, period 
 	return items, nil
 }
 
-func (s *LedgerStore) GetUsageEvents(ctx context.Context, tenantID string) ([]domain.UsageEvent, error) {
-	events, err := s.ch.GetUsageEvents(ctx, tenantID)
-	if err != nil {
-		log.Printf("[WARN Ledger] ClickHouse usage events failed, serving in-memory ledger: %v", err)
-		return s.MemoryStore.GetUsageEvents(ctx, tenantID)
-	}
-	return events, nil
-}
-
 // SaveAnomalyEvent keeps the in-memory copy as fallback and persists to ClickHouse.
 func (s *LedgerStore) SaveAnomalyEvent(ctx context.Context, a domain.AnomalyEvent) error {
 	_ = s.MemoryStore.SaveAnomalyEvent(ctx, a)
@@ -118,4 +109,13 @@ func logWriteErr(err error) error {
 		log.Printf("[WARN Ledger] ClickHouse write failed, kept in memory only: %v", err)
 	}
 	return err
+}
+
+func (s *LedgerStore) GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error) {
+	rollups, err := s.ch.GetCostRollups(ctx, tenantID, period)
+	if err != nil {
+		log.Printf("[WARN Ledger] ClickHouse cost rollups failed, serving in-memory ledger: %v", err)
+		return s.MemoryStore.GetCostRollups(ctx, tenantID, period)
+	}
+	return rollups, nil
 }

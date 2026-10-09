@@ -202,11 +202,11 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 	// 2. Fetch historical cost items from store if available
 	dailySpends := make(map[int]float64)
 	if e.store != nil {
-		items, err := e.store.GetCostItems(ctx, tenantID, period)
+		items, err := e.store.GetCostRollups(ctx, tenantID, period)
 		if err == nil && len(items) > 0 {
 			var totalItemCost float64
 			for _, item := range items {
-				d := item.Timestamp.Day()
+				d := item.Day.Day()
 				cost := item.EffectiveCost
 				if cost <= 0 {
 					cost = item.ListCost

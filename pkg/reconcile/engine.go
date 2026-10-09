@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,7 +20,7 @@ func NewReconciliationEngine() *ReconciliationEngine {
 func (e *ReconciliationEngine) Reconcile(
 	billingPeriod string,
 	provider string,
-	observedCosts []domain.CostItem,
+	observed []domain.CostRollup,
 	invoices []domain.InvoiceRecord,
 ) domain.ReconciliationReport {
 	prov := strings.ToLower(provider)
@@ -29,7 +30,7 @@ func (e *ReconciliationEngine) Reconcile(
 	observedTokenMap := make(map[string]float64)
 	var totalExpectedUSD float64
 
-	for _, item := range observedCosts {
+	for _, item := range observed {
 		if prov == "all" || strings.ToLower(item.Provider) == prov {
 			m := strings.ToLower(item.Model)
 			observedModelMap[m] += item.EffectiveCost
@@ -117,6 +118,15 @@ func (e *ReconciliationEngine) Reconcile(
 	if math.Abs(adjustmentsUSD) < 0.0001 {
 		adjustmentsUSD = 0.0
 	}
+
+	// Largest absolute discrepancy first; map iteration order is random.
+	sort.Slice(modelDiffs, func(i, j int) bool {
+		di, dj := math.Abs(modelDiffs[i].DifferenceUSD), math.Abs(modelDiffs[j].DifferenceUSD)
+		if di != dj {
+			return di > dj
+		}
+		return modelDiffs[i].Model < modelDiffs[j].Model
+	})
 
 	status := "matched"
 	if math.Abs(variancePercent) > 10.0 {

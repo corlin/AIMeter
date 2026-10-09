@@ -13,23 +13,9 @@ func TestReconciliationEngineVarianceDecomposition(t *testing.T) {
 	engine := NewReconciliationEngine()
 
 	// 1. Observed Telemetry: Expected $100 for gpt-4o, $50 for claude-3-5-sonnet
-	observedCosts := []domain.CostItem{
-		{
-			CostItemID:    uuid.New(),
-			Provider:      "openai",
-			Model:         "gpt-4o",
-			Quantity:      40000000,
-			EffectiveCost: 100.0,
-			Timestamp:     time.Now(),
-		},
-		{
-			CostItemID:    uuid.New(),
-			Provider:      "anthropic",
-			Model:         "claude-3-5-sonnet",
-			Quantity:      15000000,
-			EffectiveCost: 50.0,
-			Timestamp:     time.Now(),
-		},
+	observedCosts := []domain.CostRollup{
+		{Day: time.Now(), Provider: "openai", Model: "gpt-4o", Quantity: 40000000, EffectiveCost: 100.0, Items: 1},
+		{Day: time.Now(), Provider: "anthropic", Model: "claude-3-5-sonnet", Quantity: 15000000, EffectiveCost: 50.0, Items: 1},
 	}
 
 	// 2. Invoice Records: Billed $110 for gpt-4o, $50 for claude, plus $20 unmonitored gpt-4o-mini
