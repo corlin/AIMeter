@@ -33,14 +33,14 @@ import { apiGet, apiPost, apiPut } from "./http";
 
 export async function fetchFineTuningStats(): Promise<FineTuningStatsSummary> {
   return apiGet<FineTuningStatsSummary>("/finetuning/stats", {
-    total_capex_usd: 1415.0,
-    active_adapters: 3,
-    total_inference_savings_usd: 2075.4,
-    net_alpha_savings_usd: 838.2,
-    portfolio_roi: 146.67,
-    achieved_adapters: 2,
-    total_jobs: 3,
-    completed_jobs: 3,
+    total_capex_usd: 0,
+    active_adapters: 0,
+    total_inference_savings_usd: 0,
+    net_alpha_savings_usd: 0,
+    portfolio_roi: 0,
+    achieved_adapters: 0,
+    total_jobs: 0,
+    completed_jobs: 0,
   });
 }
 
@@ -142,15 +142,15 @@ export async function simulateHeteroSandbox(req: HeteroSimulateRequest): Promise
 
 export async function fetchFlywheelStats(): Promise<FlywheelStatsSummary> {
   return apiGet<FlywheelStatsSummary>("/flywheel/stats", {
-    total_generated_candidates: 13000,
-    total_accepted_pairs: 2300,
-    avg_acceptance_rate_percent: 17.69,
-    total_generation_cost_usd: 55.30,
-    total_sunk_rejection_cost_usd: 44.82,
-    total_alignment_capex_usd: 916.00,
-    total_online_invocations: 5,
-    total_inference_savings_usd: 28750.13,
-    overall_flywheel_roi_percent: 2859.91,
+    total_generated_candidates: 0,
+    total_accepted_pairs: 0,
+    avg_acceptance_rate_percent: 0,
+    total_generation_cost_usd: 0,
+    total_sunk_rejection_cost_usd: 0,
+    total_alignment_capex_usd: 0,
+    total_online_invocations: 0,
+    total_inference_savings_usd: 0,
+    overall_flywheel_roi_percent: 0,
     active_jobs_count: 0,
   });
 }

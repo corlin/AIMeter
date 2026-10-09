@@ -185,7 +185,7 @@ export async function fetchExperimentStats(): Promise<ExperimentStatsSummary> {
     active_experiments: 0,
     total_evaluated_requests: 0,
     avg_cost_reduction_pct: 0,
-    avg_quality_score: 4.5,
+    avg_quality_score: 0,
     pareto_winners_count: 0,
   });
 }

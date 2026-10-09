@@ -83,7 +83,7 @@ export async function fetchSwarmStats(tenantId?: string): Promise<SwarmStatsSumm
     total_loop_incidents: 0,
     break_injected_count: 0,
     blocked_deadlocks: 0,
-    self_healed_rate: 96.5,
+    self_healed_rate: 0,
     total_wasted_spend_usd: 0,
     avoided_spend_usd: 0,
   });
@@ -130,7 +130,7 @@ export async function fetchMemoryStats(tenantId?: string): Promise<MemoryStatsSu
     tokens_saved: 0,
     total_memory_spend_usd: 0,
     total_avoided_spend_usd: 0,
-    avg_utility_score: 0.85,
+    avg_utility_score: 0,
     identified_noise_count: 0,
   });
 }
@@ -174,8 +174,8 @@ export async function fetchReasoningStats(tenantId?: string): Promise<ReasoningS
     thinking_spend_usd: 0,
     wasted_spend_usd: 0,
     avoided_spend_usd: 0,
-    avg_oscillation_index: 0.15,
-    avg_redundancy_score: 0.12,
+    avg_oscillation_index: 0,
+    avg_redundancy_score: 0,
     high_oscillation_count: 0,
   });
 }
@@ -202,12 +202,12 @@ export async function fetchKVCacheStats(): Promise<KVCacheStatsSummary> {
     cached_requests_count: 0,
     total_prompt_tokens: 0,
     total_cached_tokens: 0,
-    actual_hit_ratio: 0.85,
-    theoretical_hit_ratio: 0.92,
+    actual_hit_ratio: 0,
+    theoretical_hit_ratio: 0,
     total_cost_saved_usd: 0,
     canonicalized_count: 0,
     canonicalized_saved_usd: 0,
-    active_prefix_nodes: 1,
+    active_prefix_nodes: 0,
     prewarm_probes_sent: 0,
   });
 }
@@ -240,15 +240,15 @@ export async function simulateKVCache(req: KVCacheSimulateRequest): Promise<KVCa
 
 export async function fetchQualityStats(): Promise<QualityStatsSummary> {
   return apiGet<QualityStatsSummary>("/quality/stats", {
-    total_evaluated_requests: 48900,
-    syntax_repaired_count: 1450,
-    syntax_repaired_rate: 0.030,
-    hallucinations_detected: 462,
-    hallucination_rate: 0.009,
-    bad_debt_incidents: 119,
-    total_penalty_saved_usd: 142.85,
-    total_bad_debt_avoided_usd: 88.40,
-    avg_credibility_score: 95.8,
+    total_evaluated_requests: 0,
+    syntax_repaired_count: 0,
+    syntax_repaired_rate: 0,
+    hallucinations_detected: 0,
+    hallucination_rate: 0,
+    bad_debt_incidents: 0,
+    total_penalty_saved_usd: 0,
+    total_bad_debt_avoided_usd: 0,
+    avg_credibility_score: 0,
   });
 }
 

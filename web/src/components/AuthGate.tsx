@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { KeyRound, LogOut } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/http";
+import { RequestErrorBanner } from "./RequestErrorBanner";
 import { UNAUTHORIZED_EVENT, clearApiKey, getApiKey, setApiKey, subscribeSession } from "@/lib/session";
 
 /**
@@ -63,7 +64,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div key={generation}>{children}</div>
+      <div key={generation}>
+        <RequestErrorBanner />
+        {children}
+      </div>
 
       {apiKey && !needsAuth && (
         <button

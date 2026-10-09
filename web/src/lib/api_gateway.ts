@@ -305,13 +305,13 @@ export async function simulateDLP(req: DLPSimulateRequest): Promise<DLPSimulateR
 
 export async function fetchWAFStats(): Promise<WAFStatsSummary> {
   return apiGet<WAFStatsSummary>("/waf/stats", {
-    total_inspected: 5,
-    blocked_attacks: 4,
+    total_inspected: 0,
+    blocked_attacks: 0,
     sanitized_requests: 0,
-    block_rate_percent: 80.0,
-    total_avoided_loss_usd: 1.18,
-    active_banned_count: 2,
-    total_rules: 6,
+    block_rate_percent: 0,
+    total_avoided_loss_usd: 0,
+    active_banned_count: 0,
+    total_rules: 0,
   });
 }
 

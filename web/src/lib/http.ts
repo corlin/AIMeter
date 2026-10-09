@@ -1,18 +1,27 @@
+import { reportRequestFailure } from "./requestErrors";
 import { getApiKey, signalUnauthorized } from "./session";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
 
 /**
- * fetch against the control plane API: attaches the session API key and
- * signals the AuthGate on 401 so the operator is asked to sign in.
+ * fetch against the control plane API: attaches the session API key, signals
+ * the AuthGate on 401 and reports 403/5xx/network failures so they are shown
+ * to the operator instead of rendering as empty data.
  */
 export async function apiFetch(endpoint: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   const key = getApiKey();
   if (key) headers.set("Authorization", `Bearer ${key}`);
 
-  const res = await fetch(`${API_BASE}${endpoint}`, { cache: "no-store", ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${endpoint}`, { cache: "no-store", ...init, headers });
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === "AbortError")) reportRequestFailure(endpoint, 0);
+    throw err;
+  }
   if (res.status === 401) signalUnauthorized();
+  else reportRequestFailure(endpoint, res.status);
   return res;
 }
 
