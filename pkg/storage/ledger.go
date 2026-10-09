@@ -63,13 +63,22 @@ func (s *LedgerStore) GetTraceDetail(ctx context.Context, traceID string) (*doma
 	return detail, nil
 }
 
-func (s *LedgerStore) GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error) {
-	items, err := s.ch.GetCostItems(ctx, tenantID, period)
-	if err != nil {
+// StreamCostItems streams from ClickHouse. It falls back to memory only if
+// ClickHouse fails before emitting anything; a failure mid-stream is returned
+// as-is, since replaying from memory would duplicate rows already sent.
+func (s *LedgerStore) StreamCostItems(ctx context.Context, tenantID string, period string, fn func(domain.CostItem) error) error {
+	emitted := false
+	var fnErr error
+	err := s.ch.StreamCostItems(ctx, tenantID, period, func(item domain.CostItem) error {
+		emitted = true
+		fnErr = fn(item)
+		return fnErr
+	})
+	if err != nil && !emitted && fnErr == nil {
 		log.Printf("[WARN Ledger] ClickHouse cost items failed, serving in-memory ledger: %v", err)
-		return s.MemoryStore.GetCostItems(ctx, tenantID, period)
+		return s.MemoryStore.StreamCostItems(ctx, tenantID, period, fn)
 	}
-	return items, nil
+	return err
 }
 
 // SaveAnomalyEvent keeps the in-memory copy as fallback and persists to ClickHouse.

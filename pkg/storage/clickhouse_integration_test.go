@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -89,16 +90,28 @@ func TestClickHouse_WriteThenRead(t *testing.T) {
 	assert.EqualValues(t, 120, detail.RootNode.LatencyMs)
 	assert.InDelta(t, 0.50, detail.TotalCost, 1e-9)
 
-	costItems, err := ch.GetCostItems(ctx, tenant, "2026-10")
-	require.NoError(t, err)
+	collect := func(period string) []domain.CostItem {
+		var items []domain.CostItem
+		require.NoError(t, ch.StreamCostItems(ctx, tenant, period, func(it domain.CostItem) error {
+			items = append(items, it)
+			return nil
+		}))
+		return items
+	}
+	costItems := collect("2026-10")
 	require.Len(t, costItems, 2)
 	assert.Equal(t, costs[0].CostItemID, costItems[0].CostItemID)
 	assert.Equal(t, "USD", costItems[0].Currency)
 	assert.InDelta(t, 0.25, costItems[0].EffectiveCost, 1e-9)
 
-	none, err := ch.GetCostItems(ctx, tenant, "1999-01")
-	require.NoError(t, err)
-	assert.Empty(t, none)
+	assert.Empty(t, collect("1999-01"))
+
+	// A callback error stops the stream and is returned unchanged.
+	stop := errors.New("stop")
+	calls := 0
+	err = ch.StreamCostItems(ctx, tenant, "", func(domain.CostItem) error { calls++; return stop })
+	assert.ErrorIs(t, err, stop)
+	assert.Equal(t, 1, calls)
 
 	rollups, err := ch.GetCostRollups(ctx, tenant, "2026-10")
 	require.NoError(t, err)

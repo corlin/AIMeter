@@ -20,7 +20,9 @@ type Store interface {
 	GetOverviewStats(ctx context.Context, tenantID string, startTime, endTime time.Time) (*domain.OverviewStats, error)
 	GetTraceSummaries(ctx context.Context, tenantID string, limit int) ([]domain.TraceDetail, error)
 	GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error)
-	GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error)
+	// StreamCostItems calls fn for each matching cost item, oldest first, and
+	// stops at the first error fn returns.
+	StreamCostItems(ctx context.Context, tenantID string, period string, fn func(domain.CostItem) error) error
 	GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error)
 	SaveReconciliationReport(ctx context.Context, report domain.ReconciliationReport) error
 	GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error)
@@ -68,35 +70,41 @@ func (s *MemoryStore) WriteBatch(ctx context.Context, usages []domain.UsageEvent
 	return nil
 }
 
-func (s *MemoryStore) GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error) {
+func (s *MemoryStore) StreamCostItems(ctx context.Context, tenantID string, period string, fn func(domain.CostItem) error) error {
+	// s.costs is append-only and its elements are never modified, so iterating a
+	// snapshot of the slice header is race-free and does not hold the lock while
+	// fn (e.g. a slow HTTP client) runs.
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	snapshot := s.costs
+	s.mu.RUnlock()
 
-	var result []domain.CostItem
-	for _, c := range s.costs {
+	for _, c := range snapshot {
 		if tenantID != "" && tenantID != "all" && c.Attribution.TenantID != tenantID {
 			continue
 		}
 		if period != "" && c.BillingPeriod != period {
 			continue
 		}
-		result = append(result, c)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := fn(c); err != nil {
+			return err
+		}
 	}
-	return result, nil
+	return nil
 }
 
 // GetCostRollups sums cost items per UTC day, provider, model and meter,
-// using the same tenant/period filters as GetCostItems.
+// using the same tenant/period filters as StreamCostItems.
 func (s *MemoryStore) GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error) {
-	items, _ := s.GetCostItems(ctx, tenantID, period)
-
 	type key struct {
 		day                    time.Time
 		provider, model, meter string
 	}
 	sums := make(map[key]*domain.CostRollup)
 	var order []key
-	for _, c := range items {
+	err := s.StreamCostItems(ctx, tenantID, period, func(c domain.CostItem) error {
 		t := c.Timestamp.UTC()
 		k := key{time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), c.Provider, c.Model, c.MeterName}
 		r, ok := sums[k]
@@ -109,6 +117,10 @@ func (s *MemoryStore) GetCostRollups(ctx context.Context, tenantID string, perio
 		r.EffectiveCost += c.EffectiveCost
 		r.ListCost += c.ListCost
 		r.Items++
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	rollups := make([]domain.CostRollup, 0, len(order))

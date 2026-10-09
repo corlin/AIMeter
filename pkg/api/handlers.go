@@ -1,7 +1,9 @@
 package api
 
 import (
+	"encoding/json"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -283,30 +285,54 @@ func (h *APIHandler) GetReconciliationReports(c *gin.Context) {
 }
 
 // ExportFocus streams or downloads FOCUS 1.0 compliant dataset
+// Rows are streamed from the store straight into the response, so memory use
+// does not grow with the size of the ledger.
 func (h *APIHandler) ExportFocus(c *gin.Context) {
 	tenantID := c.Query("tenant_id")
-	format := c.DefaultQuery("format", "csv")
 
-	costs, err := h.store.GetCostItems(c.Request.Context(), tenantID, "")
+	var write func(domain.CostItem) error
+	var finish func() error
+	if c.DefaultQuery("format", "csv") == "json" {
+		c.Header("Content-Type", "application/json; charset=utf-8")
+		enc := json.NewEncoder(c.Writer)
+		n := 0
+		write = func(item domain.CostItem) error {
+			sep := "["
+			if n > 0 {
+				sep = ","
+			}
+			n++
+			if _, err := c.Writer.WriteString(sep); err != nil {
+				return err
+			}
+			return enc.Encode(h.focusExport.ToRecord(item))
+		}
+		finish = func() error {
+			closing := "]"
+			if n == 0 {
+				closing = "[]"
+			}
+			_, err := c.Writer.WriteString(closing)
+			return err
+		}
+	} else {
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", "attachment; filename=aimeter_focus_1.0_export.csv")
+		cw := focus.NewCSVWriter(c.Writer)
+		write = func(item domain.CostItem) error { return cw.Write(h.focusExport.ToRecord(item)) }
+		finish = cw.Flush
+	}
+
+	c.Status(http.StatusOK)
+	err := h.store.StreamCostItems(c.Request.Context(), tenantID, "", write)
+	if err == nil {
+		err = finish()
+	}
 	if err != nil {
-		costs = []domain.CostItem{}
+		// Headers are already sent: the client receives a truncated body
+		// (invalid JSON / short CSV), which is the only signal left.
+		log.Printf("[WARN FOCUS] export for tenant %q aborted: %v", tenantID, err)
 	}
-
-	records := h.focusExport.ConvertToFocusRecords(costs)
-
-	if format == "json" {
-		c.JSON(http.StatusOK, records)
-		return
-	}
-
-	csvBytes, err := h.focusExport.ExportToCSV(records)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSV"})
-		return
-	}
-
-	c.Header("Content-Disposition", "attachment; filename=aimeter_focus_1.0_export.csv")
-	c.Data(http.StatusOK, "text/csv", csvBytes)
 }
 
 // GetBudgets returns registered budget rules

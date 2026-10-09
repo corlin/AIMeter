@@ -313,7 +313,11 @@ func (c *ClickHouseClient) GetTraceSummaries(ctx context.Context, tenantID strin
 
 // GetTraceDetail builds the full hierarchical execution tree for a trace
 func (c *ClickHouseClient) GetTraceDetail(ctx context.Context, traceID string) (*domain.TraceDetail, error) {
-	costItems, err := c.queryCostItems(ctx, "WHERE trace_id = ?", traceID)
+	var costItems []domain.CostItem
+	err := c.streamCostItems(ctx, func(item domain.CostItem) error {
+		costItems = append(costItems, item)
+		return nil
+	}, "WHERE trace_id = ?", traceID)
 	if err != nil {
 		return nil, err
 	}
@@ -423,9 +427,16 @@ func (c *ClickHouseClient) GetTraceDetail(ctx context.Context, traceID string) (
 	}, nil
 }
 
-// GetCostItems lists cost items for a tenant ("" or "all" for every tenant),
-// optionally restricted to a billing period.
-func (c *ClickHouseClient) GetCostItems(ctx context.Context, tenantID string, period string) ([]domain.CostItem, error) {
+// StreamCostItems calls fn for each cost item of a tenant ("" or "all" for
+// every tenant), optionally restricted to a billing period, oldest first.
+// Rows are read incrementally, so memory use does not grow with the result.
+func (c *ClickHouseClient) StreamCostItems(ctx context.Context, tenantID string, period string, fn func(domain.CostItem) error) error {
+	where, args := tenantPeriodWhere(tenantID, period)
+	return c.streamCostItems(ctx, fn, where, args...)
+}
+
+// tenantPeriodWhere builds the WHERE clause shared by ledger queries.
+func tenantPeriodWhere(tenantID, period string) (string, []any) {
 	where, args := "WHERE 1", []any{}
 	if tenantID != "" && tenantID != "all" {
 		where += " AND tenant_id = ?"
@@ -435,12 +446,12 @@ func (c *ClickHouseClient) GetCostItems(ctx context.Context, tenantID string, pe
 		where += " AND billing_period = ?"
 		args = append(args, period)
 	}
-	return c.queryCostItems(ctx, where, args...)
+	return where, args
 }
 
-// queryCostItems selects cost_ledger rows matching where, oldest first.
-// Decimal columns are cast to Float64 and FixedString currency is trimmed.
-func (c *ClickHouseClient) queryCostItems(ctx context.Context, where string, args ...any) ([]domain.CostItem, error) {
+// streamCostItems calls fn for each cost_ledger row matching where, oldest
+// first. Decimal columns are cast to Float64 and FixedString currency is trimmed.
+func (c *ClickHouseClient) streamCostItems(ctx context.Context, fn func(domain.CostItem) error, where string, args ...any) error {
 	rows, err := c.conn.Query(ctx, `
 		SELECT cost_item_id, usage_event_id, timestamp, trace_id, span_id, parent_span_id,
 			tenant_id, customer_id, app_id, workflow_id, agent_id, feature_id, environment,
@@ -450,11 +461,10 @@ func (c *ClickHouseClient) queryCostItems(ctx context.Context, where string, arg
 		FROM aimeter.cost_ledger `+where+`
 		ORDER BY timestamp ASC`, args...)
 	if err != nil {
-		return nil, fmt.Errorf("query cost items failed: %w", err)
+		return fmt.Errorf("query cost items failed: %w", err)
 	}
 	defer rows.Close()
 
-	var items []domain.CostItem
 	for rows.Next() {
 		var item domain.CostItem
 		if err := rows.Scan(
@@ -465,11 +475,13 @@ func (c *ClickHouseClient) queryCostItems(ctx context.Context, where string, arg
 			&item.UnitPrice, &item.Currency, &item.ListCost, &item.ContractDiscount, &item.EffectiveCost,
 			&item.IsReconciled, &item.BillingPeriod,
 		); err != nil {
-			return nil, fmt.Errorf("scan cost item failed: %w", err)
+			return fmt.Errorf("scan cost item failed: %w", err)
 		}
-		items = append(items, item)
+		if err := fn(item); err != nil {
+			return err
+		}
 	}
-	return items, rows.Err()
+	return rows.Err()
 }
 
 // SaveAnomalyEvent persists an anomaly detection (idempotent per ID).
@@ -567,15 +579,7 @@ func (c *ClickHouseClient) GetReconciliationReports(ctx context.Context) ([]doma
 // GetCostRollups sums the cost ledger per UTC day, provider, model and meter in
 // ClickHouse, so callers receive one row per group instead of every cost item.
 func (c *ClickHouseClient) GetCostRollups(ctx context.Context, tenantID string, period string) ([]domain.CostRollup, error) {
-	where, args := "WHERE 1", []any{}
-	if tenantID != "" && tenantID != "all" {
-		where += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
-	if period != "" {
-		where += " AND billing_period = ?"
-		args = append(args, period)
-	}
+	where, args := tenantPeriodWhere(tenantID, period)
 	rows, err := c.conn.Query(ctx, `
 		SELECT toDate(timestamp) AS day, provider, model, meter_name,
 			sum(quantity), toFloat64(sum(effective_cost)), toFloat64(sum(list_cost)), toInt64(count())
