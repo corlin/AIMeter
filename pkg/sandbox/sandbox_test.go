@@ -76,7 +76,7 @@ func TestToolRegistry(t *testing.T) {
 }
 
 func TestSandboxManagerLifecycleAndBreach(t *testing.T) {
-	mgr := NewSandboxManager("../../configs/sandbox_seed.json")
+	mgr := NewSandboxManager("../../configs/demo/sandbox_seed.json")
 
 	stats := mgr.GetStats()
 	if stats.TotalExecutions == 0 {
@@ -180,7 +180,7 @@ func TestSandboxManagerConcurrencyAndRace(t *testing.T) {
 
 	wg.Wait()
 	finalStats := mgr.GetStats()
-	expectedTotal := int64(workers*iterations + 1) // +1 baseline seed
+	expectedTotal := int64(workers * iterations)
 	if finalStats.TotalExecutions != expectedTotal {
 		t.Errorf("Expected %d total executions, got %d", expectedTotal, finalStats.TotalExecutions)
 	}

@@ -44,7 +44,7 @@ func TestProxyFineTuningLoRAIntegration(t *testing.T) {
 	defer upstream.Close()
 
 	store := storage.NewMemoryStore()
-	finetuneMgr := finetuning.NewManager()
+	finetuneMgr := finetuning.NewManager("configs/demo/finetuning_seed.json")
 
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyHandler := proxy.NewProxyHandler(fbMgr, nil, nil)

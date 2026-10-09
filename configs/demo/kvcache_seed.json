@@ -1,0 +1,90 @@
+{
+  "policies": [
+    {
+      "tenant_id": "default",
+      "enabled": true,
+      "enable_canonicalization": true,
+      "canonicalize_patterns": [
+        "(?i)current[ _]?time:\\s*\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}",
+        "(?i)timestamp:\\s*\\d{10,13}",
+        "(?i)session[ _]?id:\\s*[a-f0-9\\-]{16,36}",
+        "(?i)request[ _]?id:\\s*req_[a-zA-Z0-9]+"
+      ],
+      "min_prefix_tokens": 64,
+      "block_alignment_tokens": 64,
+      "affinity_routing_enabled": true,
+      "auto_prewarm_enabled": true,
+      "prewarm_probe_model": "deepseek-ai/DeepSeek-R1",
+      "updated_at": "2026-10-06T08:00:00Z"
+    },
+    {
+      "tenant_id": "fintech-corp",
+      "enabled": true,
+      "enable_canonicalization": true,
+      "canonicalize_patterns": [
+        "(?i)当前系统时间[：:]\\s*\\d{4}年\\d{1,2}月\\d{1,2}日\\s*\\d{1,2}:\\d{2}:\\d{2}",
+        "(?i)会话流水号[：:]\\s*[A-Z0-9\\-]{16,32}",
+        "(?i)用户令牌[：:]\\s*tk_[a-zA-Z0-9]+"
+      ],
+      "min_prefix_tokens": 128,
+      "block_alignment_tokens": 64,
+      "affinity_routing_enabled": true,
+      "auto_prewarm_enabled": true,
+      "prewarm_probe_model": "deepseek-ai/DeepSeek-V3",
+      "updated_at": "2026-10-06T08:00:00Z"
+    }
+  ],
+  "traces": [
+    {
+      "id": "trace-kv-101",
+      "tenant_id": "fintech-corp",
+      "request_id": "req-fin-9981",
+      "model": "deepseek-ai/DeepSeek-R1",
+      "prompt_preview": "你是由 FinTech Corp 研发的资深金融合规审计智能体。请遵循《2026年企业跨境流动性监管细则（第四版）》...",
+      "prompt_tokens": 8192,
+      "actual_cached_tokens": 7680,
+      "theoretical_cached_tokens": 7680,
+      "actual_hit_ratio": 0.9375,
+      "theoretical_hit_ratio": 0.9375,
+      "cost_saved_usd": 0.0967,
+      "was_canonicalized": true,
+      "canonicalized_boost_tokens": 7680,
+      "is_prewarmed": true,
+      "created_at": "2026-10-06T08:15:20Z"
+    },
+    {
+      "id": "trace-kv-102",
+      "tenant_id": "default",
+      "request_id": "req-std-4421",
+      "model": "gpt-4o",
+      "prompt_preview": "You are an enterprise code review assistant. Guidelines: All Go code must pass -race check and follow Google Style Guide...",
+      "prompt_tokens": 4096,
+      "actual_cached_tokens": 3072,
+      "theoretical_cached_tokens": 3072,
+      "actual_hit_ratio": 0.75,
+      "theoretical_hit_ratio": 0.75,
+      "cost_saved_usd": 0.0384,
+      "was_canonicalized": false,
+      "canonicalized_boost_tokens": 0,
+      "is_prewarmed": false,
+      "created_at": "2026-10-06T08:20:11Z"
+    },
+    {
+      "id": "trace-kv-103",
+      "tenant_id": "fintech-corp",
+      "request_id": "req-fin-9982",
+      "model": "deepseek-ai/DeepSeek-V3",
+      "prompt_preview": "你是由 FinTech Corp 研发的资深金融合规审计智能体。当前系统时间：2026年10月06日 08:25:00...",
+      "prompt_tokens": 12288,
+      "actual_cached_tokens": 11520,
+      "theoretical_cached_tokens": 11520,
+      "actual_hit_ratio": 0.9375,
+      "theoretical_hit_ratio": 0.9375,
+      "cost_saved_usd": 0.1451,
+      "was_canonicalized": true,
+      "canonicalized_boost_tokens": 11520,
+      "is_prewarmed": true,
+      "created_at": "2026-10-06T08:25:03Z"
+    }
+  ]
+}

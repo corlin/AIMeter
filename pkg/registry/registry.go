@@ -1,6 +1,8 @@
 package registry
 
 import (
+	"path/filepath"
+
 	"github.com/corlin/AIMeter/pkg/alert"
 	"github.com/corlin/AIMeter/pkg/budget"
 	"github.com/corlin/AIMeter/pkg/cache"
@@ -64,6 +66,8 @@ func NewControlPlaneRegistry() *ControlPlaneRegistry {
 }
 
 // NewDefaultRegistry builds and wires a complete, production-ready control plane registry.
+// seedDir holds the managers' seed files: "configs" for product defaults
+// (policies, rules, catalogs) or "configs/demo" to add demo records.
 func NewDefaultRegistry(
 	store storage.Store,
 	rater *rater.RatingEngine,
@@ -71,8 +75,10 @@ func NewDefaultRegistry(
 	alertDispatcher *alert.AlertDispatcher,
 	slaArbiter *router.SLAArbiter,
 	cacheMgr *cache.SemanticCacheManager,
+	seedDir string,
 ) *ControlPlaneRegistry {
 	reg := NewControlPlaneRegistry()
+	seed := func(name string) string { return filepath.Join(seedDir, name) }
 
 	reg.RaterEngine = rater
 	reg.BudgetManager = budgetMgr
@@ -91,6 +97,7 @@ func NewDefaultRegistry(
 		reg.ThrottlerEngine,
 		alertDispatcher,
 	)
+	_ = reg.ForecastEngine.LoadSeedPolicies(seed("forecast_seed.json"))
 
 	reg.ClusterCoordinator = cluster.NewClusterCoordinator(
 		"hub-primary",
@@ -100,26 +107,27 @@ func NewDefaultRegistry(
 		budgetMgr,
 		alertDispatcher,
 	)
+	_ = reg.ClusterCoordinator.LoadSeedTopology(seed("cluster_seed.json"))
 
-	reg.ExperimentEngine = experiment.NewEngine("configs/experiments_seed.json")
-	reg.DLPManager = dlp.NewManager("configs/dlp_seed.json")
-	reg.SwarmManager = swarm.NewManager("configs/swarm_seed.json")
+	reg.ExperimentEngine = experiment.NewEngine(seed("experiments_seed.json"))
+	reg.DLPManager = dlp.NewManager(seed("dlp_seed.json"))
+	reg.SwarmManager = swarm.NewManager(seed("swarm_seed.json"))
 
-	memMgr, _ := memory.NewMemoryManager("configs/memory_seed.json")
+	memMgr, _ := memory.NewMemoryManager(seed("memory_seed.json"))
 	reg.MemoryManager = memMgr
 
-	reg.ReasoningManager = reasoning.NewReasoningManager("configs/reasoning_seed.json")
-	reg.KVCacheManager = kvcache.NewManager("configs/kvcache_seed.json")
-	reg.QualityManager = quality.NewQualityManager("configs/quality_seed.json")
-	reg.WorkflowManager = workflow.NewWorkflowManager("configs/workflow_seed.json")
-	reg.SandboxManager = sandbox.NewSandboxManager("configs/sandbox_seed.json")
-	reg.HierarchyManager = hierarchy.NewHierarchyManager("configs/hierarchy_seed.json")
-	reg.FederationManager = federation.NewFederationManager("configs/federation_seed.json")
-	reg.FineTuningManager = finetuning.NewManager("configs/finetuning_seed.json")
-	reg.WAFManager = waf.NewManager("configs/waf_seed.json")
-	reg.HeteroManager = hetero.NewManager("configs/hetero_seed.json")
+	reg.ReasoningManager = reasoning.NewReasoningManager(seed("reasoning_seed.json"))
+	reg.KVCacheManager = kvcache.NewManager(seed("kvcache_seed.json"))
+	reg.QualityManager = quality.NewQualityManager(seed("quality_seed.json"))
+	reg.WorkflowManager = workflow.NewWorkflowManager(seed("workflow_seed.json"))
+	reg.SandboxManager = sandbox.NewSandboxManager(seed("sandbox_seed.json"))
+	reg.HierarchyManager = hierarchy.NewHierarchyManager(seed("hierarchy_seed.json"))
+	reg.FederationManager = federation.NewFederationManager(seed("federation_seed.json"))
+	reg.FineTuningManager = finetuning.NewManager(seed("finetuning_seed.json"))
+	reg.WAFManager = waf.NewManager(seed("waf_seed.json"))
+	reg.HeteroManager = hetero.NewManager(seed("hetero_seed.json"))
 
-	fwMgr, _ := flywheel.NewFlywheelManager("configs/flywheel_seed.json")
+	fwMgr, _ := flywheel.NewFlywheelManager(seed("flywheel_seed.json"))
 	reg.FlywheelManager = fwMgr
 
 	return reg

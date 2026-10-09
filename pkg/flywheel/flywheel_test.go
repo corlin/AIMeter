@@ -95,7 +95,7 @@ func TestAlignmentCostDPOvsPPO(t *testing.T) {
 }
 
 func TestFlywheelManager_SeedAndCRUD(t *testing.T) {
-	mgr, err := NewFlywheelManager("../../configs/flywheel_seed.json")
+	mgr, err := NewFlywheelManager("../../configs/demo/flywheel_seed.json")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestFlywheelManager_SeedAndCRUD(t *testing.T) {
 }
 
 func TestFlywheelManager_HarvestAndConcurrency(t *testing.T) {
-	mgr, err := NewFlywheelManager("../../configs/flywheel_seed.json")
+	mgr, err := NewFlywheelManager("../../configs/demo/flywheel_seed.json")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestFlywheelManager_HarvestAndConcurrency(t *testing.T) {
 }
 
 func TestFlywheelManager_Simulation(t *testing.T) {
-	mgr, _ := NewFlywheelManager("../../configs/flywheel_seed.json")
+	mgr, _ := NewFlywheelManager("../../configs/demo/flywheel_seed.json")
 
 	simResp, err := mgr.SimulateFlywheel(&domain.FlywheelSimulateRequest{
 		SeedPromptScale:          10000,

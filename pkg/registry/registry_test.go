@@ -20,7 +20,7 @@ func TestNewDefaultRegistry(t *testing.T) {
 	arb := router.NewSLAArbiter(r)
 	cMgr := cache.NewSemanticCacheManager()
 
-	reg := NewDefaultRegistry(memStore, r, bMgr, disp, arb, cMgr)
+	reg := NewDefaultRegistry(memStore, r, bMgr, disp, arb, cMgr, "configs")
 	assert.NotNil(t, reg)
 	assert.NotNil(t, reg.RaterEngine)
 	assert.NotNil(t, reg.BudgetManager)

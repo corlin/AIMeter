@@ -42,8 +42,9 @@ func NewManager(seedPath ...string) *Manager {
 		scheduler: NewScheduler(),
 	}
 
-	targetPath := "configs/hetero_seed.json"
-	if len(seedPath) > 0 && seedPath[0] != "" {
+	// No implicit default path: the registry chooses config vs demo seeds.
+	targetPath := ""
+	if len(seedPath) > 0 {
 		targetPath = seedPath[0]
 	}
 

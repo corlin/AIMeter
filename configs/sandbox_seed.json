@@ -1,154 +1,44 @@
 {
-  "stats": {
-    "total_executions": 542,
-    "active_sandboxes": 14,
-    "total_compute_cost_usd": 924.50,
-    "total_tool_cost_usd": 682.30,
-    "total_llm_cost_usd": 1873.40,
-    "tripartite_total_usd": 3480.20,
-    "budget_breach_count": 42,
-    "timeout_cap_count": 19,
-    "avg_duration_ms": 14500
-  },
   "tools": [
     {
-      "tool_name": "code_interpreter",
-      "provider": "E2B",
-      "cost_per_call_usd": 0.0030,
       "category": "compute",
+      "cost_per_call_usd": 0.0030,
       "description": "Python/Bash 独立沙箱容器代码执行与数学建模",
-      "enabled": true
+      "enabled": true,
+      "provider": "E2B",
+      "tool_name": "code_interpreter"
     },
     {
-      "tool_name": "web_search",
-      "provider": "SerpApi",
-      "cost_per_call_usd": 0.0050,
       "category": "search",
+      "cost_per_call_usd": 0.0050,
       "description": "实时多源搜索引擎数据抓取与前沿新闻召回",
-      "enabled": true
+      "enabled": true,
+      "provider": "SerpApi",
+      "tool_name": "web_search"
     },
     {
-      "tool_name": "browser_automation",
-      "provider": "Playwright",
-      "cost_per_call_usd": 0.0080,
       "category": "browser",
+      "cost_per_call_usd": 0.0080,
       "description": "无头浏览器动态页面交互、截图与 DOM 解析",
-      "enabled": true
+      "enabled": true,
+      "provider": "Playwright",
+      "tool_name": "browser_automation"
     },
     {
-      "tool_name": "financial_data",
-      "provider": "AlphaVantage",
+      "category": "data",
       "cost_per_call_usd": 0.0120,
-      "category": "data",
       "description": "实时外汇汇率、股票期权行情与跨境宏观数据 API",
-      "enabled": true
+      "enabled": true,
+      "provider": "AlphaVantage",
+      "tool_name": "financial_data"
     },
     {
-      "tool_name": "sql_sandbox",
-      "provider": "DuckDB-Wasm",
-      "cost_per_call_usd": 0.0020,
       "category": "data",
+      "cost_per_call_usd": 0.0020,
       "description": "嵌入式极速只读分析型 SQL 引擎与表格清洗",
-      "enabled": true
-    }
-  ],
-  "executions": [
-    {
-      "id": "sbx-exec-101",
-      "tenant_id": "fintech-corp",
-      "session_id": "sess-fin-401",
-      "trace_id": "trace-sbx-01",
-      "agent_role": "QuantAnalystAgent",
-      "runtime": "e2b",
-      "cpu": 2,
-      "ram_mb": 4096,
-      "duration_ms": 18500,
-      "compute_cost_usd": 0.0018,
-      "tool_name": "code_interpreter",
-      "tool_cost_usd": 0.0030,
-      "llm_cost_usd": 0.0180,
-      "tripartite_total_usd": 0.0228,
-      "status": "completed",
-      "code_snippet": "import numpy as np\nimport pandas as pd\n# Monte-carlo VaR calculation...",
-      "created_at": "2026-10-06T11:20:00Z"
-    },
-    {
-      "id": "sbx-exec-102",
-      "tenant_id": "fintech-corp",
-      "session_id": "sess-fin-402",
-      "trace_id": "trace-sbx-02",
-      "agent_role": "WebScraperAgent",
-      "runtime": "docker",
-      "cpu": 4,
-      "ram_mb": 4096,
-      "duration_ms": 62000,
-      "compute_cost_usd": 0.0055,
-      "tool_name": "browser_automation",
-      "tool_cost_usd": 0.0080,
-      "llm_cost_usd": 0.0240,
-      "tripartite_total_usd": 0.0375,
-      "status": "timeout_capped",
-      "code_snippet": "await page.goto('https://regulations.example.org'); while True: await page.wait_for_selector(...)",
-      "error_message": "Hard timeout cap triggered: execution exceeded 60s limit",
-      "created_at": "2026-10-06T11:45:00Z"
-    },
-    {
-      "id": "sbx-exec-103",
-      "tenant_id": "sec-ops",
-      "session_id": "sess-sec-801",
-      "trace_id": "trace-sbx-03",
-      "agent_role": "CodeAuditorAgent",
-      "runtime": "modal",
-      "cpu": 2,
-      "ram_mb": 2048,
-      "duration_ms": 8200,
-      "compute_cost_usd": 0.0014,
-      "tool_name": "sql_sandbox",
-      "tool_cost_usd": 0.0020,
-      "llm_cost_usd": 0.0120,
-      "tripartite_total_usd": 0.0154,
-      "status": "completed",
-      "code_snippet": "SELECT vulnerability_type, COUNT(*) FROM audit_logs GROUP BY 1",
-      "created_at": "2026-10-06T12:10:00Z"
-    },
-    {
-      "id": "sbx-exec-104",
-      "tenant_id": "default",
-      "session_id": "sess-def-105",
-      "trace_id": "trace-sbx-04",
-      "agent_role": "DataCleanerAgent",
-      "runtime": "wasm",
-      "cpu": 1,
-      "ram_mb": 1024,
-      "duration_ms": 3500,
-      "compute_cost_usd": 0.0011,
-      "tool_name": "web_search",
-      "tool_cost_usd": 0.0050,
-      "llm_cost_usd": 0.0080,
-      "tripartite_total_usd": 0.0141,
-      "status": "completed",
-      "code_snippet": "serp.query('SEC 10-K filings 2025 tech sector')",
-      "created_at": "2026-10-06T12:30:00Z"
-    },
-    {
-      "id": "sbx-exec-105",
-      "tenant_id": "fintech-corp",
-      "session_id": "sess-fin-403",
-      "trace_id": "trace-sbx-05",
-      "agent_role": "LoopTesterAgent",
-      "runtime": "docker",
-      "cpu": 2,
-      "ram_mb": 2048,
-      "duration_ms": 15000,
-      "compute_cost_usd": 0.0017,
-      "tool_name": "financial_data",
-      "tool_cost_usd": 0.0120,
-      "llm_cost_usd": 0.0150,
-      "tripartite_total_usd": 0.0287,
-      "status": "budget_breached",
-      "code_snippet": "for currency in currency_list: fetch_fx_ticks(currency)",
-      "error_message": "Session tool budget cap ($0.05) reached. Active execution blocked.",
-      "created_at": "2026-10-06T13:05:00Z"
+      "enabled": true,
+      "provider": "DuckDB-Wasm",
+      "tool_name": "sql_sandbox"
     }
   ]
 }

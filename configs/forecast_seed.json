@@ -1,38 +1,14 @@
 [
   {
-    "tenant_id": "default",
-    "auto_pilot_enabled": true,
-    "soft_mitigate_threshold": 0.80,
     "active_throttle_threshold": 0.95,
-    "hard_cap_threshold": 1.00,
     "allow_compression_boost": true,
     "allow_model_downgrade": true,
     "allow_rate_limit_tighten": true,
     "allow_stream_capping": true,
-    "updated_at": "2026-10-01T00:00:00Z"
-  },
-  {
-    "tenant_id": "org-corp-enterprise",
     "auto_pilot_enabled": true,
-    "soft_mitigate_threshold": 0.85,
-    "active_throttle_threshold": 0.96,
     "hard_cap_threshold": 1.00,
-    "allow_compression_boost": true,
-    "allow_model_downgrade": false,
-    "allow_rate_limit_tighten": true,
-    "allow_stream_capping": true,
-    "updated_at": "2026-10-01T00:00:00Z"
-  },
-  {
-    "tenant_id": "tenant-batch-processing",
-    "auto_pilot_enabled": true,
-    "soft_mitigate_threshold": 0.75,
-    "active_throttle_threshold": 0.90,
-    "hard_cap_threshold": 0.98,
-    "allow_compression_boost": true,
-    "allow_model_downgrade": true,
-    "allow_rate_limit_tighten": true,
-    "allow_stream_capping": true,
+    "soft_mitigate_threshold": 0.80,
+    "tenant_id": "default",
     "updated_at": "2026-10-01T00:00:00Z"
   }
 ]

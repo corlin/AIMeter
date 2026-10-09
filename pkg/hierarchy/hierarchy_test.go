@@ -73,7 +73,7 @@ func TestOrgTree_BasicOperations(t *testing.T) {
 }
 
 func TestBudgetChecker_BottomUpHardBlock(t *testing.T) {
-	mgr := hierarchy.NewHierarchyManager("configs/hierarchy_seed.json")
+	mgr := hierarchy.NewHierarchyManager("configs/demo/hierarchy_seed.json")
 
 	// Target node corp/tech/ai-lab/nlp has 800 budget + 100 overdraft limit = 900 ceiling
 	// Seed spend is 830. An additional 80 request costs 830+80=910 > 900 -> hard block!
@@ -90,7 +90,7 @@ func TestBudgetChecker_BottomUpHardBlock(t *testing.T) {
 }
 
 func TestBudgetChecker_SoftWarningAndP2Degrade(t *testing.T) {
-	mgr := hierarchy.NewHierarchyManager("configs/hierarchy_seed.json")
+	mgr := hierarchy.NewHierarchyManager("configs/demo/hierarchy_seed.json")
 
 	// Target node corp/tech/ai-lab/sandbox has 600 budget. 80% soft warning is 480.
 	// Current spend is 590, already in soft warning!
@@ -120,7 +120,7 @@ func TestBudgetChecker_SoftWarningAndP2Degrade(t *testing.T) {
 }
 
 func TestHierarchyManager_RecordSpendAndConcurrency(t *testing.T) {
-	mgr := hierarchy.NewHierarchyManager("")
+	mgr := hierarchy.NewHierarchyManager("configs/demo/hierarchy_seed.json")
 
 	// Concurrent spend records
 	var wg sync.WaitGroup

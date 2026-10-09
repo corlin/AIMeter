@@ -728,6 +728,7 @@ func TestExperimentEndpoints(t *testing.T) {
 		nil,
 		nil,
 		false,
+		api.WithSeedDir("configs/demo"),
 	)
 
 	// 1. GET /api/v1/experiments
@@ -1332,7 +1333,7 @@ func TestQualityEndpoints(t *testing.T) {
 }
 
 func TestWorkflowEndpoints(t *testing.T) {
-	server := api.NewServer(0, nil, nil, nil, nil, nil, nil, nil, nil, nil, false)
+	server := api.NewServer(0, nil, nil, nil, nil, nil, nil, nil, nil, nil, false, api.WithSeedDir("configs/demo"))
 
 	// 1. GET /api/v1/workflows/stats
 	w := httptest.NewRecorder()
@@ -1418,7 +1419,7 @@ func TestWorkflowEndpoints(t *testing.T) {
 }
 
 func TestSandboxEndpoints(t *testing.T) {
-	server := api.NewServer(0, nil, nil, nil, nil, nil, nil, nil, nil, nil, false)
+	server := api.NewServer(0, nil, nil, nil, nil, nil, nil, nil, nil, nil, false, api.WithSeedDir("configs/demo"))
 
 	// 1. GET /api/v1/sandboxes/stats
 	w := httptest.NewRecorder()
@@ -1529,7 +1530,7 @@ func TestSandboxEndpoints(t *testing.T) {
 
 func TestHierarchyEndpoints(t *testing.T) {
 	memStore := storage.NewMemoryStore()
-	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false, api.WithSeedDir("configs/demo"))
 
 	// 1. GET /api/v1/hierarchy/tree
 	w := httptest.NewRecorder()
@@ -1632,7 +1633,7 @@ func TestHierarchyEndpoints(t *testing.T) {
 
 func TestFederationEndpoints(t *testing.T) {
 	memStore := storage.NewMemoryStore()
-	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false, api.WithSeedDir("configs/demo"))
 
 	// 1. GET /api/v1/federation/stats
 	w := httptest.NewRecorder()
@@ -1884,7 +1885,7 @@ func TestFineTuningEndpoints(t *testing.T) {
 
 func TestWAFEndpoints(t *testing.T) {
 	memStore := storage.NewMemoryStore()
-	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false)
+	server := api.NewServer(8080, memStore, nil, nil, nil, nil, nil, nil, nil, nil, false, api.WithSeedDir("configs/demo"))
 
 	// 1. GET /api/v1/waf/stats
 	w := httptest.NewRecorder()
@@ -2179,6 +2180,7 @@ func TestFlywheelEndpoints(t *testing.T) {
 		nil,
 		nil,
 		false,
+		api.WithSeedDir("configs/demo"),
 	)
 
 	// 1. GET /api/v1/flywheel/stats

@@ -17,7 +17,7 @@ func TestProxyHierarchyBudgetIntegration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// 1. Initialize HierarchyManager with seed path
-	hm := hierarchy.NewHierarchyManager("configs/hierarchy_seed.json")
+	hm := hierarchy.NewHierarchyManager("configs/demo/hierarchy_seed.json")
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
 	proxyH.HierarchyManager = hm

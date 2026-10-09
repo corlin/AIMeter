@@ -380,7 +380,7 @@ docker compose -f deploy/docker-compose.yml up -d clickhouse postgres
 
 # 编译并启动 AI Meter 后端服务
 go build -o bin/aimeter ./cmd/aimeter
-./bin/aimeter --config configs/aimeter.yaml --seed-demo  # --seed-demo: 注入演示租户/预算/异常/熔断数据，生产环境不要开启
+./bin/aimeter --config configs/aimeter.yaml --seed-demo  # --seed-demo: 注入演示租户/预算/异常/熔断及 configs/demo/ 下各模块演示数据，生产环境不要开启
 
 # 启动前端 Web 控制台
 cd web && npm run dev

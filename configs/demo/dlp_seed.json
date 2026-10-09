@@ -1,0 +1,47 @@
+[
+  {
+    "tenant_id": "default",
+    "enabled": true,
+    "default_action": "mask",
+    "entity_actions": {
+      "api_key": "block",
+      "connection_string": "block",
+      "jwt_token": "block",
+      "phone": "mask",
+      "email": "mask",
+      "id_card": "mask",
+      "bank_card": "mask",
+      "private_ip": "mask",
+      "custom_keyword": "mask"
+    },
+    "enable_unmasking": true,
+    "custom_keywords": [
+      "CONFIDENTIAL_PROPRIETARY",
+      "PROJECT_NEBULA_KEY",
+      "INTERNAL_PASSPHRASE"
+    ],
+    "updated_at": "2026-10-01T00:00:00Z"
+  },
+  {
+    "tenant_id": "finance-enterprise-1",
+    "enabled": true,
+    "default_action": "block",
+    "entity_actions": {
+      "api_key": "block",
+      "connection_string": "block",
+      "jwt_token": "block",
+      "bank_card": "block",
+      "id_card": "block",
+      "phone": "mask",
+      "email": "mask",
+      "private_ip": "audit",
+      "custom_keyword": "block"
+    },
+    "enable_unmasking": true,
+    "custom_keywords": [
+      "SWIFT_BIC_SECRET",
+      "MERCHANT_KEY"
+    ],
+    "updated_at": "2026-10-02T10:00:00Z"
+  }
+]

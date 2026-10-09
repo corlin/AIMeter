@@ -31,6 +31,19 @@ type Server struct {
 	authService *auth.AuthService
 }
 
+// ServerOption customises NewServer.
+type ServerOption func(*serverOptions)
+
+type serverOptions struct {
+	seedDir string
+}
+
+// WithSeedDir loads manager seed files from dir instead of "configs"
+// (e.g. "configs/demo" for -seed-demo).
+func WithSeedDir(dir string) ServerOption {
+	return func(o *serverOptions) { o.seedDir = dir }
+}
+
 func NewServer(
 	port int,
 	store storage.Store,
@@ -43,7 +56,13 @@ func NewServer(
 	guardSvc *guard.GuardService,
 	authSvc *auth.AuthService,
 	authEnabled bool,
+	opts ...ServerOption,
 ) *Server {
+	options := serverOptions{seedDir: "configs"}
+	for _, o := range opts {
+		o(&options)
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -162,7 +181,7 @@ func NewServer(
 	proxyHandler := proxy.NewProxyHandler(fbMgr, collectorSvc, nil)
 
 	// Unified Control Plane Registry: instantiate and wire all 24 domain engines and managers in one line
-	reg := registry.NewDefaultRegistry(store, r, budgetMgr, handler.alertDispatcher, slaArbiter, cacheMgr)
+	reg := registry.NewDefaultRegistry(store, r, budgetMgr, handler.alertDispatcher, slaArbiter, cacheMgr, options.seedDir)
 	handler.SetRegistry(reg)
 	proxyHandler.SetRegistry(reg)
 	router.POST("/v1/chat/completions", auth.RequireScopeMiddleware(authSvc, auth.ScopeProxyInvoke, authEnabled), proxyHandler.HandleChatCompletions)

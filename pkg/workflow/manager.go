@@ -37,11 +37,6 @@ func NewWorkflowManager(seedPath string) *WorkflowManager {
 		mgr.loadSeed(seedPath)
 	}
 
-	// If no instances loaded, inject default baseline instance
-	if len(mgr.instances) == 0 {
-		mgr.injectDefaultSeed()
-	}
-
 	mgr.recalculateStats()
 	return mgr
 }
@@ -76,79 +71,6 @@ func (m *WorkflowManager) loadSeed(path string) {
 
 	m.stats = seed.Stats
 }
-
-func (m *WorkflowManager) injectDefaultSeed() {
-	now := time.Now().UTC()
-	defaultSteps := []domain.WorkflowStep{
-		{
-			StepID:            "step-1-gather",
-			Name:              "企业跨境数据收集",
-			AgentRole:         "CrawlerAgent",
-			Parents:           []string{},
-			Children:          []string{"step-2-process"},
-			Status:            domain.StepStatusCompleted,
-			InputTokens:       1000,
-			OutputTokens:      2500,
-			CostUSD:           0.0150,
-			DurationMs:        2800,
-			IdempotencyKey:    "idemp-default-s1",
-			CheckpointPayload: `{"status": "ok", "records": 1000}`,
-		},
-		{
-			StepID:         "step-2-process",
-			Name:           "合规校验与条款分析",
-			AgentRole:      "LegalAgent",
-			Parents:        []string{"step-1-gather"},
-			Children:       []string{"step-3-sign"},
-			Status:         domain.StepStatusFailed,
-			InputTokens:    3500,
-			OutputTokens:   500,
-			CostUSD:        0.0180,
-			DurationMs:     10200,
-			IdempotencyKey: "idemp-default-s2",
-			ErrorMsg:       "Rate-limit timeout on upstream vendor",
-			RetryCount:     1,
-		},
-		{
-			StepID:         "step-3-sign",
-			Name:           "报告生成与归档签署",
-			AgentRole:      "SignerAgent",
-			Parents:        []string{"step-2-process"},
-			Status:         domain.StepStatusPending,
-			IdempotencyKey: "idemp-default-s3",
-		},
-	}
-
-	inst := &domain.WorkflowInstance{
-		ID:                   "wf-default-01",
-		TenantID:             "default",
-		WorkflowName:         "跨境合规与风控研报流水线",
-		Status:               domain.WorkflowStatusFailed,
-		Steps:                defaultSteps,
-		TotalIncurredCostUSD: 0.0330,
-		EffectiveCostUSD:     0.0150,
-		AvoidedWasteUSD:      0.0150,
-		SunkCostUSD:          0.0180,
-		SunkCostCapUSD:       0.2000,
-		MaxStepRetries:       3,
-		CreatedAt:            now.Add(-30 * time.Minute),
-		UpdatedAt:            now,
-	}
-
-	m.instances[inst.ID] = inst
-	m.instanceOrder = append(m.instanceOrder, inst.ID)
-	m.checkpoints.Put(
-		inst.ID,
-		"step-1-gather",
-		"idemp-default-s1",
-		`{"status": "ok", "records": 1000}`,
-		0.0150,
-		1000,
-		2500,
-		2800,
-	)
-}
-
 func (m *WorkflowManager) recalculateStats() {
 	var total int64
 	var active int64

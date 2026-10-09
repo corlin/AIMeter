@@ -44,8 +44,9 @@ func NewManager(seedPath ...string) *Manager {
 		events:   make([]*domain.WAFEvent, 0, 200),
 	}
 
-	targetPath := "configs/waf_seed.json"
-	if len(seedPath) > 0 && seedPath[0] != "" {
+	// No implicit default path: the registry chooses config vs demo seeds.
+	targetPath := ""
+	if len(seedPath) > 0 {
 		targetPath = seedPath[0]
 	}
 

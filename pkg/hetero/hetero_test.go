@@ -12,7 +12,7 @@ import (
 )
 
 func TestManager_LoadSeedAndGetNodes(t *testing.T) {
-	mgr := hetero.NewManager("../../configs/hetero_seed.json")
+	mgr := hetero.NewManager("../../configs/demo/hetero_seed.json")
 	require.NotNil(t, mgr)
 
 	nodes := mgr.GetNodes()
@@ -40,7 +40,7 @@ func TestManager_LoadSeedAndGetNodes(t *testing.T) {
 }
 
 func TestManager_Dispatch_PrefillDecodeDisaggregation(t *testing.T) {
-	mgr := hetero.NewManager("../../configs/hetero_seed.json")
+	mgr := hetero.NewManager("../../configs/demo/hetero_seed.json")
 
 	ctx := context.Background()
 
@@ -70,7 +70,7 @@ func TestManager_Dispatch_PrefillDecodeDisaggregation(t *testing.T) {
 }
 
 func TestManager_Dispatch_WatermarkBurst(t *testing.T) {
-	mgr := hetero.NewManager("../../configs/hetero_seed.json")
+	mgr := hetero.NewManager("../../configs/demo/hetero_seed.json")
 
 	// Manually push nodes to high watermark > 85%
 	nodes := mgr.GetNodes()
@@ -94,7 +94,7 @@ func TestManager_Dispatch_WatermarkBurst(t *testing.T) {
 }
 
 func TestManager_RecordTraceAndStats(t *testing.T) {
-	mgr := hetero.NewManager("../../configs/hetero_seed.json")
+	mgr := hetero.NewManager("../../configs/demo/hetero_seed.json")
 	initialStats := mgr.GetStats()
 
 	trace := &domain.HeteroUsageTrace{
@@ -126,7 +126,7 @@ func TestManager_RecordTraceAndStats(t *testing.T) {
 }
 
 func TestManager_Simulate(t *testing.T) {
-	mgr := hetero.NewManager("../../configs/hetero_seed.json")
+	mgr := hetero.NewManager("../../configs/demo/hetero_seed.json")
 
 	simReq := &domain.HeteroSimulateRequest{
 		Concurrency:            48,
@@ -145,7 +145,7 @@ func TestManager_Simulate(t *testing.T) {
 }
 
 func TestManager_ConcurrentAccess(t *testing.T) {
-	mgr := hetero.NewManager("../../configs/hetero_seed.json")
+	mgr := hetero.NewManager("../../configs/demo/hetero_seed.json")
 
 	var wg sync.WaitGroup
 	ctx := context.Background()

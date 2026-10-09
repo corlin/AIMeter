@@ -75,7 +75,7 @@ func TestCheckpointStoreOperations(t *testing.T) {
 }
 
 func TestWorkflowResumeAndAvoidedCost(t *testing.T) {
-	mgr := NewWorkflowManager("../../configs/workflow_seed.json")
+	mgr := NewWorkflowManager("../../configs/demo/workflow_seed.json")
 
 	// Get wf-fin-report-01 which is in "failed" state at step-4
 	inst, ok := mgr.GetInstance("wf-fin-report-01")

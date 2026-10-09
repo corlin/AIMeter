@@ -36,10 +36,6 @@ func NewHierarchyManager(seedPath string) *HierarchyManager {
 		m.loadSeed(seedPath)
 	}
 
-	if len(m.tree.nodesByID) == 0 {
-		m.injectBaselineSeed()
-	}
-
 	m.recalculateStats()
 	return m
 }
@@ -73,52 +69,6 @@ func (m *HierarchyManager) loadSeed(path string) {
 
 	m.stats = seed.Stats
 }
-
-func (m *HierarchyManager) injectBaselineSeed() {
-	corpReq := domain.OrgNodeUpsertRequest{
-		ID:                 "node-corp",
-		TenantID:           "default",
-		Name:               "集团控股 (Group Global Corp)",
-		Path:               "corp",
-		NodeType:           domain.OrgNodeEnterprise,
-		AllocatedBudgetUSD: 10000.0,
-		SoftWarningPct:     0.8,
-		Priority:           domain.OrgPriorityP0,
-		EnableOverdraft:    true,
-		OverdraftLimitUSD:  2000.0,
-	}
-	techReq := domain.OrgNodeUpsertRequest{
-		ID:                 "node-tech",
-		TenantID:           "default",
-		Name:               "科技研发部 (Tech Division)",
-		Path:               "corp/tech",
-		ParentID:           "node-corp",
-		NodeType:           domain.OrgNodeDivision,
-		AllocatedBudgetUSD: 5000.0,
-		SoftWarningPct:     0.8,
-		Priority:           domain.OrgPriorityP0,
-		EnableOverdraft:    true,
-		OverdraftLimitUSD:  500.0,
-	}
-	nlpReq := domain.OrgNodeUpsertRequest{
-		ID:                 "node-nlp",
-		TenantID:           "default",
-		Name:               "NLP 算法组 (NLP Team)",
-		Path:               "corp/tech/nlp",
-		ParentID:           "node-tech",
-		NodeType:           domain.OrgNodeTeam,
-		AllocatedBudgetUSD: 1000.0,
-		SoftWarningPct:     0.8,
-		Priority:           domain.OrgPriorityP1,
-		EnableOverdraft:    false,
-		OverdraftLimitUSD:  0.0,
-	}
-
-	_, _ = m.tree.UpsertNode(corpReq)
-	_, _ = m.tree.UpsertNode(techReq)
-	_, _ = m.tree.UpsertNode(nlpReq)
-}
-
 func (m *HierarchyManager) recalculateStats() {
 	nodes := m.tree.ListAll()
 	totalNodes := len(nodes)

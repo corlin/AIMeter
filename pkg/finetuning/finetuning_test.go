@@ -141,7 +141,7 @@ func TestJobManager_CreateAndCapitalize(t *testing.T) {
 }
 
 func TestManager_GatewayAuditAndSimulate(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager("configs/demo/finetuning_seed.json")
 
 	// Audit with existing seed adapter "lora-quant-sentiment-v2"
 	saved, adapter, err := mgr.AuditInferenceSavings("lora-quant-sentiment-v2", "gpt-4o", "qwen-7b", 0.0012)
@@ -188,7 +188,7 @@ func TestManager_GatewayAuditAndSimulate(t *testing.T) {
 }
 
 func TestManager_ConcurrentInferenceRace(t *testing.T) {
-	mgr := NewManager()
+	mgr := NewManager("configs/demo/finetuning_seed.json")
 
 	var wg sync.WaitGroup
 	workers := 25

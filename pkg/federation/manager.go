@@ -38,10 +38,6 @@ func NewFederationManager(seedPath string) *FederationManager {
 		m.loadSeed(seedPath)
 	}
 
-	if len(m.registry.workspaces) == 0 {
-		m.injectBaselineSeed()
-	}
-
 	m.recalculateStats()
 	return m
 }
@@ -70,47 +66,6 @@ func (m *FederationManager) loadSeed(path string) {
 
 	m.stats = seed.Stats
 }
-
-func (m *FederationManager) injectBaselineSeed() {
-	ws1 := domain.FederationWorkspace{
-		ID:              "ws-quant-alpha",
-		TenantID:        "default",
-		Name:            "量化高频交易群 (Quant Alpha)",
-		BalanceUSD:      500.0,
-		EscrowLockedUSD: 0.0,
-		TotalEarnedUSD:  1200.0,
-		ReputationScore: 98.5,
-		TasksCompleted:  40,
-		TasksCreated:    25,
-	}
-	ws2 := domain.FederationWorkspace{
-		ID:              "ws-risk-crawler",
-		TenantID:        "default",
-		Name:            "全球风险情报网络 (Risk Crawler)",
-		BalanceUSD:      350.0,
-		EscrowLockedUSD: 0.0,
-		TotalEarnedUSD:  800.0,
-		ReputationScore: 96.0,
-		TasksCompleted:  50,
-		TasksCreated:    10,
-	}
-	ws3 := domain.FederationWorkspace{
-		ID:              "ws-compliance-sec",
-		TenantID:        "default",
-		Name:            "安全合规风控群 (Compliance Sec)",
-		BalanceUSD:      600.0,
-		EscrowLockedUSD: 0.0,
-		TotalEarnedUSD:  550.0,
-		ReputationScore: 99.2,
-		TasksCompleted:  20,
-		TasksCreated:    15,
-	}
-
-	m.registry.Upsert(ws1)
-	m.registry.Upsert(ws2)
-	m.registry.Upsert(ws3)
-}
-
 func (m *FederationManager) recalculateStats() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

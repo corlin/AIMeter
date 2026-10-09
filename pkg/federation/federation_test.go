@@ -137,7 +137,7 @@ func TestTaskAuction_Match(t *testing.T) {
 }
 
 func TestFederationManager_FullFlow(t *testing.T) {
-	mgr := federation.NewFederationManager("configs/federation_seed.json")
+	mgr := federation.NewFederationManager("configs/demo/federation_seed.json")
 
 	// 1. Check seed loaded
 	workspaces := mgr.ListWorkspaces()

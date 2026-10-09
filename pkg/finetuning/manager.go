@@ -37,8 +37,9 @@ func NewManager(seedPath ...string) *Manager {
 		jobManager:    jobMgr,
 	}
 
-	targetPath := "configs/finetuning_seed.json"
-	if len(seedPath) > 0 && seedPath[0] != "" {
+	// No implicit default path: the registry chooses config vs demo seeds.
+	targetPath := ""
+	if len(seedPath) > 0 {
 		targetPath = seedPath[0]
 	}
 
@@ -53,68 +54,9 @@ func NewManager(seedPath ...string) *Manager {
 		for _, j := range seed.Jobs {
 			m.jobManager.RegisterExistingJob(j)
 		}
-	} else {
-		m.injectBaselineSeed()
 	}
 
 	return m
-}
-
-func (m *Manager) injectBaselineSeed() {
-	m.adapterLedger.RegisterAdapter(&domain.LoRAAdapterAsset{
-		ID:                   "lora-quant-sentiment-v2",
-		TenantID:             "corp-fintech",
-		Name:                 "High-Frequency Financial Sentiment LoRA",
-		BaseModel:            "Qwen/Qwen2.5-7B-Instruct",
-		BenchmarkModel:       "gpt-4o",
-		JobID:                "job-ft-quant-8801",
-		TotalCapExUSD:        420.00,
-		AvgCostBenchmarkUSD:  0.0120,
-		AvgCostStudentUSD:    0.0012,
-		UnitSavedUSD:         0.0108,
-		InferenceCount:       85000,
-		TotalSavingsUSD:      918.00,
-		NetAlphaUSD:          498.00,
-		ROIPercent:           218.57,
-		BreakEvenInvocations: 38889,
-		Status:               domain.BreakEvenStatusAchieved,
-	})
-	m.adapterLedger.RegisterAdapter(&domain.LoRAAdapterAsset{
-		ID:                   "lora-security-audit-7b",
-		TenantID:             "corp-security",
-		Name:                 "Smart Contract & Code Vulnerability Auditor",
-		BaseModel:            "deepseek-ai/DeepSeek-Coder-V2-Lite",
-		BenchmarkModel:       "claude-3-5-sonnet",
-		JobID:                "job-ft-sec-8802",
-		TotalCapExUSD:        680.00,
-		AvgCostBenchmarkUSD:  0.0180,
-		AvgCostStudentUSD:    0.0018,
-		UnitSavedUSD:         0.0162,
-		InferenceCount:       31000,
-		TotalSavingsUSD:      502.20,
-		NetAlphaUSD:          0.0,
-		ROIPercent:           73.85,
-		BreakEvenInvocations: 41975,
-		Status:               domain.BreakEvenStatusRecovering,
-	})
-	m.adapterLedger.RegisterAdapter(&domain.LoRAAdapterAsset{
-		ID:                   "lora-compliance-agent-8b",
-		TenantID:             "corp-legal",
-		Name:                 "Global Cross-Border Legal & PII Compliance Copilot",
-		BaseModel:            "meta-llama/Llama-3.1-8B-Instruct",
-		BenchmarkModel:       "gpt-4o",
-		JobID:                "job-ft-comp-8803",
-		TotalCapExUSD:        315.00,
-		AvgCostBenchmarkUSD:  0.0140,
-		AvgCostStudentUSD:    0.0014,
-		UnitSavedUSD:         0.0126,
-		InferenceCount:       52000,
-		TotalSavingsUSD:      655.20,
-		NetAlphaUSD:          340.20,
-		ROIPercent:           208.00,
-		BreakEvenInvocations: 25000,
-		Status:               domain.BreakEvenStatusAchieved,
-	})
 }
 
 // GetComputeEngine returns the compute engine

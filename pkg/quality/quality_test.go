@@ -136,7 +136,7 @@ func TestPenaltyEconomicsMatrix(t *testing.T) {
 }
 
 func TestManagerLifecycleAndSimulation(t *testing.T) {
-	mgr := NewQualityManager("../../configs/quality_seed.json")
+	mgr := NewQualityManager("../../configs/demo/quality_seed.json")
 
 	stats := mgr.GetStats()
 	if stats.TotalEvaluatedRequests == 0 {

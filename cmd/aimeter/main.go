@@ -134,6 +134,10 @@ func main() {
 	}
 
 	// 9. Initialize API Server
+	var serverOpts []api.ServerOption
+	if *seedDemo {
+		serverOpts = append(serverOpts, api.WithSeedDir("configs/demo"))
+	}
 	server := api.NewServer(
 		cfg.Server.HTTPPort,
 		primaryStore,
@@ -146,6 +150,7 @@ func main() {
 		guardSvc,
 		authSvc,
 		cfg.Auth.Enabled,
+		serverOpts...,
 	)
 
 	go func() {

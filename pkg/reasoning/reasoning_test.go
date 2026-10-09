@@ -114,7 +114,7 @@ Wait, hold on, let me reconsider this again. 到底选哪个方案？我反复�
 }
 
 func TestManager_AuditAndPrune(t *testing.T) {
-	mgr := NewReasoningManager("../../configs/reasoning_seed.json")
+	mgr := NewReasoningManager("../../configs/demo/reasoning_seed.json")
 
 	// Verify seed policies loaded
 	policy := mgr.GetPolicy("default")

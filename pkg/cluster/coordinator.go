@@ -54,16 +54,15 @@ func NewClusterCoordinator(
 		isHub:           isHub,
 	}
 
-	c.loadSeedTopology()
+	c.registerSelfNode()
 	return c
 }
 
-// loadSeedTopology initializes seed nodes from configs/cluster_seed.json or defaults.
-func (c *ClusterCoordinator) loadSeedTopology() {
+// registerSelfNode registers the local hub node and its default quota leases.
+func (c *ClusterCoordinator) registerSelfNode() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Default self node
 	selfNode := &domain.ClusterNode{
 		NodeID:           c.localNodeID,
 		RegionID:         c.localRegionID,
@@ -72,28 +71,34 @@ func (c *ClusterCoordinator) loadSeedTopology() {
 		Status:           domain.NodeStatusHealthy,
 		EndpointURL:      "http://localhost:8080",
 		Weight:           1.0,
-		LatencyMs:        1.2,
+		LatencyMs:        0,
 		LastHeartbeatAt:  time.Now().UTC(),
 		RegisteredAt:     time.Now().UTC(),
-		ActiveLeaseCount: 4,
+		ActiveLeaseCount: 0,
 	}
 	c.nodes[selfNode.NodeID] = selfNode
-
-	// Attempt reading seed file
-	var seeds []domain.ClusterNode
-	if err := common.LoadSeedFile("configs/cluster_seed.json", &seeds); err == nil {
-		for _, seed := range seeds {
-			s := seed
-			if s.RegisteredAt.IsZero() {
-				s.RegisteredAt = time.Now().UTC()
-			}
-			s.LastHeartbeatAt = time.Now().UTC()
-			c.nodes[s.NodeID] = &s
-		}
-	}
-
-	// Initial leases generation
 	c.provisionInitialLeasesLocked()
+}
+
+// LoadSeedTopology registers additional cluster nodes from a seed file and
+// provisions their default quota leases.
+func (c *ClusterCoordinator) LoadSeedTopology(path string) error {
+	var seeds []domain.ClusterNode
+	if err := common.LoadSeedFile(path, &seeds); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, seed := range seeds {
+		s := seed
+		if s.RegisteredAt.IsZero() {
+			s.RegisteredAt = time.Now().UTC()
+		}
+		s.LastHeartbeatAt = time.Now().UTC()
+		c.nodes[s.NodeID] = &s
+	}
+	c.provisionInitialLeasesLocked()
+	return nil
 }
 
 func (c *ClusterCoordinator) provisionInitialLeasesLocked() {
@@ -105,8 +110,6 @@ func (c *ClusterCoordinator) provisionInitialLeasesLocked() {
 		cpm    float64
 	}{
 		{"default", "standard", 60, 200000, 5.00},
-		{"org-corp-enterprise", "enterprise", 300, 1000000, 30.00},
-		{"tenant-batch-processing", "free", 20, 40000, 0.50},
 	}
 
 	for _, n := range c.nodes {

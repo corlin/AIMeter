@@ -53,16 +53,15 @@ func NewForecastEngine(
 		cachedProjections: make(map[string]*domain.ForecastProjection),
 	}
 
-	e.loadSeedPolicies()
+	e.installDefaultPolicy()
 	return e
 }
 
-// loadSeedPolicies initializes policies from configs/forecast_seed.json or defaults.
-func (e *ForecastEngine) loadSeedPolicies() {
+// installDefaultPolicy registers the built-in fallback remediation policy.
+func (e *ForecastEngine) installDefaultPolicy() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Default fallback policy
 	defaultPolicy := domain.RemediationPolicy{
 		TenantID:                "default",
 		AutoPilotEnabled:        true,
@@ -76,18 +75,25 @@ func (e *ForecastEngine) loadSeedPolicies() {
 		UpdatedAt:               time.Now().UTC(),
 	}
 	e.policies["default"] = &defaultPolicy
+}
 
-	// Attempt reading seed configuration
+// LoadSeedPolicies adds remediation policies from a seed file, overriding the
+// built-in default for any tenant it lists.
+func (e *ForecastEngine) LoadSeedPolicies(path string) error {
 	var seeds []domain.RemediationPolicy
-	if err := common.LoadSeedFile("configs/forecast_seed.json", &seeds); err == nil {
-		for _, seed := range seeds {
-			s := seed
-			if s.UpdatedAt.IsZero() {
-				s.UpdatedAt = time.Now().UTC()
-			}
-			e.policies[s.TenantID] = &s
-		}
+	if err := common.LoadSeedFile(path, &seeds); err != nil {
+		return err
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, seed := range seeds {
+		s := seed
+		if s.UpdatedAt.IsZero() {
+			s.UpdatedAt = time.Now().UTC()
+		}
+		e.policies[s.TenantID] = &s
+	}
+	return nil
 }
 
 // GetPolicy retrieves a tenant's remediation policy or defaults.

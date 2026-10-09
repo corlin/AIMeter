@@ -40,10 +40,6 @@ func NewSandboxManager(seedPath string) *SandboxManager {
 		mgr.loadSeed(seedPath)
 	}
 
-	if len(mgr.executions) == 0 {
-		mgr.injectBaselineSeed()
-	}
-
 	mgr.recalculateStats()
 	return mgr
 }
@@ -67,34 +63,6 @@ func (m *SandboxManager) loadSeed(path string) {
 
 	m.stats = seed.Stats
 }
-
-func (m *SandboxManager) injectBaselineSeed() {
-	now := time.Now().UTC()
-	exec := &domain.SandboxExecutionRecord{
-		ID:                 "sbx-default-01",
-		TenantID:           "default",
-		SessionID:          "sess-default-01",
-		TraceID:            "trace-default-01",
-		AgentRole:          "CodeInterpreterAgent",
-		Runtime:            domain.SandboxRuntimeDocker,
-		CPU:                2,
-		RAMMB:              2048,
-		DurationMs:         4500,
-		ComputeCostUSD:     0.0012,
-		ToolName:           "code_interpreter",
-		ToolCostUSD:        0.0030,
-		LLMCostUSD:         0.0150,
-		TripartiteTotalUSD: 0.0192,
-		Status:             domain.SandboxStatusCompleted,
-		CodeSnippet:        "import math; print(math.sqrt(42))",
-		CreatedAt:          now.Add(-10 * time.Minute),
-	}
-
-	m.executions[exec.ID] = exec
-	m.executionOrder = append(m.executionOrder, exec.ID)
-	m.sessionSpend[exec.SessionID] += exec.TripartiteTotalUSD
-}
-
 func (m *SandboxManager) recalculateStats() {
 	var total int64
 	var active int64

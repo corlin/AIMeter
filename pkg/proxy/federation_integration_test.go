@@ -17,7 +17,7 @@ func TestProxyFederationEscrowIntegration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// 1. Initialize FederationManager with seed
-	fm := federation.NewFederationManager("configs/federation_seed.json")
+	fm := federation.NewFederationManager("configs/demo/federation_seed.json")
 	fbMgr := proxy.NewFallbackManager(nil, nil)
 	proxyH := proxy.NewProxyHandler(fbMgr, nil, nil)
 	proxyH.FederationManager = fm

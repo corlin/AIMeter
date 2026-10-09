@@ -20,6 +20,9 @@ func setupTestCoordinator(t *testing.T) (*ClusterCoordinator, *throttler.Throttl
 	dispatcher := alertPkg.NewAlertDispatcher(client)
 
 	coord := NewClusterCoordinator("hub-test", "us-east-1", true, throttlerEng, budgetMgr, dispatcher)
+	if err := coord.LoadSeedTopology("configs/demo/cluster_seed.json"); err != nil {
+		t.Fatalf("load seed topology: %v", err)
+	}
 	return coord, throttlerEng, budgetMgr
 }
 

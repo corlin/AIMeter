@@ -57,6 +57,7 @@ func TestProxyHeteroIntegration(t *testing.T) {
 		nil,
 		nil,
 		false,
+		api.WithSeedDir("configs/demo"),
 	)
 
 	// 1. Invoke chat completions with target URL pointed to upstream

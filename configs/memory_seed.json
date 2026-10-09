@@ -1,87 +1,15 @@
 {
   "policies": [
     {
-      "tenant_id": "default",
+      "auto_compaction": true,
       "enabled": true,
-      "max_hot_turns": 6,
-      "warm_compression_ratio": 0.25,
       "half_life_hours": 24.0,
-      "noise_threshold": 0.10,
+      "max_hot_turns": 6,
       "min_recall_utility_pct": 0.15,
-      "auto_compaction": true,
-      "updated_at": "2026-10-05T12:00:00Z"
-    },
-    {
-      "tenant_id": "fintech-corp",
-      "enabled": true,
-      "max_hot_turns": 4,
-      "warm_compression_ratio": 0.20,
-      "half_life_hours": 12.0,
-      "noise_threshold": 0.15,
-      "min_recall_utility_pct": 0.20,
-      "auto_compaction": true,
-      "updated_at": "2026-10-05T12:00:00Z"
-    }
-  ],
-  "seed_items": [
-    {
-      "id": "mem_seed_001",
+      "noise_threshold": 0.10,
       "tenant_id": "default",
-      "session_id": "sess_agent_demo_1",
-      "agent_name": "PlannerAgent",
-      "role": "user",
-      "content": "Project Requirement: We must strictly comply with EU AI Act and GDPR Article 17. The database port is 5432 and backup is daily at 02:00 UTC.",
-      "summary_content": "[Fact Memo] Compliance: EU AI Act & GDPR Art 17; DB: :5432; Daily Backup: 02:00 UTC",
-      "tier": "warm",
-      "tokens": 420,
-      "compressed_tokens": 95,
-      "estimated_spend_usd": 0.0084,
-      "saved_spend_usd": 0.0260,
-      "access_count": 8,
-      "utility_score": 0.88,
-      "is_noise": false,
-      "half_life_score": 0.94,
-      "created_at": "2026-10-05T08:30:00Z",
-      "last_accessed_at": "2026-10-05T11:45:00Z"
-    },
-    {
-      "id": "mem_seed_002",
-      "tenant_id": "default",
-      "session_id": "sess_agent_demo_1",
-      "agent_name": "CoderAgent",
-      "role": "assistant",
-      "content": "Sure! Here is the preliminary architecture design for the vector store indexing pipeline using HNSW and cosine similarity.",
-      "tier": "hot",
-      "tokens": 680,
-      "compressed_tokens": 680,
-      "estimated_spend_usd": 0.0136,
-      "saved_spend_usd": 0.0,
-      "access_count": 3,
-      "utility_score": 0.75,
-      "is_noise": false,
-      "half_life_score": 0.98,
-      "created_at": "2026-10-05T11:30:00Z",
-      "last_accessed_at": "2026-10-05T11:50:00Z"
-    },
-    {
-      "id": "mem_seed_003",
-      "tenant_id": "default",
-      "session_id": "sess_agent_demo_1",
-      "agent_name": "ReviewerAgent",
-      "role": "tool",
-      "content": "Tool Output: Tavily Search results returned 4,000 words of generic background history about relational databases from 1980 to 2010.",
-      "summary_content": "[Archived Cold] Search tool background history dump (1980-2010)",
-      "tier": "cold",
-      "tokens": 1250,
-      "compressed_tokens": 45,
-      "estimated_spend_usd": 0.0250,
-      "saved_spend_usd": 0.0964,
-      "access_count": 1,
-      "utility_score": 0.02,
-      "is_noise": true,
-      "half_life_score": 0.12,
-      "created_at": "2026-10-04T10:00:00Z",
-      "last_accessed_at": "2026-10-04T10:05:00Z"
+      "updated_at": "2026-10-05T12:00:00Z",
+      "warm_compression_ratio": 0.25
     }
   ]
 }

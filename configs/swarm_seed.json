@@ -1,22 +1,12 @@
 [
   {
-    "tenant_id": "default",
-    "enabled": true,
-    "max_ping_pong_turns": 3,
-    "max_cyclic_turns": 4,
     "break_prompt_text": "[System Intervention: Loop Detected] A recurring debate pattern between agents has been detected. You MUST synthesize the current consensus, stop raising open-ended questions, make a decisive executive conclusion, and end the conversation now.",
     "default_action": "break_prompt",
-    "max_total_turns": 25,
-    "updated_at": "2026-10-01T00:00:00Z"
-  },
-  {
-    "tenant_id": "finance-enterprise-1",
     "enabled": true,
-    "max_ping_pong_turns": 2,
-    "max_cyclic_turns": 3,
-    "break_prompt_text": "[Financial Audit Mandate: Deadlock Break] Strict compliance policy triggered. Cease recursive argumentation immediately, yield execution back to LeadAuditor, and provide audit outcome report.",
-    "default_action": "block",
-    "max_total_turns": 15,
-    "updated_at": "2026-10-02T10:00:00Z"
+    "max_cyclic_turns": 4,
+    "max_ping_pong_turns": 3,
+    "max_total_turns": 25,
+    "tenant_id": "default",
+    "updated_at": "2026-10-01T00:00:00Z"
   }
 ]
