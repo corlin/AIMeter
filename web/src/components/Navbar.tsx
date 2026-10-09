@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SystemStatus } from "./SystemStatus";
 import { useState, useRef, useEffect } from "react";
 import { 
   Activity, 
@@ -249,10 +250,7 @@ export function Navbar() {
 
         {/* Right Status Indicator & Mobile Hamburger */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Active Guard Online</span>
-          </div>
+          <SystemStatus />
 
           {/* Mobile Menu Button */}
           <button

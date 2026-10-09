@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
         source: "/api/v1/:path*",
         destination: `${backendUrl}/api/v1/:path*`,
       },
+      {
+        // Backend readiness probe, used by the console's status indicator.
+        source: "/api/status",
+        destination: `${backendUrl}/readyz`,
+      },
     ];
   },
 };

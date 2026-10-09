@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -125,12 +126,14 @@ func NewServer(
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()
 
-		components := gin.H{}
+		// Public probe: report component states only; error details go to the log.
+		components := gin.H{"postgres": "disabled"}
 		isReady := true
 
 		if pg != nil {
 			if err := pg.Ping(ctx); err != nil {
-				components["postgres"] = "unhealthy: " + err.Error()
+				log.Printf("[WARN readyz] postgres ping failed: %v", err)
+				components["postgres"] = "unhealthy"
 				isReady = false
 			} else {
 				components["postgres"] = "healthy"
@@ -139,16 +142,26 @@ func NewServer(
 
 		if store != nil {
 			if err := store.Ping(ctx); err != nil {
-				components["store"] = "unhealthy: " + err.Error()
+				log.Printf("[WARN readyz] store ping failed: %v", err)
+				components["store"] = "unhealthy"
 				isReady = false
 			} else {
 				components["store"] = "healthy"
 			}
 		}
 
+		// The service works without ClickHouse, but the usage/cost ledger then
+		// lives in memory only and is lost on restart.
+		_, persistent := store.(*storage.LedgerStore)
+		components["ledger"] = "memory"
+		if persistent {
+			components["ledger"] = "clickhouse"
+		}
+
 		if !isReady {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"status":     "not_ready",
+				"persistent": persistent,
 				"components": components,
 			})
 			return
@@ -156,6 +169,7 @@ func NewServer(
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":     "ready",
+			"persistent": persistent,
 			"components": components,
 		})
 	})

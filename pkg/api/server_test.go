@@ -42,6 +42,10 @@ func TestHealthAndMetricsEndpoints(t *testing.T) {
 	if !strings.Contains(w.Body.String(), `"status":"ready"`) {
 		t.Errorf("Expected status: ready in /readyz response, got: %s", w.Body.String())
 	}
+	// A MemoryStore ledger is reported as non-persistent so the console can warn.
+	if !strings.Contains(w.Body.String(), `"persistent":false`) || !strings.Contains(w.Body.String(), `"ledger":"memory"`) {
+		t.Errorf("Expected non-persistent memory ledger in /readyz response, got: %s", w.Body.String())
+	}
 
 	// 3. Test /health
 	w = httptest.NewRecorder()
