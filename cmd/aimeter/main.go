@@ -98,7 +98,7 @@ func main() {
 		}
 		for _, u := range usages {
 			if anom := anomalyDetector.InspectUsageEvent(&u); anom != nil {
-				_ = memStore.SaveAnomalyEvent(ctx, *anom)
+				_ = primaryStore.SaveAnomalyEvent(ctx, *anom)
 			}
 		}
 		log.Printf("[INFO Ingestion] Flushed batch of %d usage events, %d cost items", len(usages), len(costs))
@@ -116,7 +116,7 @@ func main() {
 	authSvc := auth.NewAuthService()
 
 	if *seedDemo {
-		seedDemoData(context.Background(), ratingEngine, budgetMgr, memStore, breakerMgr, authSvc, pgClient)
+		seedDemoData(context.Background(), ratingEngine, budgetMgr, primaryStore, breakerMgr, authSvc, pgClient)
 	}
 
 	// Bootstrap operator key: with auth enabled, the /api/v1 control plane

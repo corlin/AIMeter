@@ -12,6 +12,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ../migrations/clickhouse/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - ../migrations/clickhouse/002_operational_state.sql:/docker-entrypoint-initdb.d/002_operational_state.sql
     healthcheck:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 3s

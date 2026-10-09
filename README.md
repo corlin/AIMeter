@@ -369,6 +369,10 @@ docker compose -f deploy/docker-compose.yml up -d
 * Prometheus 指标：`http://localhost:8080/metrics`
 * K8s 存活 / 就绪探针：`http://localhost:8080/livez` / `http://localhost:8080/readyz`
 
+> **ClickHouse 迁移**：`migrations/clickhouse/*.sql` 仅在全新数据卷首次启动时由 Compose 自动执行。已有部署升级时需手动执行新增脚本，例如：
+> `docker exec -i aimeter-clickhouse clickhouse-client --multiquery < migrations/clickhouse/002_operational_state.sql`
+> 缺少新表时服务不会失败，异常事件与对账报告会退回内存存储并输出 `[WARN Ledger]` 日志。
+
 ### 2. 本地源码极速启动 (开发模式)
 ```bash
 # 启动依赖数据库

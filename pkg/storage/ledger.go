@@ -8,10 +8,11 @@ import (
 	"github.com/corlin/AIMeter/pkg/domain"
 )
 
-// LedgerStore makes ClickHouse the durable source for the usage/cost ledger
-// (overview and trace queries) while the embedded MemoryStore keeps serving
-// the remaining operational state (anomalies, breakers, reconciliations,
-// recommendations). Ledger reads fall back to memory if ClickHouse errors.
+// LedgerStore makes ClickHouse the durable source for the usage/cost ledger,
+// anomaly events and reconciliation reports. The embedded MemoryStore keeps a
+// copy of every write as fallback and serves short-lived runtime state
+// (circuit breakers, recommendations). Reads fall back to memory if ClickHouse
+// errors.
 type LedgerStore struct {
 	*MemoryStore
 	ch *ClickHouseClient
@@ -78,4 +79,43 @@ func (s *LedgerStore) GetUsageEvents(ctx context.Context, tenantID string) ([]do
 		return s.MemoryStore.GetUsageEvents(ctx, tenantID)
 	}
 	return events, nil
+}
+
+// SaveAnomalyEvent keeps the in-memory copy as fallback and persists to ClickHouse.
+func (s *LedgerStore) SaveAnomalyEvent(ctx context.Context, a domain.AnomalyEvent) error {
+	_ = s.MemoryStore.SaveAnomalyEvent(ctx, a)
+	return logWriteErr(s.ch.SaveAnomalyEvent(ctx, a))
+}
+
+func (s *LedgerStore) GetAnomalyEvents(ctx context.Context, tenantID string, limit int) ([]domain.AnomalyEvent, error) {
+	events, err := s.ch.GetAnomalyEvents(ctx, tenantID, limit)
+	if err != nil {
+		log.Printf("[WARN Ledger] ClickHouse anomaly events failed, serving in-memory state: %v", err)
+		return s.MemoryStore.GetAnomalyEvents(ctx, tenantID, limit)
+	}
+	return events, nil
+}
+
+// SaveReconciliationReport keeps the in-memory copy as fallback and persists to ClickHouse.
+func (s *LedgerStore) SaveReconciliationReport(ctx context.Context, r domain.ReconciliationReport) error {
+	_ = s.MemoryStore.SaveReconciliationReport(ctx, r)
+	return logWriteErr(s.ch.SaveReconciliationReport(ctx, r))
+}
+
+func (s *LedgerStore) GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error) {
+	reports, err := s.ch.GetReconciliationReports(ctx)
+	if err != nil {
+		log.Printf("[WARN Ledger] ClickHouse reconciliation reports failed, serving in-memory state: %v", err)
+		return s.MemoryStore.GetReconciliationReports(ctx)
+	}
+	return reports, nil
+}
+
+// logWriteErr logs ClickHouse write failures, since several callers discard
+// the error (the in-memory copy still serves reads until restart).
+func logWriteErr(err error) error {
+	if err != nil {
+		log.Printf("[WARN Ledger] ClickHouse write failed, kept in memory only: %v", err)
+	}
+	return err
 }

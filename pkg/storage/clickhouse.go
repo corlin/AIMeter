@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -505,4 +506,96 @@ func (c *ClickHouseClient) queryCostItems(ctx context.Context, where string, arg
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// SaveAnomalyEvent persists an anomaly detection (idempotent per ID).
+func (c *ClickHouseClient) SaveAnomalyEvent(ctx context.Context, a domain.AnomalyEvent) error {
+	if err := c.conn.Exec(ctx, `
+		INSERT INTO aimeter.anomaly_events
+			(id, triggered_at, tenant_id, workflow_id, trace_id, span_id, type, severity,
+			 title, description, metric_value, threshold_value)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.TriggeredAt, a.TenantID, a.WorkflowID, a.TraceID, a.SpanID, a.Type, a.Severity,
+		a.Title, a.Description, a.MetricValue, a.ThresholdValue,
+	); err != nil {
+		return fmt.Errorf("insert anomaly event failed: %w", err)
+	}
+	return nil
+}
+
+// GetAnomalyEvents lists the most recent anomalies for a tenant ("" or "all"
+// for every tenant); limit <= 0 returns all.
+func (c *ClickHouseClient) GetAnomalyEvents(ctx context.Context, tenantID string, limit int) ([]domain.AnomalyEvent, error) {
+	query := `
+		SELECT id, triggered_at, tenant_id, workflow_id, trace_id, span_id, type, severity,
+			title, description, metric_value, threshold_value
+		FROM aimeter.anomaly_events FINAL`
+	args := []any{}
+	if tenantID != "" && tenantID != "all" {
+		query += " WHERE tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	query += " ORDER BY triggered_at DESC"
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := c.conn.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query anomaly events failed: %w", err)
+	}
+	defer rows.Close()
+
+	events := []domain.AnomalyEvent{}
+	for rows.Next() {
+		var a domain.AnomalyEvent
+		if err := rows.Scan(&a.ID, &a.TriggeredAt, &a.TenantID, &a.WorkflowID, &a.TraceID, &a.SpanID,
+			&a.Type, &a.Severity, &a.Title, &a.Description, &a.MetricValue, &a.ThresholdValue); err != nil {
+			return nil, fmt.Errorf("scan anomaly event failed: %w", err)
+		}
+		events = append(events, a)
+	}
+	return events, rows.Err()
+}
+
+// SaveReconciliationReport persists a reconciliation report as JSON.
+func (c *ClickHouseClient) SaveReconciliationReport(ctx context.Context, r domain.ReconciliationReport) error {
+	body, err := json.Marshal(r)
+	if err != nil {
+		return fmt.Errorf("encode reconciliation report failed: %w", err)
+	}
+	if err := c.conn.Exec(ctx, `
+		INSERT INTO aimeter.reconciliation_reports
+			(id, created_at, billing_period, provider, status, report_json)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		r.ID, r.CreatedAt, r.BillingPeriod, r.Provider, r.Status, string(body),
+	); err != nil {
+		return fmt.Errorf("insert reconciliation report failed: %w", err)
+	}
+	return nil
+}
+
+// GetReconciliationReports lists reconciliation reports, newest first.
+func (c *ClickHouseClient) GetReconciliationReports(ctx context.Context) ([]domain.ReconciliationReport, error) {
+	rows, err := c.conn.Query(ctx, `
+		SELECT report_json FROM aimeter.reconciliation_reports FINAL
+		ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("query reconciliation reports failed: %w", err)
+	}
+	defer rows.Close()
+
+	reports := []domain.ReconciliationReport{}
+	for rows.Next() {
+		var body string
+		if err := rows.Scan(&body); err != nil {
+			return nil, fmt.Errorf("scan reconciliation report failed: %w", err)
+		}
+		var r domain.ReconciliationReport
+		if err := json.Unmarshal([]byte(body), &r); err != nil {
+			return nil, fmt.Errorf("decode reconciliation report failed: %w", err)
+		}
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
 }

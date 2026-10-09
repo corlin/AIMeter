@@ -107,3 +107,48 @@ func TestClickHouse_WriteThenRead(t *testing.T) {
 	assert.Equal(t, tenant, events[0].Attribution.TenantID)
 	assert.EqualValues(t, 120, events[0].LatencyMs)
 }
+
+func TestClickHouse_OperationalState(t *testing.T) {
+	ch := newTestClickHouse(t)
+	ctx := context.Background()
+	tenant := "it-" + uuid.NewString()[:8]
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	older := domain.AnomalyEvent{ID: uuid.New(), TenantID: tenant, Type: "spend_spike", Severity: "high",
+		Title: "older", MetricValue: 4.85, ThresholdValue: 1, TriggeredAt: now.Add(-time.Hour)}
+	newer := domain.AnomalyEvent{ID: uuid.New(), TenantID: tenant, Type: "runaway_loop", Severity: "critical",
+		Title: "newer", TraceID: "tr-1", TriggeredAt: now}
+	require.NoError(t, ch.SaveAnomalyEvent(ctx, older))
+	require.NoError(t, ch.SaveAnomalyEvent(ctx, newer))
+	require.NoError(t, ch.SaveAnomalyEvent(ctx, newer)) // re-insert must not duplicate
+
+	events, err := ch.GetAnomalyEvents(ctx, tenant, 0)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, "newer", events[0].Title)
+	assert.Equal(t, "tr-1", events[0].TraceID)
+	assert.InDelta(t, 4.85, events[1].MetricValue, 1e-9)
+
+	limited, err := ch.GetAnomalyEvents(ctx, tenant, 1)
+	require.NoError(t, err)
+	assert.Len(t, limited, 1)
+
+	report := domain.ReconciliationReport{
+		ID: uuid.New(), BillingPeriod: "2026-10", Provider: "openai", Status: "variance_detected",
+		ExpectedCostUSD: 100, ActualBilledUSD: 112.5, VarianceUSD: 12.5,
+		ModelDifferences: []domain.ModelDiff{{Model: "gpt-4o"}}, CreatedAt: now,
+	}
+	require.NoError(t, ch.SaveReconciliationReport(ctx, report))
+	reports, err := ch.GetReconciliationReports(ctx)
+	require.NoError(t, err)
+	var found *domain.ReconciliationReport
+	for i := range reports {
+		if reports[i].ID == report.ID {
+			found = &reports[i]
+		}
+	}
+	require.NotNil(t, found, "saved report not returned")
+	assert.InDelta(t, 12.5, found.VarianceUSD, 1e-9)
+	require.Len(t, found.ModelDifferences, 1)
+	assert.Equal(t, "gpt-4o", found.ModelDifferences[0].Model)
+}

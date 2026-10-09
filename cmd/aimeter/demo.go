@@ -21,7 +21,7 @@ func seedDemoData(
 	ctx context.Context,
 	ratingEngine *rater.RatingEngine,
 	budgetMgr *budget.BudgetManager,
-	memStore *storage.MemoryStore,
+	store storage.Store,
 	breakerMgr *guard.CircuitBreakerManager,
 	authSvc *auth.AuthService,
 	pgClient *storage.PostgresClient,
@@ -51,8 +51,8 @@ func seedDemoData(
 		CriticalThreshold: 1.00,
 	})
 
-	_ = memStore.SaveAnomalyEvent(ctx, domain.AnomalyEvent{
-		ID:             uuid.New(),
+	_ = store.SaveAnomalyEvent(ctx, domain.AnomalyEvent{
+		ID:             demoID("runaway-loop"),
 		TenantID:       "org-enterprise-1",
 		WorkflowID:     "contract-review-agent",
 		TraceID:        "trace-runaway-9812",
@@ -64,8 +64,8 @@ func seedDemoData(
 		ThresholdValue: 10,
 		TriggeredAt:    time.Now().Add(-15 * time.Minute),
 	})
-	_ = memStore.SaveAnomalyEvent(ctx, domain.AnomalyEvent{
-		ID:             uuid.New(),
+	_ = store.SaveAnomalyEvent(ctx, domain.AnomalyEvent{
+		ID:             demoID("spend-spike"),
 		TenantID:       "org-fintech-2",
 		WorkflowID:     "batch-sec-filings",
 		TraceID:        "trace-spike-4410",
@@ -90,4 +90,10 @@ func seedDemoData(
 	}); err == nil {
 		log.Printf("[INFO Demo] Demo API Key generated (Masked: %s)", demoKey.APIKey.KeyPrefix)
 	}
+}
+
+// demoID returns a stable UUID so re-running -seed-demo against a persistent
+// store replaces the demo rows instead of duplicating them.
+func demoID(name string) uuid.UUID {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("aimeter-demo/"+name))
 }
