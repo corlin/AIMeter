@@ -2,6 +2,7 @@ package advisor
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -65,10 +66,8 @@ func (a *CostAdvisor) analyzeCacheOpportunity(tenantID string, rollups []domain.
 		cacheHitRate := cachedInputTokens / totalInputTokens
 		if cacheHitRate < 0.40 {
 			// If cache hit rate is below 40%, caching could save ~50% of input costs
-			potentialMonthlySavings := unchachedInputSpend * 0.45 * 30.0 // extrapolated monthly
-			if potentialMonthlySavings < 15.0 {
-				potentialMonthlySavings = 45.0
-			}
+			// Caching typically saves ~45% of uncached input spend.
+			potentialMonthlySavings := monthly(rollups, unchachedInputSpend*0.45)
 
 			return &domain.CostRecommendation{
 				ID:                         uuid.New(),
@@ -104,10 +103,8 @@ func (a *CostAdvisor) analyzeModelDowngrades(tenantID string, rollups []domain.C
 
 	if gpt4oSpend > 0.05 || gpt4oRequests >= 3 {
 		// Replacing GPT-4o with GPT-4o-mini / DeepSeek V3 saves ~85%
-		monthlySavings := gpt4oSpend * 0.85 * 30.0
-		if monthlySavings < 25.0 {
-			monthlySavings = 120.0
-		}
+		// Moving routine calls to GPT-4o-mini / DeepSeek-V3 saves ~85%.
+		monthlySavings := monthly(rollups, gpt4oSpend*0.85)
 
 		return &domain.CostRecommendation{
 			ID:                         uuid.New(),
@@ -140,10 +137,8 @@ func (a *CostAdvisor) analyzeReasoningBudget(tenantID string, rollups []domain.C
 	}
 
 	if reasoningTokens > 5000 || reasoningSpend > 0.02 {
-		monthlySavings := reasoningSpend * 0.40 * 30.0
-		if monthlySavings < 20.0 {
-			monthlySavings = 85.0
-		}
+		// Bounding thinking tokens typically saves ~40% of reasoning spend.
+		monthlySavings := monthly(rollups, reasoningSpend*0.40)
 
 		return &domain.CostRecommendation{
 			ID:                         uuid.New(),
@@ -160,4 +155,19 @@ func (a *CostAdvisor) analyzeReasoningBudget(tenantID string, rollups []domain.C
 	}
 
 	return nil
+}
+
+// monthly converts an amount observed over the rollups' period into a 30-day
+// figure using the number of distinct days that actually have data. (The
+// previous code multiplied all-time totals by 30 as if they were one day, and
+// replaced small results with fixed minimums.)
+func monthly(rollups []domain.CostRollup, observed float64) float64 {
+	days := make(map[time.Time]struct{})
+	for _, r := range rollups {
+		days[r.Day] = struct{}{}
+	}
+	if len(days) == 0 {
+		return 0
+	}
+	return math.Round(observed/float64(len(days))*30*100) / 100
 }

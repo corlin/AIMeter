@@ -40,3 +40,28 @@ func TestCostAdvisorRecommendations(t *testing.T) {
 		t.Errorf("expected cache, downgrade and reasoning recommendations, got: %+v", recs)
 	}
 }
+
+// Savings are extrapolated from the observed daily rate, without minimum floors.
+func TestRecommendationSavingsUseObservedDailyRate(t *testing.T) {
+	d1 := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	d2 := d1.AddDate(0, 0, 1)
+	// $0.10 of gpt-4o spend over two observed days -> $0.05/day.
+	rollups := []domain.CostRollup{
+		{Day: d1, Model: "gpt-4o", MeterName: domain.MeterLLMInputToken, EffectiveCost: 0.06, Items: 2},
+		{Day: d2, Model: "gpt-4o", MeterName: domain.MeterLLMInputToken, EffectiveCost: 0.04, Items: 2},
+	}
+	var downgrade *domain.CostRecommendation
+	for _, r := range NewCostAdvisor().GenerateRecommendations("t", rollups) {
+		if r.Category == "model_downgrade" {
+			rec := r
+			downgrade = &rec
+		}
+	}
+	if downgrade == nil {
+		t.Fatal("expected a model_downgrade recommendation")
+	}
+	// 85% of $0.05/day over 30 days = $1.275 -> 1.28 (previously floored to $120).
+	if downgrade.EstimatedMonthlySavingsUSD != 1.28 {
+		t.Errorf("expected $1.28 monthly savings, got %v", downgrade.EstimatedMonthlySavingsUSD)
+	}
+}
