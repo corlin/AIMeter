@@ -30,6 +30,7 @@ type ForecastEngine struct {
 	policies          map[string]*domain.RemediationPolicy
 	statuses          map[string]*domain.RemediationStatus
 	cachedProjections map[string]*domain.ForecastProjection
+	now               func() time.Time // injectable clock for tests
 }
 
 // NewForecastEngine constructs a new ForecastEngine and loads seed policies.
@@ -51,6 +52,7 @@ func NewForecastEngine(
 		policies:          make(map[string]*domain.RemediationPolicy),
 		statuses:          make(map[string]*domain.RemediationStatus),
 		cachedProjections: make(map[string]*domain.ForecastProjection),
+		now:               time.Now,
 	}
 
 	e.installDefaultPolicy()
@@ -192,7 +194,7 @@ func (e *ForecastEngine) ListStatuses() []domain.RemediationStatus {
 
 // PredictTenant computes mathematical forecast projection and breach estimation for a tenant.
 func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period string) (*domain.ForecastProjection, error) {
-	now := time.Now().UTC()
+	now := e.now().UTC()
 	year, month, currentDay := now.Date()
 	daysInMonth := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 
@@ -236,23 +238,39 @@ func (e *ForecastEngine) PredictTenant(ctx context.Context, tenantID, period str
 		}
 	}
 
-	// With fewer than 3 observed days there is no meaningful daily trend: days
-	// without data fall back to the real run-rate (tracked spend / elapsed days)
-	// below, and the projection is flagged as a run-rate estimate. Nothing is
-	// synthesised: a tenant with no spend projects $0.
+	// With fewer than 3 observed days there is no meaningful daily trend and
+	// the projection is flagged as a run-rate estimate. Nothing is synthesised:
+	// a tenant with no spend projects $0.
 	observedDays := len(dailySpends)
 	insufficientData := observedDays < 3
+
+	// Spend tracked by the budget manager but absent from the ledger (e.g. from
+	// before ClickHouse was connected) is real but not attributed to a day: it
+	// is spread evenly over the days without ledger data, so month-to-date
+	// actual spend matches the tracked total.
+	var ledgerTotal float64
+	missingDays := 0
+	for d := 1; d <= currentDay; d++ {
+		ledgerTotal += dailySpends[d]
+		if dailySpends[d] <= 0 {
+			missingDays++
+		}
+	}
+	if gap := currentSpend - ledgerTotal; gap > 0 && missingDays > 0 {
+		perDay := gap / float64(missingDays)
+		for d := 1; d <= currentDay; d++ {
+			if dailySpends[d] <= 0 {
+				dailySpends[d] = perDay
+			}
+		}
+	}
 
 	// 3. Compute EWMA & Ordinary Least Squares (OLS) Slope on daily spend
 	historyDays := make([]float64, 0, currentDay)
 	historyValues := make([]float64, 0, currentDay)
 	for d := 1; d <= currentDay; d++ {
-		val := dailySpends[d]
-		if val <= 0 {
-			val = currentSpend / float64(currentDay)
-		}
 		historyDays = append(historyDays, float64(d))
-		historyValues = append(historyValues, val)
+		historyValues = append(historyValues, dailySpends[d])
 	}
 
 	ewmaVal := computeEWMA(historyValues, 0.35)

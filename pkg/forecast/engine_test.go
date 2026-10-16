@@ -92,6 +92,7 @@ func TestPolicyCRUD(t *testing.T) {
 
 func TestPredictTenantAndBreach(t *testing.T) {
 	eng, budgetMgr, _ := setupTestEngine(t)
+	eng.now = func() time.Time { return time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC) }
 	ctx := context.Background()
 
 	// Seed a budget rule of $200 for tenant-alpha
@@ -324,5 +325,33 @@ func TestRemediationSavingsDerivedFromProjection(t *testing.T) {
 	want := math.Round(proj.ProjectedSpendUSD*0.45*100) / 100
 	if st.EstimatedSavingsUSD != want {
 		t.Errorf("expected savings %v (45%% of projected %v), got %v", want, proj.ProjectedSpendUSD, st.EstimatedSavingsUSD)
+	}
+}
+
+// Whatever the day of the month, the month-to-date actual equals the tracked
+// spend and the projection never falls below it (regression: spend tracked by
+// the budget manager but missing from the ledger was dropped from history).
+func TestProjectionNeverBelowTrackedSpend(t *testing.T) {
+	for _, day := range []int{1, 2, 15, 24, 31} {
+		eng, budgetMgr, _ := setupTestEngine(t)
+		eng.now = func() time.Time { return time.Date(2026, 10, day, 12, 0, 0, 0, time.UTC) }
+		budgetMgr.UpsertBudget(domain.BudgetRule{ID: uuid.New(), TenantID: "tenant-x", MonthlyLimitUSD: 1000, CurrentSpendUSD: 150})
+
+		proj, err := eng.PredictTenant(context.Background(), "tenant-x", "current")
+		if err != nil {
+			t.Fatalf("day %d: PredictTenant: %v", day, err)
+		}
+		var mtd float64
+		for _, p := range proj.DataPoints {
+			if !p.IsProjected {
+				mtd = p.ActualSpendUSD
+			}
+		}
+		if math.Abs(mtd-150) > 0.01 {
+			t.Errorf("day %d: month-to-date actual = %v, want 150", day, mtd)
+		}
+		if proj.ProjectedSpendUSD+0.01 < 150 {
+			t.Errorf("day %d: projected %v below tracked spend 150", day, proj.ProjectedSpendUSD)
+		}
 	}
 }
