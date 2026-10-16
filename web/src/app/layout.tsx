@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Suspense } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { FeedbackHost } from "@/components/FeedbackHost";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
@@ -27,6 +28,7 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <AuthGate>{children}</AuthGate>
           </Suspense>
+          <FeedbackHost />
         </main>
       </body>
     </html>

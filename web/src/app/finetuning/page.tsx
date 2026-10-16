@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -139,7 +140,7 @@ export default function FineTuningPage() {
       setShowJobModal(false);
       loadAllData();
     } catch (err: any) {
-      alert("创建任务失败: " + err.message);
+      notify("创建任务失败: " + err.message);
     }
   };
 
@@ -150,7 +151,7 @@ export default function FineTuningPage() {
       setShowAdapterModal(false);
       loadAllData();
     } catch (err: any) {
-      alert("注册 LoRA 资产失败: " + err.message);
+      notify("注册 LoRA 资产失败: " + err.message);
     }
   };
 

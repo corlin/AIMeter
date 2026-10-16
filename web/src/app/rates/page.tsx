@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 
 import { useEffect, useState } from "react";
 import { 
@@ -140,7 +141,7 @@ export default function RateCatalogPage() {
       setNewGPUType("");
       setNewDesc("");
     } catch (err) {
-      alert("Failed to save GPU profile: " + err);
+      notify("Failed to save GPU profile: " + err);
     }
   };
 

@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction, notify } from "@/lib/feedback";
 
 import { useState, useEffect } from "react";
 import {
@@ -178,20 +179,20 @@ export default function HierarchyPage() {
       await loadData();
     } catch (err) {
       console.error("Failed to save node:", err);
-      alert("保存节点配置失败: " + err);
+      notify("保存节点配置失败: " + err);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteNode = async (node: OrgNode) => {
-    if (!confirm(`确定要删除组织节点 "${node.name}" (${node.path}) 吗？`)) return;
+    if (!(await confirmAction(`确定要删除组织节点 "${node.name}" (${node.path}) 吗？`))) return;
     try {
       await deleteHierarchyNode(node.id);
       await loadData();
     } catch (err) {
       console.error("Failed to delete node:", err);
-      alert("删除失败: " + err);
+      notify("删除失败: " + err);
     }
   };
 
@@ -203,7 +204,7 @@ export default function HierarchyPage() {
       setCheckResult(res);
     } catch (err) {
       console.error("Budget check failed:", err);
-      alert("预检失败: " + err);
+      notify("预检失败: " + err);
     } finally {
       setIsChecking(false);
     }
@@ -223,7 +224,7 @@ export default function HierarchyPage() {
       setSimResult(res);
     } catch (err) {
       console.error("Simulation failed:", err);
-      alert("推演失败: " + err);
+      notify("推演失败: " + err);
     } finally {
       setIsSimulating(false);
     }

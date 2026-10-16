@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -77,7 +78,7 @@ export default function PromptCompressionPage() {
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "保存失败";
-      alert(`保存失败: ${msg}`);
+      notify(`保存失败: ${msg}`);
     } finally {
       setSavingPolicy(false);
     }
@@ -133,7 +134,7 @@ export default function PromptCompressionPage() {
       setSimResult(res);
     } catch (err) {
       console.error(err);
-      alert("仿真请求失败，请检查网络或后端状态。");
+      notify("仿真请求失败，请检查网络或后端状态。");
     } finally {
       setSimulating(false);
     }

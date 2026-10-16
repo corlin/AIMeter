@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -127,7 +128,7 @@ export default function WorkflowsPage() {
       // Reload instances
       await loadData();
     } catch (err: any) {
-      alert(`续算失败: ${err.message}`);
+      notify(`续算失败: ${err.message}`);
     } finally {
       setIsResuming(false);
     }

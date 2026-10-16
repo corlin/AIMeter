@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction, notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -114,19 +115,19 @@ export default function MultimodalPage() {
       });
       await loadData();
     } catch (err) {
-      alert("保存工具费率失败: " + err);
+      notify("保存工具费率失败: " + err);
     } finally {
       setModalSaving(false);
     }
   };
 
   const handleDeleteTool = async (name: string) => {
-    if (!confirm(`确定要移除工具【${name}】的计费费率配置吗？`)) return;
+    if (!(await confirmAction(`确定要移除工具【${name}】的计费费率配置吗？`))) return;
     try {
       await deleteToolRate(name);
       await loadData();
     } catch (err) {
-      alert("删除失败: " + err);
+      notify("删除失败: " + err);
     }
   };
 
@@ -153,7 +154,7 @@ export default function MultimodalPage() {
       });
       setSimResult(res);
     } catch (err) {
-      alert("仿真计算失败: " + err);
+      notify("仿真计算失败: " + err);
     } finally {
       setSimulating(false);
     }

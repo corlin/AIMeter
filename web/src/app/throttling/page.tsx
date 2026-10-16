@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction, notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -124,19 +125,19 @@ export default function ThrottlingPage() {
       setShowModal(false);
       await loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save policy");
+      notify(err instanceof Error ? err.message : "Failed to save policy");
     } finally {
       setModalSaving(false);
     }
   };
 
   const handleDeletePolicy = async (id: string) => {
-    if (!confirm(`Are you sure you want to delete policy ${id}?`)) return;
+    if (!(await confirmAction(`Are you sure you want to delete policy ${id}?`))) return;
     try {
       await deleteThrottlingPolicy(id);
       await loadData();
     } catch (err) {
-      alert("Failed to delete policy");
+      notify("Failed to delete policy");
     }
   };
 
@@ -152,7 +153,7 @@ export default function ThrottlingPage() {
       const res = await simulateThrottling(req);
       setSimResult(res);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Simulation failed");
+      notify(err instanceof Error ? err.message : "Simulation failed");
     } finally {
       setSimulating(false);
     }

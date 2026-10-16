@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
@@ -139,7 +140,7 @@ export default function ExperimentsPage() {
       setPromoteNotice(`Variant ${winnerId} successfully promoted to 100% production traffic!`);
       await loadData();
     } catch (err: any) {
-      alert(`Promote failed: ${err.message}`);
+      notify(`Promote failed: ${err.message}`);
     } finally {
       setPromoting(false);
     }
@@ -160,7 +161,7 @@ export default function ExperimentsPage() {
       setTimeout(() => setFeedbackSuccess(null), 3000);
       await loadData();
     } catch (err: any) {
-      alert(`Feedback error: ${err.message}`);
+      notify(`Feedback error: ${err.message}`);
     }
   };
 
@@ -218,7 +219,7 @@ export default function ExperimentsPage() {
       setShowCreateModal(false);
       await loadData();
     } catch (err: any) {
-      alert(`Create error: ${err.message}`);
+      notify(`Create error: ${err.message}`);
     } finally {
       setCreating(false);
     }
@@ -236,7 +237,7 @@ export default function ExperimentsPage() {
       });
       setSimResult(res);
     } catch (err: any) {
-      alert(`Simulation failed: ${err.message}`);
+      notify(`Simulation failed: ${err.message}`);
     } finally {
       setSimulating(false);
     }

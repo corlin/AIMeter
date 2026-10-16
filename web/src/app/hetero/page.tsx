@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -137,7 +138,7 @@ export default function HeteroPage() {
       setSelectedNode(null);
       await loadData();
     } catch (err: any) {
-      alert("更新节点显存配置失败: " + err.message);
+      notify("更新节点显存配置失败: " + err.message);
     }
   };
 
@@ -149,7 +150,7 @@ export default function HeteroPage() {
       setShowAddNodeModal(false);
       await loadData();
     } catch (err: any) {
-      alert("创建节点失败: " + err.message);
+      notify("创建节点失败: " + err.message);
     }
   };
 
@@ -161,7 +162,7 @@ export default function HeteroPage() {
       const res = await dispatchHeteroRequest(dispatchForm);
       setDispatchResult(res);
     } catch (err: any) {
-      alert("调度评估失败: " + err.message);
+      notify("调度评估失败: " + err.message);
     } finally {
       setEvaluating(false);
     }
@@ -175,7 +176,7 @@ export default function HeteroPage() {
       const res = await simulateHeteroSandbox(simForm);
       setSimResponse(res);
     } catch (err: any) {
-      alert("推演失败: " + err.message);
+      notify("推演失败: " + err.message);
     } finally {
       setSimulating(false);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 
 function generateHeartbeatMetrics() {
   return {
@@ -163,7 +164,7 @@ export default function ClusteringPage() {
       setShowRegisterModal(false);
       await loadData();
     } catch (err: any) {
-      alert(`Registration failed: ${err.message}`);
+      notify(`Registration failed: ${err.message}`);
     } finally {
       setRegistering(false);
     }
@@ -181,7 +182,7 @@ export default function ClusteringPage() {
       });
       setSimResult(res);
     } catch (err: any) {
-      alert(`Simulation failed: ${err.message}`);
+      notify(`Simulation failed: ${err.message}`);
     } finally {
       setSimulating(false);
     }

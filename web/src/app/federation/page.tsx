@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction, notify } from "@/lib/feedback";
 
 import { useState, useEffect } from "react";
 import {
@@ -133,7 +134,7 @@ export default function FederationPage() {
       await loadData();
     } catch (err) {
       console.error("Failed to create task:", err);
-      alert("发布任务失败: " + err);
+      notify("发布任务失败: " + err);
     } finally {
       setIsCreatingTask(false);
     }
@@ -153,7 +154,7 @@ export default function FederationPage() {
       await loadData();
     } catch (err) {
       console.error("Failed to save workspace:", err);
-      alert("创建工作区失败: " + err);
+      notify("创建工作区失败: " + err);
     } finally {
       setIsSavingWs(false);
     }
@@ -174,7 +175,7 @@ export default function FederationPage() {
       await loadData();
     } catch (err) {
       console.error("Failed to submit bid:", err);
-      alert("提交竞标失败: " + err);
+      notify("提交竞标失败: " + err);
     } finally {
       setIsSubmittingBid(false);
     }
@@ -183,7 +184,7 @@ export default function FederationPage() {
   const handleFinalizeTask = async (accept: boolean) => {
     if (!selectedTask || !selectedTask.voucher_id) return;
     const actionLabel = accept ? "验收清算" : "违约争议仲裁";
-    if (!confirm(`确定要对任务 "${selectedTask.title}" 执行两阶段 ${actionLabel} 吗？`)) return;
+    if (!(await confirmAction(`确定要对任务 "${selectedTask.title}" 执行两阶段 ${actionLabel} 吗？`))) return;
     try {
       await finalizeFederationTask(selectedTask.id, {
         voucher_id: selectedTask.voucher_id,
@@ -195,7 +196,7 @@ export default function FederationPage() {
       await loadData();
     } catch (err) {
       console.error("Failed to finalize task:", err);
-      alert("清算执行失败: " + err);
+      notify("清算执行失败: " + err);
     }
   };
 
@@ -213,7 +214,7 @@ export default function FederationPage() {
       setSimResult(res);
     } catch (err) {
       console.error("Simulation failed:", err);
-      alert("推演失败: " + err);
+      notify("推演失败: " + err);
     } finally {
       setIsSimulating(false);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -101,7 +102,7 @@ export default function PrivacyDLPPage() {
       const newStats = await fetchDLPStats(selectedTenant);
       setStats(newStats);
     } catch (err) {
-      alert("保存策略失败: " + (err instanceof Error ? err.message : String(err)));
+      notify("保存策略失败: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSaving(false);
     }
@@ -137,7 +138,7 @@ export default function PrivacyDLPPage() {
       });
       setSimResult(res);
     } catch (err) {
-      alert("仿真嗅探失败: " + (err instanceof Error ? err.message : String(err)));
+      notify("仿真嗅探失败: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSimulating(false);
     }

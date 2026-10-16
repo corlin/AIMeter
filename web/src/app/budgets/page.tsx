@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction, notify } from "@/lib/feedback";
 
 import { useEffect, useState } from "react";
 import { 
@@ -126,7 +127,7 @@ export default function BudgetsPage() {
       setTimeout(() => setCappingSuccessMsg(null), 4000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "保存失败";
-      alert(`保存失败: ${msg}`);
+      notify(`保存失败: ${msg}`);
     } finally {
       setSavingCapping(false);
     }
@@ -207,7 +208,7 @@ export default function BudgetsPage() {
   };
 
   const handleDeleteChannel = async (id: string) => {
-    if (!confirm("确定要删除该告警通道吗？")) return;
+    if (!(await confirmAction("确定要删除该告警通道吗？"))) return;
     await deleteAlertChannel(id);
     await loadData();
   };

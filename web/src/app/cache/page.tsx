@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -115,7 +116,7 @@ export default function SemanticCachePage() {
   };
 
   const handleClearCache = async () => {
-    if (!window.confirm(`确定要清空租户 [${selectedTenant}] 的所有缓存条目吗？此操作不可逆。`)) {
+    if (!(await confirmAction(`确定要清空租户 [${selectedTenant}] 的所有缓存条目吗？此操作不可逆。`))) {
       return;
     }
     await clearCacheEntries(selectedTenant);

@@ -1,4 +1,5 @@
 "use client";
+import { confirmAction, notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -97,7 +98,7 @@ export default function ApiKeysPage() {
       loadData();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "创建失败";
-      alert("创建失败: " + message);
+      notify("创建失败: " + message);
     } finally {
       setSubmitting(false);
     }
@@ -112,7 +113,7 @@ export default function ApiKeysPage() {
   };
 
   const handleRevoke = async (id: string, name: string) => {
-    if (!confirm(`确定要彻底吊销 API Key [${name}] 吗？吊销后将永久失效且无法恢复！`)) return;
+    if (!(await confirmAction(`确定要彻底吊销 API Key [${name}] 吗？吊销后将永久失效且无法恢复！`))) return;
     const ok = await revokeAPIKey(id);
     if (ok) {
       setKeys(keys.map(k => k.id === id ? { ...k, status: "revoked" } : k));

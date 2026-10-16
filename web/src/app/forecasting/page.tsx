@@ -1,4 +1,5 @@
 "use client";
+import { notify } from "@/lib/feedback";
 import { TenantSelect } from "@/components/TenantSelect";
 import { useTenantFilter } from "@/lib/filters";
 
@@ -119,7 +120,7 @@ export default function ForecastingPage() {
       await applyRemediation(tenantId, level, reason);
       await loadData();
     } catch (err) {
-      alert("Failed to apply remediation: " + (err as Error).message);
+      notify("Failed to apply remediation: " + (err as Error).message);
     }
   };
 
@@ -136,7 +137,7 @@ export default function ForecastingPage() {
       const res = await simulateForecast(req);
       setSimResult(res);
     } catch (err) {
-      alert("Simulation failed: " + (err as Error).message);
+      notify("Simulation failed: " + (err as Error).message);
     } finally {
       setSimulating(false);
     }
@@ -150,7 +151,7 @@ export default function ForecastingPage() {
       setShowPolicyModal(false);
       await loadData();
     } catch (err) {
-      alert("Failed to save policy: " + (err as Error).message);
+      notify("Failed to save policy: " + (err as Error).message);
     } finally {
       setPolicySaving(false);
     }
