@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Suspense } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { FeedbackHost } from "@/components/FeedbackHost";
+import { CommandPalette } from "@/components/CommandPalette";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
@@ -27,6 +28,7 @@ export default function RootLayout({
           {/* Pages read shared filters from the URL (useSearchParams), which needs a Suspense boundary */}
           <Suspense fallback={null}>
             <AuthGate>{children}</AuthGate>
+            <CommandPalette />
           </Suspense>
           <FeedbackHost />
         </main>
