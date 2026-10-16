@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import {
@@ -40,7 +42,7 @@ import {
 } from "@/types";
 
 export default function SandboxesPage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [activeTab, setActiveTab] = useState<"executions" | "tools" | "simulation">("executions");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -166,16 +168,7 @@ export default function SandboxesPage() {
         </div>
 
         <div className="flex items-center gap-3 self-end md:self-auto">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/50"
-          >
-            <option value="all">全量租户 (All Tenants)</option>
-            <option value="fintech-corp">fintech-corp (量化金融)</option>
-            <option value="sec-ops">sec-ops (安全合规)</option>
-            <option value="default">default (默认组织)</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

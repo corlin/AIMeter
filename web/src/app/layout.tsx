@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { Suspense } from "react";
 import { AuthGate } from "@/components/AuthGate";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -22,7 +23,10 @@ export default function RootLayout({
       <body className={`${inter.variable} ${mono.variable} font-sans bg-zinc-950 text-zinc-100 min-h-screen antialiased flex flex-col`}>
         <Navbar />
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <AuthGate>{children}</AuthGate>
+          {/* Pages read shared filters from the URL (useSearchParams), which needs a Suspense boundary */}
+          <Suspense fallback={null}>
+            <AuthGate>{children}</AuthGate>
+          </Suspense>
         </main>
       </body>
     </html>

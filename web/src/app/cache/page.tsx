@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useEffect, useState, useCallback } from "react";
 import { 
@@ -33,7 +35,7 @@ import {
 } from "@/types";
 
 export default function SemanticCachePage() {
-  const [selectedTenant, setSelectedTenant] = useState("default");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("default");
   const [loading, setLoading] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [policyMessage, setPolicyMessage] = useState("");
@@ -167,16 +169,7 @@ export default function SemanticCachePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700 text-xs text-white rounded-lg px-3 py-2 outline-none focus:border-emerald-500"
-          >
-            <option value="default">租户: Default</option>
-            <option value="tenant-prod">租户: Production</option>
-            <option value="tenant-staging">租户: Staging</option>
-            <option value="all">全部租户 (汇总视图)</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

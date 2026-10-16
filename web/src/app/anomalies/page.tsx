@@ -1,8 +1,10 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
-import { fetchAnomalies, fetchTenants } from "@/lib/api";
-import { AnomalyEvent, Tenant } from "@/types";
+import { fetchAnomalies } from "@/lib/api";
+import { AnomalyEvent } from "@/types";
 import { 
   ShieldAlert, 
   AlertTriangle, 
@@ -17,20 +19,15 @@ import {
 
 export default function AnomaliesPage() {
   const [anomalies, setAnomalies] = useState<AnomalyEvent[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [anomData, tenantData] = await Promise.all([
-        fetchAnomalies(selectedTenant),
-        fetchTenants(),
-      ]);
+      const anomData = await fetchAnomalies(selectedTenant);
       setAnomalies(anomData);
-      setTenants(tenantData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -98,18 +95,7 @@ export default function AnomaliesPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-700 font-medium"
-          >
-            <option value="all">All Tenants / Orgs</option>
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.id})
-              </option>
-            ))}
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

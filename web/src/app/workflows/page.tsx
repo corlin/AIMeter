@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import {
@@ -41,7 +43,7 @@ import {
 } from "@/types";
 
 export default function WorkflowsPage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [activeTab, setActiveTab] = useState<"dag" | "instances" | "sandbox">("dag");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -230,16 +232,7 @@ export default function WorkflowsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-sm rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors"
-          >
-            <option value="all">所有租户 (All Tenants)</option>
-            <option value="fintech-corp">fintech-corp</option>
-            <option value="sec-ops">sec-ops</option>
-            <option value="default">default</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

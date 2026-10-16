@@ -1,16 +1,16 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useEffect, useState } from "react";
 import { 
   fetchPromptCompressionPolicy, 
   upsertPromptCompressionPolicy, 
-  simulatePromptCompression, 
-  fetchTenants 
+  simulatePromptCompression 
 } from "@/lib/api";
 import { 
   PromptCompressionPolicy, 
   PromptCompressionSimulateResponse, 
-  Tenant, 
   ChatMessageItem 
 } from "@/types";
 import { 
@@ -29,8 +29,7 @@ import {
 } from "lucide-react";
 
 export default function PromptCompressionPage() {
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState<string>("tenant-default");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("tenant-default");
   const [policy, setPolicy] = useState<PromptCompressionPolicy | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
@@ -50,18 +49,6 @@ export default function PromptCompressionPage() {
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<PromptCompressionSimulateResponse | null>(null);
 
-  // Load tenants & default policy
-  useEffect(() => {
-    async function init() {
-      try {
-        const tList = await fetchTenants();
-        setTenants(tList);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    init();
-  }, []);
 
   useEffect(() => {
     async function loadPolicy() {
@@ -202,18 +189,7 @@ export default function PromptCompressionPage() {
                 <Sliders className="h-4 w-4 text-emerald-400" />
                 <h3 className="text-sm font-semibold text-white">租户瘦身策略 (Tenant Rules)</h3>
               </div>
-              <select
-                value={selectedTenant}
-                onChange={(e) => setSelectedTenant(e.target.value)}
-                className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-zinc-700"
-              >
-                <option value="tenant-default">tenant-default</option>
-                {tenants.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.id})
-                  </option>
-                ))}
-              </select>
+              <TenantSelect value={selectedTenant} onChange={setSelectedTenant} allowAll={false} />
             </div>
 
             {saveSuccessMsg && (

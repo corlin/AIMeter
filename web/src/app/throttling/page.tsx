@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useEffect, useState, useCallback } from "react";
 import { 
@@ -34,7 +36,7 @@ import {
 } from "@/types";
 
 export default function ThrottlingPage() {
-  const [selectedTenant, setSelectedTenant] = useState("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"policies" | "simulate">("policies");
 
@@ -181,16 +183,7 @@ export default function ThrottlingPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-emerald-500"
-          >
-            <option value="all">All Tenants (全局监控)</option>
-            <option value="default">Default Tenant</option>
-            <option value="enterprise">Enterprise Tier</option>
-            <option value="free">Free Tier</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

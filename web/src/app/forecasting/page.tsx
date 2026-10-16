@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { 
@@ -41,7 +43,7 @@ import {
 } from "@/types";
 
 export default function ForecastingPage() {
-  const [selectedTenant, setSelectedTenant] = useState("default");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("default");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"projection" | "remediation" | "simulate">("projection");
 
@@ -307,16 +309,7 @@ export default function ForecastingPage() {
           <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-300">
             <Layers className="w-4 h-4 text-zinc-400" />
             <span className="text-zinc-500">租户:</span>
-            <select
-              value={selectedTenant}
-              onChange={(e) => setSelectedTenant(e.target.value)}
-              className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
-            >
-              <option value="default" className="bg-zinc-900">default</option>
-              <option value="org-corp-enterprise" className="bg-zinc-900">org-corp-enterprise</option>
-              <option value="tenant-batch-processing" className="bg-zinc-900">tenant-batch-processing</option>
-              <option value="all" className="bg-zinc-900">全部租户 (All)</option>
-            </select>
+            <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
           </div>
 
           <button

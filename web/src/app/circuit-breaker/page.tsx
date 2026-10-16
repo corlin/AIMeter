@@ -1,8 +1,10 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
-import { fetchCircuitBreakers, resetCircuitBreaker, checkGuard, fetchTenants } from "@/lib/api";
-import { CircuitBreakerRecord, GuardCheckResponse, Tenant } from "@/types";
+import { fetchCircuitBreakers, resetCircuitBreaker, checkGuard } from "@/lib/api";
+import { CircuitBreakerRecord, GuardCheckResponse } from "@/types";
 import { 
   ZapOff, 
   ShieldCheck, 
@@ -19,8 +21,7 @@ import {
 
 export default function CircuitBreakerPage() {
   const [breakers, setBreakers] = useState<CircuitBreakerRecord[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [loading, setLoading] = useState(true);
   const [resettingKey, setResettingKey] = useState<string | null>(null);
 
@@ -35,12 +36,8 @@ export default function CircuitBreakerPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [bData, tData] = await Promise.all([
-        fetchCircuitBreakers(selectedTenant),
-        fetchTenants(),
-      ]);
+      const bData = await fetchCircuitBreakers(selectedTenant);
       setBreakers(bData);
-      setTenants(tData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -128,18 +125,7 @@ export default function CircuitBreakerPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-700 font-medium"
-          >
-            <option value="all">All Tenants / Orgs</option>
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.id})
-              </option>
-            ))}
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

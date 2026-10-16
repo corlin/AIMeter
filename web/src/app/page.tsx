@@ -1,8 +1,10 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter, useRangeFilter } from "@/lib/filters";
 
 import { useEffect, useState } from "react";
-import { fetchOverviewStats, fetchTraces, fetchTenants } from "@/lib/api";
-import { OverviewStats, TraceDetail, Tenant } from "@/types";
+import { fetchOverviewStats, fetchTraces } from "@/lib/api";
+import { OverviewStats, TraceDetail } from "@/types";
 import { StatCard } from "@/components/StatCard";
 import { AttentionPanel } from "@/components/AttentionPanel";
 import Link from "next/link";
@@ -22,22 +24,19 @@ import {
 export default function OverviewPage() {
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [traces, setTraces] = useState<TraceDetail[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState("all");
-  const [timeRange, setTimeRange] = useState("7d");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
+  const [timeRange, setTimeRange] = useRangeFilter("7d");
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sData, tData, tenData] = await Promise.all([
+      const [sData, tData] = await Promise.all([
         fetchOverviewStats(selectedTenant, timeRange),
         fetchTraces(selectedTenant, 5),
-        fetchTenants(),
       ]);
       setStats(sData);
       setTraces(Array.isArray(tData) ? tData : []);
-      setTenants(Array.isArray(tenData) ? tenData : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -49,7 +48,6 @@ export default function OverviewPage() {
     loadData();
   }, [selectedTenant, timeRange]);
 
-  const safeTenants = Array.isArray(tenants) ? tenants : [];
   const safeTraces = Array.isArray(traces) ? traces : [];
   const safeTopModels = stats && Array.isArray(stats.top_models) ? stats.top_models : [];
   const safeTopAgents = stats && Array.isArray(stats.top_agents) ? stats.top_agents : [];
@@ -67,18 +65,7 @@ export default function OverviewPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Tenant Selector */}
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="min-w-0 max-w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-700"
-          >
-            <option value="all">All Tenants / Orgs</option>
-            {safeTenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.id})
-              </option>
-            ))}
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           {/* Time Range Selector */}
           <div className="flex rounded-lg bg-zinc-900 p-1 border border-zinc-800 text-xs">

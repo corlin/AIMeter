@@ -1,8 +1,10 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect, useCallback } from "react";
-import { fetchAPIKeys, createAPIKey, revokeAPIKey, updateAPIKeyStatus, fetchTenants } from "@/lib/api";
-import { APIKey, KeyCreateResult, Tenant } from "@/types";
+import { fetchAPIKeys, createAPIKey, revokeAPIKey, updateAPIKeyStatus } from "@/lib/api";
+import { APIKey, KeyCreateResult } from "@/types";
 import { 
   KeyRound, 
   ShieldCheck, 
@@ -23,8 +25,7 @@ import {
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState<APIKey[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -34,7 +35,7 @@ export default function ApiKeysPage() {
   const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
 
   // Create form state
-  const [formTenant, setFormTenant] = useState("org-enterprise-1");
+  const [formTenant, setFormTenant] = useState("default");
   const [formName, setFormName] = useState("");
   const [formScopes, setFormScopes] = useState<string[]>([
     "proxy:invoke", 
@@ -57,12 +58,8 @@ export default function ApiKeysPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [kData, tData] = await Promise.all([
-        fetchAPIKeys(selectedTenant),
-        fetchTenants(),
-      ]);
+      const kData = await fetchAPIKeys(selectedTenant);
       setKeys(kData);
-      setTenants(tData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -159,16 +156,7 @@ export default function ApiKeysPage() {
 
         {/* Filter & Action Buttons */}
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
-          >
-            <option value="all">所有租户 (All Tenants)</option>
-            {tenants.map(t => (
-              <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
-            ))}
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={() => loadData()}
@@ -407,16 +395,7 @@ export default function ApiKeysPage() {
             <form onSubmit={handleCreateSubmit} className="p-5 space-y-4 text-xs">
               <div>
                 <label className="block text-zinc-300 font-medium mb-1.5">生效租户 (Tenant ID)</label>
-                <select
-                  value={formTenant}
-                  onChange={(e) => setFormTenant(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono"
-                >
-                  {tenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
-                  ))}
-                  <option value="custom">其它租户...</option>
-                </select>
+                <TenantSelect value={formTenant} onChange={setFormTenant} allowAll={false} />
               </div>
 
               <div>

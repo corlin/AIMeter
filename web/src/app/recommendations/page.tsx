@@ -1,8 +1,10 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
-import { fetchRecommendations, fetchTenants } from "@/lib/api";
-import { CostRecommendation, Tenant } from "@/types";
+import { fetchRecommendations } from "@/lib/api";
+import { CostRecommendation } from "@/types";
 import { 
   Sparkles, 
   TrendingDown, 
@@ -18,19 +20,14 @@ import {
 
 export default function RecommendationsPage() {
   const [recommendations, setRecommendations] = useState<CostRecommendation[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [recsData, tenantData] = await Promise.all([
-        fetchRecommendations(selectedTenant),
-        fetchTenants(),
-      ]);
+      const recsData = await fetchRecommendations(selectedTenant);
       setRecommendations(recsData);
-      setTenants(tenantData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -96,18 +93,7 @@ export default function RecommendationsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-700 font-medium"
-          >
-            <option value="all">All Tenants / Orgs</option>
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.id})
-              </option>
-            ))}
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

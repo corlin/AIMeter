@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useEffect, useState, useCallback } from "react";
 import { 
@@ -31,7 +33,7 @@ import {
 } from "@/types";
 
 export default function MultimodalPage() {
-  const [selectedTenant, setSelectedTenant] = useState("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [loading, setLoading] = useState(true);
 
   // Stats & Tools
@@ -178,16 +180,7 @@ export default function MultimodalPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 transition-colors"
-          >
-            <option value="all">全租户 (All Tenants)</option>
-            <option value="default">默认租户 (default)</option>
-            <option value="tenant-prod">生产租户 (tenant-prod)</option>
-            <option value="tenant-dev">测试租户 (tenant-dev)</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

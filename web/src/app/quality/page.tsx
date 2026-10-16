@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import {
@@ -40,7 +42,7 @@ import {
 } from "@/types";
 
 export default function QualityPage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("default");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("default");
   const [activeTab, setActiveTab] = useState<"scoreboard" | "sandbox" | "traces" | "policy">("scoreboard");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -189,14 +191,7 @@ export default function QualityPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-emerald-500"
-          >
-            <option value="default">租户: default</option>
-            <option value="fintech-corp">租户: fintech-corp</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} allowAll={false} />
 
           <button
             onClick={loadData}

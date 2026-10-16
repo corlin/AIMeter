@@ -24,12 +24,6 @@ import {
 } from "@/types";
 import { apiFetch, apiGet, apiPost } from "./http";
 
-export const defaultTenants: Tenant[] = [
-  { id: "org-enterprise-1", name: "Enterprise Corp", default_currency: "USD", global_discount: 0.15 },
-  { id: "org-fintech-2", name: "Fintech Global", default_currency: "USD", global_discount: 0.0 },
-  { id: "default", name: "Default Organization", default_currency: "USD", global_discount: 0.0 },
-];
-
 export async function fetchOverviewStats(tenantId = "all", timeRange = "7d"): Promise<OverviewStats> {
   const data = await apiGet<Partial<OverviewStats>>(`/overview/stats?tenant_id=${encodeURIComponent(tenantId)}&range=${encodeURIComponent(timeRange)}`, {});
   return {
@@ -60,8 +54,9 @@ export async function fetchRates(): Promise<RateEntry[]> {
 }
 
 export async function fetchTenants(): Promise<Tenant[]> {
-  const data = await apiGet<Tenant[]>("/tenants", defaultTenants);
-  return Array.isArray(data) && data.length > 0 ? data : defaultTenants;
+  // No invented fallback: an empty list means no tenants are registered yet.
+  const data = await apiGet<Tenant[]>("/tenants", []);
+  return Array.isArray(data) ? data : [];
 }
 
 // Phase 2: Reconciliation with 15s timeout protection

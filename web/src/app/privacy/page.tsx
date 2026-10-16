@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import { 
@@ -42,7 +44,7 @@ import {
 } from "@/types";
 
 export default function PrivacyDLPPage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("default");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("default");
   const [activeTab, setActiveTab] = useState<"policy" | "logs" | "playground">("policy");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -201,14 +203,7 @@ export default function PrivacyDLPPage() {
 
         <div className="flex items-center gap-3">
           <label className="text-xs text-zinc-400 font-medium">租户隔离空间:</label>
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition-colors"
-          >
-            <option value="default">默认租户 (default)</option>
-            <option value="finance-enterprise-1">金融严格租户 (finance-enterprise-1)</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} allowAll={false} />
 
           <button
             onClick={loadData}

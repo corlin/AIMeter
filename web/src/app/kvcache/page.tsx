@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import {
@@ -45,7 +47,7 @@ import {
 } from "@/types";
 
 export default function KVCachePage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [activeTab, setActiveTab] = useState<"trie" | "playground" | "prewarm" | "traces" | "policy">("trie");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -273,15 +275,7 @@ export default function KVCachePage() {
 
         {/* Tenant selector & Actions */}
         <div className="flex items-center space-x-3">
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          >
-            <option value="all">所有租户 (All Tenants)</option>
-            <option value="default">默认租户 (default)</option>
-            <option value="fintech-corp">金融合规租户 (fintech-corp)</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           <button
             onClick={loadData}

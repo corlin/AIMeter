@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import {
@@ -44,7 +46,7 @@ import {
 } from "@/types";
 
 export default function MemoryPage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("all");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("all");
   const [activeTab, setActiveTab] = useState<"kanban" | "audit" | "policy" | "playground">("kanban");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -194,15 +196,7 @@ export default function MemoryPage() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5">
             <span className="text-xs text-zinc-400 font-medium">租户:</span>
-            <select
-              value={selectedTenant}
-              onChange={(e) => setSelectedTenant(e.target.value)}
-              className="bg-transparent text-xs text-zinc-200 focus:outline-none cursor-pointer"
-            >
-              <option value="all">全量租户 (All)</option>
-              <option value="default">default (默认租户)</option>
-              <option value="fintech-corp">fintech-corp (金融云)</option>
-            </select>
+            <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
           </div>
 
           <button

@@ -1,4 +1,6 @@
 "use client";
+import { TenantSelect } from "@/components/TenantSelect";
+import { useTenantFilter } from "@/lib/filters";
 
 import { useState, useEffect } from "react";
 import {
@@ -46,7 +48,7 @@ import {
 } from "@/types";
 
 export default function SwarmPage() {
-  const [selectedTenant, setSelectedTenant] = useState<string>("default");
+  const [selectedTenant, setSelectedTenant] = useTenantFilter("default");
   const [activeTab, setActiveTab] = useState<"topology" | "timeline" | "policy" | "playground">("topology");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -404,15 +406,7 @@ export default function SwarmPage() {
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           {/* Tenant Selector */}
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-200 outline-none hover:border-zinc-700 focus:border-indigo-500"
-          >
-            <option value="default">默认租户 (default)</option>
-            <option value="fintech-corp">金融严管租户 (fintech-corp)</option>
-            <option value="all">全量租户 (All Tenants)</option>
-          </select>
+          <TenantSelect value={selectedTenant} onChange={setSelectedTenant} />
 
           {/* Refresh button */}
           <button
