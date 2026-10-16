@@ -10,28 +10,34 @@ import (
 const (
 	ContextKeyTenantID = "tenant_id"
 	ContextKeyAPIKey   = "api_key"
+	// ContextKeyAuthFromAuthorization is true when the AIMeter key was read from
+	// the Authorization header. The proxy must then not forward that header
+	// upstream, or the AIMeter key would be sent to the model provider.
+	ContextKeyAuthFromAuthorization = "auth_from_authorization"
 )
 
-// ExtractRawKey extracts the API key from Authorization header or X-API-Key.
-func ExtractRawKey(c *gin.Context) string {
+// ExtractRawKey returns the AIMeter API key and whether it came from the
+// Authorization header. Dedicated headers win, so proxy clients can keep their
+// provider key in Authorization and pass the AIMeter key in X-AIMeter-API-Key.
+func ExtractRawKey(c *gin.Context) (key string, fromAuthorization bool) {
+	for _, h := range []string{"X-AIMeter-API-Key", "X-API-Key"} {
+		if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
+			return v, false
+		}
+	}
+
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-			return strings.TrimSpace(parts[1])
+			return strings.TrimSpace(parts[1]), true
 		}
 		// If someone passed the raw key directly in Authorization
 		if len(parts) == 1 && strings.HasPrefix(parts[0], "sk-") {
-			return strings.TrimSpace(parts[0])
+			return strings.TrimSpace(parts[0]), true
 		}
 	}
-
-	apiKeyHeader := c.GetHeader("X-API-Key")
-	if apiKeyHeader != "" {
-		return strings.TrimSpace(apiKeyHeader)
-	}
-
-	return ""
+	return "", false
 }
 
 // RequireScopeMiddleware returns a Gin middleware that validates the API Key and scope.
@@ -95,7 +101,7 @@ func authenticate(c *gin.Context, svc *AuthService, requiredScope string, enable
 		return true
 	}
 
-	rawKey := ExtractRawKey(c)
+	rawKey, fromAuthorization := ExtractRawKey(c)
 
 	// 1. If no key is provided
 	if rawKey == "" {
@@ -149,6 +155,7 @@ func authenticate(c *gin.Context, svc *AuthService, requiredScope string, enable
 	// 3. Inject validated identity into Gin Context
 	c.Set(ContextKeyTenantID, apiKey.TenantID)
 	c.Set(ContextKeyAPIKey, apiKey)
+	c.Set(ContextKeyAuthFromAuthorization, fromAuthorization)
 	return true
 }
 

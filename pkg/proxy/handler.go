@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/corlin/AIMeter/pkg/auth"
 	"github.com/corlin/AIMeter/pkg/collector"
 	"github.com/corlin/AIMeter/pkg/compress"
 	"github.com/corlin/AIMeter/pkg/domain"
@@ -142,7 +143,19 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, provider string) {
 		return
 	}
 
+	// A caller-chosen upstream URL lets the server POST (with forwarded
+	// credentials) to arbitrary hosts, so only admin keys or auth-disabled
+	// local setups may use it.
 	customTargetHeader := c.GetHeader("X-AIMeter-Target-URL")
+	if customTargetHeader != "" && auth.PinnedTenant(c) != "" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": gin.H{
+				"message": "X-AIMeter-Target-URL requires an admin API key",
+				"type":    "permission_error",
+			},
+		})
+		return
+	}
 	resp, cancelUpstream, roundtripDuration, err := h.dispatchUpstream(c, inCtx, customTargetHeader)
 	if err != nil {
 		return
@@ -192,8 +205,9 @@ func (h *ProxyHandler) dispatchUpstream(c *gin.Context, inCtx *InboundContext, c
 			return nil, nil, 0, reqErr
 		}
 
-		if auth := c.GetHeader("Authorization"); auth != "" {
-			outReq.Header.Set("Authorization", auth)
+		// Forward the client's provider credential, but never the AIMeter key.
+		if authz := c.GetHeader("Authorization"); authz != "" && !c.GetBool(auth.ContextKeyAuthFromAuthorization) {
+			outReq.Header.Set("Authorization", authz)
 		}
 		outReq.Header.Set("Content-Type", "application/json")
 		if accept := c.GetHeader("Accept"); accept != "" {
