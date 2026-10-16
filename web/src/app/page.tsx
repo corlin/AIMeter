@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchOverviewStats, fetchTraces, fetchTenants } from "@/lib/api";
 import { OverviewStats, TraceDetail, Tenant } from "@/types";
 import { StatCard } from "@/components/StatCard";
+import { AttentionPanel } from "@/components/AttentionPanel";
 import Link from "next/link";
 import { 
   DollarSign, 
@@ -138,6 +139,9 @@ export default function OverviewPage() {
           icon={<Zap className="h-4 w-4 text-purple-400" />}
         />
       </div>
+
+      {/* What needs action now; first-run installs get the onboarding CTA instead */}
+      {safeTraces.length > 0 && <AttentionPanel tenantId={selectedTenant} />}
 
       {/* First-run guidance when no telemetry has arrived yet */}
       {safeTraces.length === 0 && (
