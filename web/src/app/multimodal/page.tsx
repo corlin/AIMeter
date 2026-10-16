@@ -169,9 +169,6 @@ export default function MultimodalPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                 多模态与 Tool 工具调用细粒度计费账本
-                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono border border-purple-500/30">
-                  Phase 16 Dual-Track
-                </span>
               </h1>
               <p className="text-sm text-zinc-400 mt-0.5">
                 实时自适应嗅探视觉图像瓦片 (Vision 512px Tiles)、音频物理时长与 Token、以及 Agent 外部工具执行费率

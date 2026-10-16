@@ -179,9 +179,6 @@ export default function ReasoningPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight text-white">Chain-of-Thought Reasoning Audit</h1>
-                <span className="text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  Phase 24 Engine
-                </span>
               </div>
               <p className="text-sm text-zinc-400 mt-0.5">
                 AI 推理思维链深度审计、认知震荡 (COI) 量化与思考预算自适应剪枝早停引擎

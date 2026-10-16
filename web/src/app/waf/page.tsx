@@ -221,8 +221,6 @@ export default function WAFPage() {
       {/* 1. Header Section */}
       <PageHeader
         title="AI WAF 提示词防火墙与拒绝钱包防御中心"
-        badge="Phase 32 LLM WAF"
-        badgeColor="rose"
         description="微秒级入站嗅探 · 拦截越狱与提示词注入 · 熔断拒绝钱包 (Denial-of-Wallet) 恶意算力盗刷 · 动态自适应封禁"
         actions={
           <div className="flex items-center gap-2.5">

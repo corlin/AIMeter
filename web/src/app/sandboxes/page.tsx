@@ -157,9 +157,6 @@ export default function SandboxesPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                 Agent 运行时沙箱与工具清算引擎
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Phase 28
-                </span>
               </h1>
               <p className="text-sm text-zinc-400 mt-0.5">
                 瞬态微轻量虚拟机算力折算 · 60s 硬超时截断 · 外部工具微事务字典 · LLM+算力+工具三合一全口径账本

@@ -263,9 +263,6 @@ export default function KVCachePage() {
                 <h1 className="text-2xl font-bold tracking-tight text-white">
                   KV-Cache 前缀共享与预热调度引擎
                 </h1>
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                  Phase 25 Active
-                </span>
               </div>
               <p className="text-sm text-zinc-400 mt-1">
                 Radix 前缀树拓扑 · 动态变量沉底重排 · 1-Token 探针主动预热 · 输入成本直降 50%~90%

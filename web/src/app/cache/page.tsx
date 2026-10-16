@@ -160,9 +160,6 @@ export default function SemanticCachePage() {
               <Zap className="h-6 w-6 text-emerald-400" />
               语义级响应缓存与零成本规避引擎
             </h1>
-            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Phase 15 Engine
-            </span>
           </div>
           <p className="mt-1 text-sm text-zinc-400">
             双层混合极速匹配（Exact SHA-256 + 64-bit SimHash 局部敏感相似度），高相似请求直接 0 成本毫秒级命中，阻断上游云厂商推理扣费。

@@ -399,9 +399,6 @@ export default function HierarchyPage() {
               <h1 className="text-xl font-bold text-white tracking-tight">
                 企业组织架构预算树与软硬双轨配额管控
               </h1>
-              <p className="text-xs text-zinc-400">
-                Phase 29: Hierarchical Team Budget Cascading, Materialized Path & Dual-Quota Engine
-              </p>
             </div>
           </div>
         </div>

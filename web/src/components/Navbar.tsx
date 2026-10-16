@@ -43,7 +43,6 @@ import {
 
 interface NavGroup {
   name: string;
-  badge?: string;
   items: {
     label: string;
     href: string;
@@ -55,7 +54,6 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     name: "FinOps & 账本",
-    badge: "9",
     items: [
       { label: "Traces 单元经济学", href: "/traces", desc: "调用链路级联归因与单次开销下钻", icon: Network },
       { label: "费率目录知识库", href: "/rates", desc: "39+ 主流模型价格表与私有 GPU 单价", icon: Layers },
@@ -69,7 +67,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     name: "网关与安全",
-    badge: "6",
     items: [
       { label: "AI WAF 提示词防火墙", href: "/waf", desc: "越狱注入检测与拒绝钱包盗刷熔断", icon: ShieldAlert },
       { label: "三态熔断防护中心", href: "/circuit-breaker", desc: "超支冷却隔离与自动降级平替", icon: ZapOff },
@@ -81,7 +78,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     name: "性能与算力",
-    badge: "4",
     items: [
       { label: "语义响应缓存", href: "/cache", desc: "SimHash 语义相似度匹配与零成本规避", icon: Zap },
       { label: "Prompt 压缩瘦身", href: "/compress", desc: "代码安全结构脱水与低熵客套剪枝", icon: Scissors },
@@ -91,7 +87,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     name: "智能体与推理",
-    badge: "6",
     items: [
       { label: "多智能体协作拓扑", href: "/swarm", desc: "有向有权调用图谱与死循环环路检测", icon: Share2 },
       { label: "CoT 思维链深度审计", href: "/reasoning", desc: "思考状态机与反思震荡冗余剪枝", icon: Cpu },
@@ -103,7 +98,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     name: "企业与资产",
-    badge: "7",
     items: [
       { label: "数据飞轮与 RLHF 对齐", href: "/flywheel", desc: "合成拒绝采样效价评估与 DPO/PPO 算力", icon: RotateCw },
       { label: "模型微调与 LoRA 资产", href: "/finetuning", desc: "蒸馏算力计量与盈亏平衡动态追踪", icon: Boxes },
@@ -198,11 +192,9 @@ export function Navbar() {
                   }`}
                 >
                   <span className={groupActive ? "text-emerald-400 font-semibold" : ""}>{group.name}</span>
-                  {group.badge && (
-                    <span className="text-[10px] px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400 font-mono">
-                      {group.badge}
-                    </span>
-                  )}
+                  <span className="text-[10px] px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400 font-mono">
+                    {group.items.length}
+                  </span>
                   <ChevronDown className={`h-3 w-3 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                 </button>
 

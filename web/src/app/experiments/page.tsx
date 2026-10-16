@@ -253,9 +253,6 @@ export default function ExperimentsPage() {
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               Prompt A/B Testing & Unit Economics ROI Engine
-              <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Phase 20
-              </span>
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">

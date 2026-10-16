@@ -215,8 +215,6 @@ export default function HeteroPage() {
       <div className="max-w-7xl mx-auto mb-8">
         <PageHeader
           title="异构私有 GPU 算力集群与显存虚拟化控制面"
-          badge="Phase 33"
-          badgeColor="cyan"
           description="混合推理调度 · KV-Cache 显存切片 · 预填充/解码分离 (PD Disaggregation) · 85% 水线弹性云溢出 (Cloud Bursting)"
           actions={
             <div className="flex items-center gap-3">

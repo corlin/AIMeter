@@ -178,9 +178,6 @@ export default function PromptCompressionPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-white">语义级智能 Prompt 压缩与 Token 瘦身 (Semantic Prompt Compression)</h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">
-                  Phase 13 Active
-                </span>
               </div>
               <p className="text-xs text-zinc-400 mt-1 max-w-3xl leading-relaxed">
                 反向代理网关在请求转发上游前，自动执行结构脱水与信息熵自适应剪枝。在零损失大模型理解力与代码格式的前提下，平均直接削减 <strong>20%~40% Prompt Tokens</strong>，从源头扼杀资金浪费。

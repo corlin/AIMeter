@@ -221,9 +221,6 @@ export default function WorkflowsPage() {
                 <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
                   长程 Agent 异步工作流 DAG 编排计费与检查点控制中心
                 </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                  Phase 27 Active
-                </span>
               </div>
               <p className="text-sm text-zinc-400 mt-1">
                 毫秒级增量差分快照固化 · 拓扑断点续算免跑 · 四维全景账本 · 沉没成本止损熔断保护

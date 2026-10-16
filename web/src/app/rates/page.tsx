@@ -217,9 +217,6 @@ export default function RateCatalogPage() {
         >
           <Cpu className="h-4 w-4" />
           <span>Self-Hosted GPU & Hardware Catalog</span>
-          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 ml-1">
-            Phase 11
-          </span>
         </button>
       </div>
 

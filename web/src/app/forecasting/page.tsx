@@ -293,9 +293,6 @@ export default function ForecastingPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight text-white">预算时序预测与自动自愈降本引擎</h1>
-                <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Phase 18
-                </span>
               </div>
               <p className="text-sm text-zinc-400 mt-0.5">
                 EWMA + OLS 亚毫秒级时序外推预测，四级渐进闭环（无损瘦身 ➔ SLA 平替 ➔ 突发微排队 ➔ 硬限熔断）

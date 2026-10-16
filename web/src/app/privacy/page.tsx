@@ -191,9 +191,6 @@ export default function PrivacyDLPPage() {
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 AI 数据隐私合规审计与机密防泄漏引擎
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                  Phase 21
-                </span>
               </h1>
               <p className="text-xs text-zinc-400 mt-0.5">
                 高性能两阶段敏感实体嗅探、双向可逆假名脱敏、Luhn 校验与网关出入站机密防泄漏 (DLP)

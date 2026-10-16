@@ -180,9 +180,6 @@ export default function QualityPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
                 质量漂移检测、幻觉惩罚经济学与鲁棒性防御引擎
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                  Phase 26
-                </span>
               </h1>
               <p className="text-sm text-zinc-400 mt-0.5">
                 实时锚定大模型输出语法有效度与事实置信度，量化幻觉损失并对齐供应商 SLA 违约扣减，支持网关毫秒级自愈与坏账冲销

@@ -264,9 +264,6 @@ export default function FederationPage() {
               <h1 className="text-xl font-bold text-white tracking-tight">
                 多智能体跨工作区联合协作与代币清算所
               </h1>
-              <p className="text-xs text-zinc-400">
-                Phase 30: Federation Clearinghouse, Cryptographic Escrow Vouchers, 2PC Settlement & Cross-Org Auction
-              </p>
             </div>
           </div>
         </div>

@@ -142,12 +142,16 @@ export default function AnomaliesPage() {
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 backdrop-blur-sm">
-          <span className="text-xs text-zinc-400 font-medium uppercase tracking-wider block">Guard Engine Status</span>
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-sm font-semibold text-emerald-400">Online & Protecting</span>
+          <span className="text-xs text-zinc-400 font-medium uppercase tracking-wider block">Last Detection</span>
+          {/* Derived from the loaded events; engine health is shown in the header status. */}
+          <div className="mt-2 text-sm font-semibold text-zinc-200">
+            {anomalies.length > 0
+              ? new Date(Math.max(...anomalies.map((a) => new Date(a.triggered_at).getTime()))).toLocaleString()
+              : "—"}
           </div>
-          <span className="text-[11px] text-zinc-500 mt-1 block">Sliding window active</span>
+          <span className="text-[11px] text-zinc-500 mt-1 block">
+            {anomalies.length > 0 ? "Most recent anomaly in this view" : "No anomalies recorded yet"}
+          </span>
         </div>
       </div>
 

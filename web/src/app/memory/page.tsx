@@ -182,9 +182,6 @@ export default function MemoryPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight text-white">Agent Memory Lifecycle</h1>
-                <span className="text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Phase 23 Engine
-                </span>
               </div>
               <p className="text-sm text-zinc-400 mt-0.5">
                 智能体长程上下文向量分层压缩、动态半衰期衰减与记忆利用率 (Utility & ROI) 归因引擎

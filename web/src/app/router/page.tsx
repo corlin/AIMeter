@@ -112,9 +112,6 @@ export default function RouterPage() {
             <h1 className="text-xl font-bold text-white tracking-tight">
               Smart Router & SLA Arbiter
             </h1>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Phase 14
-            </span>
           </div>
           <p className="mt-1 text-xs text-zinc-400 max-w-3xl">
             多模型跨供应商自动仲裁与 SLA 调度引擎。基于实时 EWMA 时延测速与费率目录，动态实现成本最优 (Cost-First)、P99 极速 (Latency-First)、性价比平衡 (Balanced) 与自动容灾转移 (Auto Failover)。

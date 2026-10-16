@@ -172,9 +172,6 @@ export default function ThrottlingPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                 Distributed Rate Limiting & Token-Bucket Cost Throttler
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                  Phase 17 Live
-                </span>
               </h1>
               <p className="text-sm text-zinc-400 mt-1">
                 多级分布式速率限制与令牌桶成本配额防护引擎：三维双轨限流 (RPM + TPM + CPM 成本速率)、微排队平滑塑形与突发缓冲。

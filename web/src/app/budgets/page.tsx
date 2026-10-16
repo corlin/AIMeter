@@ -353,9 +353,6 @@ export default function BudgetsPage() {
         >
           <Zap className="h-4 w-4 text-amber-400" />
           <span>流式断流与单次硬限额 (Streaming Hard-Capping)</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono">
-            Phase 12
-          </span>
         </button>
       </div>
 

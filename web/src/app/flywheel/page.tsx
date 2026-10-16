@@ -215,9 +215,6 @@ export default function FlywheelPage() {
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                   合成数据飞轮与 RLHF / DPO 强化学习对齐成本引擎
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-                    Phase 34
-                  </span>
                 </h1>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   Synthetic Data Flywheel, Quality-to-Cost Valuation & Alignment CapEx Engine

@@ -202,9 +202,6 @@ export default function ClusteringPage() {
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               Multi-Region Edge Coordination & Quota Sync
-              <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Phase 19
-              </span>
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">

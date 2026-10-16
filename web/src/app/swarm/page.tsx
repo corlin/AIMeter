@@ -394,9 +394,6 @@ export default function SwarmPage() {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                 多智能体协作拓扑图谱与死循环审计
-                <span className="rounded-full bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 text-xs font-mono font-medium text-indigo-400">
-                  Phase 22
-                </span>
               </h1>
               <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
                 Multi-Agent Swarm Topology, Cost Attribution & Loop Graph Audit Engine
