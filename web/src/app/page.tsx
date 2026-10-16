@@ -139,22 +139,27 @@ export default function OverviewPage() {
         />
       </div>
 
-      {/* Quick Simulation Banner if Empty */}
+      {/* First-run guidance when no telemetry has arrived yet */}
       {safeTraces.length === 0 && (
         <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 p-8 text-center space-y-4">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Terminal className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-white">No Telemetry Events Recorded Yet</h3>
+            <h3 className="text-base font-semibold text-white">还没有收到任何用量数据</h3>
             <p className="text-xs text-zinc-400 max-w-md mx-auto mt-1">
-              Start the AI Meter ingestion server and run the built-in multi-agent workflow simulator to generate realistic traces.
+              通过 REST、OpenTelemetry、反向代理或网关回调接入，几分钟内即可看到第一笔真实成本。
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-950 font-mono text-xs text-zinc-300 border border-zinc-800">
-            <span className="text-emerald-400">$</span>
-            <span>go run ./cmd/simulator --count 5</span>
-          </div>
+          <Link
+            href="/onboarding"
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+          >
+            开始接入
+          </Link>
+          <p className="text-[11px] text-zinc-500">
+            本地演示：后端以 <code className="text-zinc-400">--seed-demo</code> 启动，或运行 <code className="text-zinc-400">go run ./cmd/simulator</code>
+          </p>
         </div>
       )}
 
@@ -293,7 +298,7 @@ export default function OverviewPage() {
               ) : (
                 <tr>
                   <td colSpan={6} className="py-6 text-center text-zinc-500 font-sans">
-                    No traces recorded yet. Run the simulator to populate data.
+                    暂无 Trace。<Link href="/onboarding" className="ml-1 text-emerald-400 hover:underline">开始接入 →</Link>
                   </td>
                 </tr>
               )}
