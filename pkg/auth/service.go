@@ -254,14 +254,14 @@ func (s *AuthService) SetKeyStatus(id string, status string) error {
 	return nil
 }
 
-// ListKeys returns all keys matching the tenantID (or all keys if tenantID is empty).
+// ListKeys lists keys for a tenant; "" or "all" lists every tenant's keys.
 func (s *AuthService) ListKeys(tenantID string) []*APIKey {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	results := make([]*APIKey, 0)
 	for _, k := range s.keysByID {
-		if tenantID == "" || k.TenantID == tenantID {
+		if tenantID == "" || tenantID == "all" || k.TenantID == tenantID {
 			results = append(results, k)
 		}
 	}

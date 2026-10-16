@@ -191,3 +191,18 @@ func TestAuthService_ConcurrentSafe(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestListKeys_AllIsWildcard(t *testing.T) {
+	svc := NewAuthService()
+	for _, tenant := range []string{"t1", "t2"} {
+		if _, err := svc.GenerateKey(CreateKeyRequest{TenantID: tenant}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(svc.ListKeys("all")); n != 2 {
+		t.Errorf(`ListKeys("all") = %d keys, want 2`, n)
+	}
+	if n := len(svc.ListKeys("t1")); n != 1 {
+		t.Errorf(`ListKeys("t1") = %d keys, want 1`, n)
+	}
+}
