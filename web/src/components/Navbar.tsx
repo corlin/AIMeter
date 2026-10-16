@@ -37,6 +37,8 @@ import {
   Server,
   RotateCw,
   ChevronDown,
+  Plug,
+  type LucideIcon,
   Menu,
   X
 } from "lucide-react";
@@ -47,67 +49,64 @@ interface NavGroup {
     label: string;
     href: string;
     desc: string;
-    icon: any;
+    icon: LucideIcon;
   }[];
 }
 
+// Grouped by what the operator is trying to do; specialised modules live
+// under "更多能力" so the core cost workflow stays prominent.
 const NAV_GROUPS: NavGroup[] = [
   {
-    name: "FinOps & 账本",
+    name: "成本",
     items: [
-      { label: "Traces 单元经济学", href: "/traces", desc: "调用链路级联归因与单次开销下钻", icon: Network },
-      { label: "费率目录知识库", href: "/rates", desc: "39+ 主流模型价格表与私有 GPU 单价", icon: Layers },
-      { label: "预算控制与告警", href: "/budgets", desc: "月度预算限额与多渠道 Webhook 告警", icon: BellRing },
-      { label: "时序预测与自愈", href: "/forecasting", desc: "未来 30 天预测与 L0-L3 阶梯自愈降本", icon: TrendingUp },
-      { label: "发票对账与方差", href: "/reconcile", desc: "PDF/CSV 账单智能对账与 5 维方差拆解", icon: FileCheck2 },
-      { label: "FOCUS 标准导出", href: "/focus", desc: "FinOps 1.0/1.1 标准规约 CSV 导出", icon: PieChart },
-      { label: "成本优化建议顾问", href: "/recommendations", desc: "Prompt 缓存与模型降配等优化策略", icon: Sparkles },
-      { label: "实时异常雷达", href: "/anomalies", desc: "失控死循环与异常突增实时嗅探拦截", icon: ShieldAlert },
-    ]
+      { label: "调用明细", href: "/traces", desc: "按调用链查看每次请求的成本与归属", icon: Network },
+      { label: "预算与告警", href: "/budgets", desc: "月度预算、超支预警与通知渠道", icon: BellRing },
+      { label: "支出预测", href: "/forecasting", desc: "预测月底支出，超支前自动降本", icon: TrendingUp },
+      { label: "账单对账", href: "/reconcile", desc: "上传厂商账单，与实际用量逐项核对", icon: FileCheck2 },
+      { label: "优化建议", href: "/recommendations", desc: "缓存、模型降配等可执行的省钱建议", icon: Sparkles },
+      { label: "异常检测", href: "/anomalies", desc: "死循环与突发支出的实时告警", icon: ShieldAlert },
+      { label: "FOCUS 导出", href: "/focus", desc: "导出 FinOps 标准格式的成本数据", icon: PieChart },
+      { label: "价格目录", href: "/rates", desc: "模型与 GPU 单价，支持自定义", icon: Layers },
+    ],
   },
   {
-    name: "网关与安全",
+    name: "治理",
     items: [
-      { label: "AI WAF 提示词防火墙", href: "/waf", desc: "越狱注入检测与拒绝钱包盗刷熔断", icon: ShieldAlert },
-      { label: "三态熔断防护中心", href: "/circuit-breaker", desc: "超支冷却隔离与自动降级平替", icon: ZapOff },
-      { label: "分布式速率限制", href: "/throttling", desc: "RPM/TPM/CPM 令牌桶限流与微排队", icon: Gauge },
-      { label: "智能路由与 SLA 仲裁", href: "/router", desc: "多供应商 Pareto 最优调度与故障转移", icon: Shuffle },
-      { label: "API 凭证安全中心", href: "/api-keys", desc: "细粒度 Scopes 鉴权与 SHA-256 脱敏", icon: KeyRound },
-      { label: "多模态与工具计费", href: "/multimodal", desc: "语音/图像物理折算与外部 Tool 执行费率", icon: Wrench },
-    ]
+      { label: "API 凭证", href: "/api-keys", desc: "签发、吊销 Key 并控制权限范围", icon: KeyRound },
+      { label: "提示词防火墙", href: "/waf", desc: "拦截越狱、注入与刷量攻击", icon: ShieldAlert },
+      { label: "隐私脱敏", href: "/privacy", desc: "自动识别并脱敏请求中的敏感信息", icon: ShieldCheck },
+      { label: "熔断保护", href: "/circuit-breaker", desc: "超支或失控时自动切断与降级", icon: ZapOff },
+      { label: "速率限制", href: "/throttling", desc: "按请求数、Token 数与金额限流", icon: Gauge },
+      { label: "智能路由", href: "/router", desc: "按成本与 SLA 在多个厂商间调度", icon: Shuffle },
+    ],
   },
   {
-    name: "性能与算力",
+    name: "优化",
     items: [
-      { label: "语义响应缓存", href: "/cache", desc: "SimHash 语义相似度匹配与零成本规避", icon: Zap },
-      { label: "Prompt 压缩瘦身", href: "/compress", desc: "代码安全结构脱水与低熵客套剪枝", icon: Scissors },
-      { label: "前缀 KV-Cache 编排", href: "/kvcache", desc: "Radix 树前缀匹配与动态变量沉底规范化", icon: Database },
-      { label: "异构 GPU 集群算力", href: "/hetero", desc: "私有显存虚拟化与预填充/解码分离调度", icon: Server },
-    ]
+      { label: "语义缓存", href: "/cache", desc: "相似请求直接复用结果，不再付费", icon: Zap },
+      { label: "Prompt 压缩", href: "/compress", desc: "去除冗余内容，减少输入 Token", icon: Scissors },
+      { label: "前缀缓存", href: "/kvcache", desc: "复用共享前缀，降低长上下文成本", icon: Database },
+      { label: "多模态计费", href: "/multimodal", desc: "语音、图像与工具调用的计量", icon: Wrench },
+      { label: "A/B 实验", href: "/experiments", desc: "对比不同 Prompt 与模型的成本和效果", icon: FlaskConical },
+    ],
   },
   {
-    name: "智能体与推理",
+    name: "更多能力",
     items: [
-      { label: "多智能体协作拓扑", href: "/swarm", desc: "有向有权调用图谱与死循环环路检测", icon: Share2 },
-      { label: "CoT 思维链深度审计", href: "/reasoning", desc: "思考状态机与反思震荡冗余剪枝", icon: Cpu },
-      { label: "Agent 记忆生命周期", href: "/memory", desc: "Hot/Warm/Cold 三层温区与低效噪声淘汰", icon: BrainCircuit },
-      { label: "沙箱代码解释器", href: "/sandboxes", desc: "微轻量虚拟机算力与外部工具微事务清算", icon: Terminal },
-      { label: "长程 DAG 工作流", href: "/workflows", desc: "差分检查点持久化与幂等断点续算", icon: GitFork },
-      { label: "输出质量与语法自愈", href: "/quality", desc: "JSON 截断自动补齐与幻觉惩罚坏账冲销", icon: BadgeCheck },
-    ]
+      { label: "多智能体拓扑", href: "/swarm", desc: "智能体调用关系与死循环检测", icon: Share2 },
+      { label: "推理链审计", href: "/reasoning", desc: "思考 Token 用量与冗余分析", icon: Cpu },
+      { label: "智能体记忆", href: "/memory", desc: "记忆分层存储与清理", icon: BrainCircuit },
+      { label: "代码沙箱计费", href: "/sandboxes", desc: "代码执行与外部工具的费用", icon: Terminal },
+      { label: "长流程工作流", href: "/workflows", desc: "多步骤工作流的计费与断点续跑", icon: GitFork },
+      { label: "输出质量", href: "/quality", desc: "格式修复与幻觉检测", icon: BadgeCheck },
+      { label: "数据飞轮", href: "/flywheel", desc: "合成数据与对齐训练的成本", icon: RotateCw },
+      { label: "微调与 LoRA", href: "/finetuning", desc: "微调算力与模型资产回报", icon: Boxes },
+      { label: "部门预算树", href: "/hierarchy", desc: "按组织架构逐级分配预算", icon: Building2 },
+      { label: "跨组织结算", href: "/federation", desc: "跨工作区任务协作与费用结算", icon: Coins },
+      { label: "多集群协同", href: "/clustering", desc: "跨地域集群的配额与容灾", icon: Globe },
+      { label: "私有 GPU 集群", href: "/hetero", desc: "自建 GPU 的调度与成本", icon: Server },
+    ],
   },
-  {
-    name: "企业与资产",
-    items: [
-      { label: "数据飞轮与 RLHF 对齐", href: "/flywheel", desc: "合成拒绝采样效价评估与 DPO/PPO 算力", icon: RotateCw },
-      { label: "模型微调与 LoRA 资产", href: "/finetuning", desc: "蒸馏算力计量与盈亏平衡动态追踪", icon: Boxes },
-      { label: "组织架构预算树", href: "/hierarchy", desc: "物化路径树与部门级联软硬双轨配额", icon: Building2 },
-      { label: "跨域代币清算所", href: "/federation", desc: "工作区 2PC 托管决算与竞标撮合机制", icon: Coins },
-      { label: "数据隐私合规 DLP", href: "/privacy", desc: "敏感信息假名化双向无感脱敏与还原", icon: ShieldCheck },
-      { label: "Prompt A/B 灰度实验", href: "/experiments", desc: "一致性哈希分流与帕累托 ROI 评估", icon: FlaskConical },
-      { label: "多集群跨地域协同", href: "/clustering", desc: "边缘配额租约切片与分区自治容灾", icon: Globe },
-    ]
-  }
 ];
 
 export function Navbar() {
@@ -127,11 +126,13 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Close on route change
-  useEffect(() => {
+  // Close menus on navigation (adjust state during render on prop change).
+  const [lastPath, setLastPath] = useState(pathname);
+  if (pathname !== lastPath) {
+    setLastPath(pathname);
     setActiveDropdown(null);
     setMobileMenuOpen(false);
-  }, [pathname]);
+  }
 
   const isGroupActive = (group: NavGroup) => {
     return group.items.some(item => pathname === item.href);
@@ -172,10 +173,20 @@ export function Navbar() {
             }`}
           >
             <Activity className={`h-3.5 w-3.5 ${pathname === "/" ? "text-emerald-400" : "text-zinc-500"}`} />
-            <span>总览 (Overview)</span>
+            <span>总览</span>
+          </Link>
+          <Link
+            href="/onboarding"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              pathname === "/onboarding"
+                ? "bg-zinc-800 text-white shadow-sm border border-zinc-700/60"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+            }`}
+          >
+            <Plug className={`h-3.5 w-3.5 ${pathname === "/onboarding" ? "text-emerald-400" : "text-zinc-500"}`} />
+            <span>接入</span>
           </Link>
 
-          {/* 5 Core Hubs */}
           {NAV_GROUPS.map((group) => {
             const groupActive = isGroupActive(group);
             const isOpen = activeDropdown === group.name;
@@ -202,8 +213,8 @@ export function Navbar() {
                 {isOpen && (
                   <div className="absolute left-0 mt-2 w-80 rounded-xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-xl p-2 shadow-2xl shadow-black/80 animate-in fade-in slide-in-from-top-2 duration-150 z-50">
                     <div className="px-2 py-1.5 border-b border-zinc-800/60 mb-1 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{group.name} 功能矩阵</span>
-                      <span className="text-[10px] text-zinc-500">{group.items.length} 个功能模块</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{group.name}</span>
+                      <span className="text-[10px] text-zinc-500">{group.items.length} 项</span>
                     </div>
                     <div className="grid gap-1 max-h-[380px] overflow-y-auto pr-1">
                       {group.items.map((item) => {
@@ -248,6 +259,8 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "关闭菜单" : "打开菜单"}
+            aria-expanded={mobileMenuOpen}
             className="lg:hidden p-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -266,7 +279,16 @@ export function Navbar() {
               }`}
             >
               <Activity className="h-4 w-4 text-emerald-400" />
-              <span>总览 (Overview)</span>
+              <span>总览</span>
+            </Link>
+            <Link
+              href="/onboarding"
+              className={`flex items-center gap-2 p-2 rounded-lg text-sm font-medium ${
+                pathname === "/onboarding" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900"
+              }`}
+            >
+              <Plug className="h-4 w-4 text-emerald-400" />
+              <span>接入</span>
             </Link>
           </div>
           {NAV_GROUPS.map((group) => (
